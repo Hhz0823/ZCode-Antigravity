@@ -7,11 +7,6 @@
 **适用系统：** Windows 10 / 11 x64  
 **项目状态：** 测试版
 
-> [!WARNING]
-> 这是调用未公开 Google Antigravity / Code Assist 接口的第三方测试项目，
-> 不是 Google、Gemini 或 ZCode 官方组件。第三方代理可能导致 API 访问、
-> Code Assist 权限或 Google 账号受限。请只使用专门的测试账号，不要使用
-> 主 Gmail、Workspace 管理员或重要 Google Cloud 所有者账号。
 
 ## 功能特性
 
@@ -57,25 +52,6 @@
 > [!NOTE]
 > 安装包未使用商业代码签名，Windows SmartScreen 可能显示“未知发布者”。
 > 只有在 SHA-256 完全一致时才应继续运行。
-
-## SHA-256 校验
-
-在 PowerShell 中执行：
-
-```powershell
-Get-FileHash .\ZCode-Antigravity-Setup-v0.2.6-test.exe -Algorithm SHA256
-```
-
-发布文件的已验证哈希：
-
-```text
-F7DCFB01D2D7364CEC5E7634B643358B779A09DF2F70447BA73F355B9D2B7BB7  ZCode-Antigravity-Setup-v0.2.6-test.exe
-72EA8B6714CDD0436D55FEA97CE972FFDA9664194A790913639A2FA325FD3C20  ZCode-Antigravity-OneClick-v0.2.6-test.bat
-4CD1767720FA2DDDC80F810205DEE54DA17D93F35DE08BD96C8CC53BCDD330DF  ZCode-Antigravity-Windows-x64-0.2.6-test.zip
-7E150E2E2503B549B41AF0FEAF30B9C43998135927A77AE7191E55A0BEAD6265  ZCode-Antigravity-Source-v0.2.6-test.zip
-```
-
-完整清单见 [`SHA256SUMS.txt`](SHA256SUMS.txt)。
 
 ## 本地端口与代理
 
