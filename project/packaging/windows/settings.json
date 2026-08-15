@@ -1,0 +1,7 @@
+{
+  "preferredPort": 18080,
+  "portScanEnd": 18180,
+  "callbackPreferredPort": 51121,
+  "callbackScanEnd": 51221,
+  "proxyURL": "http://127.0.0.1:10808"
+}

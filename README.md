@@ -119,6 +119,17 @@ $env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
 
 源码包包含管理器、Windows 脚本、测试、文档、固定的 CLIProxyAPI v7.2.132
 源码和可重放补丁。已验证构建环境为 Go 1.26.5、Windows x64、`CGO_ENABLED=0`。
+提交修改前请另见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
+
+GitHub 源码不内置 Google OAuth 客户端凭据。开发者需使用自己有权使用的
+OAuth 桌面应用配置，并在运行源码构建前设置：
+
+```powershell
+$env:ANTIGRAVITY_OAUTH_CLIENT_ID = '<your-client-id>'
+$env:ANTIGRAVITY_OAUTH_CLIENT_SECRET = '<your-client-secret>'
+```
+
+这两个值只从进程环境中读取，不应提交到 Git。未配置时，OAuth 登录和 token 刷新会返回明确错误。
 
 ```powershell
 cd project
@@ -137,6 +148,8 @@ go build -trimpath -ldflags='-s -w -H windowsgui -X main.defaultCommand=gui' `
 ```text
 project/docs/CLIProxyAPI-v7.2.132-zcode.patch
 ```
+
+该文件是对上游版本的历史业务补丁。GitHub 发布树中将 OAuth 凭据改为环境变量的安全改动以当前源码为准。
 
 ## 第三方说明与许可
 

@@ -1,0 +1,289 @@
+//go:build windows
+
+package main
+
+import (
+	"archive/zip"
+	"bytes"
+	"crypto/sha256"
+	_ "embed"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"unsafe"
+	"unicode/utf8"
+)
+
+//go:embed payload.zip
+var payloadZIP []byte
+
+//go:embed install.ps1
+var installScript []byte
+
+const (
+	packageVersion        = "__PACKAGE_VERSION__"
+	payloadSHA256         = "__PAYLOAD_SHA256__"
+	managerSHA256         = "__MANAGER_SHA256__"
+	controlCenterSHA256   = "__CONTROL_CENTER_SHA256__"
+	backendSHA256         = "__BACKEND_SHA256__"
+	createNoWindow        = 0x08000000
+	messageOK             = 0x00000000
+	messageYesNo          = 0x00000004
+	messageIconError      = 0x00000010
+	messageIconQuestion   = 0x00000020
+	messageIconInfo       = 0x00000040
+	messageTopmost        = 0x00040000
+	messageSetForeground  = 0x00010000
+	messageResultYes      = 6
+)
+
+var (
+	user32          = syscall.NewLazyDLL("user32.dll")
+	messageBoxWProc = user32.NewProc("MessageBoxW")
+)
+
+func main() {
+	if len(os.Args) == 3 && strings.EqualFold(os.Args[1], "--extract-only") {
+		if err := extractOnly(os.Args[2]); err != nil {
+			showMessage("验证解包失败\n\n"+displayError(err), messageOK|messageIconError)
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) != 1 {
+		showMessage("用法错误：请直接双击安装，或使用 --extract-only <空目录>。", messageOK|messageIconError)
+		os.Exit(2)
+	}
+
+	answer := showMessage(
+		"将为当前 Windows 用户安装 ZCode Antigravity Bridge "+packageVersion+"。\n\n"+
+			"安装前请确认：\n"+
+			"1. 已在 v2rayN 开启 TUN 模式；\n"+
+			"2. 已从系统托盘完全退出 ZCode。\n\n"+
+			"安装器不会删除账号、聊天、项目或其它 Provider。是否继续？",
+		messageYesNo|messageIconQuestion,
+	)
+	if answer != messageResultYes {
+		return
+	}
+
+	controlCenter, output, err := install()
+	if err != nil {
+		logPath := writeFailureLog(output, err)
+		message := "安装失败\n\n" + displayError(err)
+		if logPath != "" {
+			message += "\n\n日志：" + logPath
+		}
+		message += "\n\n没有删除账号、聊天、项目或其它 ZCode Provider。"
+		showMessage(message, messageOK|messageIconError)
+		os.Exit(1)
+	}
+
+	showMessage(
+		"安装完成。\n\n已创建桌面和开始菜单快捷方式，接下来将打开蓝白控制中心并开始接入 ZCode。",
+		messageOK|messageIconInfo,
+	)
+	if err := launchControlCenter(controlCenter); err != nil {
+		showMessage("安装已完成，但控制中心未能自动打开：\n\n"+displayError(err)+"\n\n可使用桌面快捷方式手动打开。", messageOK|messageIconError)
+		os.Exit(1)
+	}
+}
+
+func install() (string, string, error) {
+	stage, err := os.MkdirTemp("", "zcode-antigravity-exe-installer-")
+	if err != nil {
+		return "", "", fmt.Errorf("创建安装临时目录: %w", err)
+	}
+	defer os.RemoveAll(stage)
+
+	packageDir := filepath.Join(stage, "package")
+	if err := extractPayload(packageDir); err != nil {
+		return "", "", err
+	}
+	scriptPath := filepath.Join(stage, "install.ps1")
+	if err := os.WriteFile(scriptPath, installScript, 0o600); err != nil {
+		return "", "", fmt.Errorf("准备安装脚本: %w", err)
+	}
+
+	powerShell := filepath.Join(os.Getenv("SystemRoot"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+	if _, err := os.Stat(powerShell); err != nil {
+		powerShell, err = exec.LookPath("powershell.exe")
+		if err != nil {
+			return "", "", errors.New("找不到 Windows PowerShell")
+		}
+	}
+	args := []string{
+		"-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", scriptPath,
+		"-PackageDir", packageDir,
+		"-PackageVersion", packageVersion,
+		"-ExpectedManagerSha256", managerSHA256,
+		"-ExpectedControlCenterSha256", controlCenterSHA256,
+		"-ExpectedBackendSha256", backendSHA256,
+	}
+	cmd := exec.Command(powerShell, args...)
+	cmd.Dir = stage
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNoWindow}
+	var captured bytes.Buffer
+	cmd.Stdout = &captured
+	cmd.Stderr = &captured
+	if err := cmd.Run(); err != nil {
+		return "", captured.String(), fmt.Errorf("部署未完成: %w\n%s", err, tailText(captured.String(), 1200))
+	}
+	localAppData := strings.TrimSpace(os.Getenv("LOCALAPPDATA"))
+	if localAppData == "" {
+		return "", captured.String(), errors.New("安装完成后无法解析 LOCALAPPDATA")
+	}
+	controlCenter := filepath.Join(localAppData, "ZCodeAntigravity", "app-"+packageVersion, "ZCode-Antigravity-ControlCenter.exe")
+	if _, err := os.Stat(controlCenter); err != nil {
+		return "", captured.String(), fmt.Errorf("安装完成后缺少控制中心: %w", err)
+	}
+	return controlCenter, captured.String(), nil
+}
+
+func extractOnly(destination string) error {
+	destination, err := filepath.Abs(destination)
+	if err != nil {
+		return err
+	}
+	if entries, errRead := os.ReadDir(destination); errRead == nil && len(entries) != 0 {
+		return errors.New("--extract-only 目标目录必须为空")
+	} else if errRead != nil && !os.IsNotExist(errRead) {
+		return errRead
+	}
+	return extractPayload(destination)
+}
+
+func extractPayload(destination string) error {
+	sum := sha256.Sum256(payloadZIP)
+	if !strings.EqualFold(hex.EncodeToString(sum[:]), payloadSHA256) {
+		return errors.New("内嵌运行包 SHA-256 校验失败")
+	}
+	if err := os.MkdirAll(destination, 0o700); err != nil {
+		return err
+	}
+	reader, err := zip.NewReader(bytes.NewReader(payloadZIP), int64(len(payloadZIP)))
+	if err != nil {
+		return fmt.Errorf("打开内嵌运行包: %w", err)
+	}
+	root, err := filepath.Abs(destination)
+	if err != nil {
+		return err
+	}
+	for _, entry := range reader.File {
+		clean := filepath.Clean(filepath.FromSlash(entry.Name))
+		if clean == "." || filepath.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("运行包包含不安全路径: %q", entry.Name)
+		}
+		target := filepath.Join(root, clean)
+		relative, errRel := filepath.Rel(root, target)
+		if errRel != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("运行包路径越界: %q", entry.Name)
+		}
+		if entry.FileInfo().Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("运行包不允许符号链接: %q", entry.Name)
+		}
+		if entry.FileInfo().IsDir() {
+			if err := os.MkdirAll(target, 0o700); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+			return err
+		}
+		input, errOpen := entry.Open()
+		if errOpen != nil {
+			return errOpen
+		}
+		output, errCreate := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+		if errCreate != nil {
+			input.Close()
+			return errCreate
+		}
+		_, errCopy := io.Copy(output, input)
+		errCloseOutput := output.Close()
+		errCloseInput := input.Close()
+		if errCopy != nil {
+			return errCopy
+		}
+		if errCloseOutput != nil {
+			return errCloseOutput
+		}
+		if errCloseInput != nil {
+			return errCloseInput
+		}
+	}
+	return verifyExecutables(root)
+}
+
+func verifyExecutables(root string) error {
+	checks := []struct{ relative, expected string }{
+		{"ZCode-Antigravity.exe", managerSHA256},
+		{"ZCode-Antigravity-ControlCenter.exe", controlCenterSHA256},
+		{filepath.Join("backend", "cli-proxy-api.exe"), backendSHA256},
+	}
+	for _, check := range checks {
+		raw, err := os.ReadFile(filepath.Join(root, check.relative))
+		if err != nil {
+			return fmt.Errorf("运行包缺少 %s", check.relative)
+		}
+		sum := sha256.Sum256(raw)
+		if !strings.EqualFold(hex.EncodeToString(sum[:]), check.expected) {
+			return fmt.Errorf("%s SHA-256 校验失败", check.relative)
+		}
+	}
+	return nil
+}
+
+func launchControlCenter(path string) error {
+	cmd := exec.Command(path, "--auto-setup")
+	cmd.Dir = filepath.Dir(path)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNoWindow}
+	return cmd.Start()
+}
+
+func showMessage(message string, flags uintptr) int {
+	title, _ := syscall.UTF16PtrFromString("ZCode Antigravity 安装器")
+	text, _ := syscall.UTF16PtrFromString(message)
+	result, _, _ := messageBoxWProc.Call(0, uintptr(unsafe.Pointer(text)), uintptr(unsafe.Pointer(title)), flags|messageTopmost|messageSetForeground)
+	return int(result)
+}
+
+func displayError(err error) string {
+	if err == nil {
+		return "未知错误"
+	}
+	return tailText(strings.ReplaceAll(err.Error(), "\x00", ""), 1600)
+}
+
+func tailText(value string, limit int) string {
+	value = strings.TrimSpace(value)
+	if utf8.RuneCountInString(value) <= limit {
+		return value
+	}
+	runes := []rune(value)
+	return "…" + string(runes[len(runes)-limit:])
+}
+
+func writeFailureLog(output string, installErr error) string {
+	base := strings.TrimSpace(os.Getenv("LOCALAPPDATA"))
+	if base == "" {
+		return ""
+	}
+	dir := filepath.Join(base, "ZCodeAntigravity", "logs")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return ""
+	}
+	path := filepath.Join(dir, "exe-installer-last-error.log")
+	content := "ZCode Antigravity EXE installer " + packageVersion + "\r\n" + displayError(installErr) + "\r\n" + tailText(output, 4000) + "\r\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		return ""
+	}
+	return path
+}

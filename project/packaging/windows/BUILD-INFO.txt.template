@@ -1,0 +1,69 @@
+ZCode Antigravity Bridge build information
+===========================================
+
+Package: ZCode-Antigravity-Windows-x64-0.2.6-test
+Build date (UTC): 2026-08-15
+Target: Windows x64 (PE32+ console manager and GUI control center)
+
+Manager
+-------
+Version: 0.2.6-test
+Go: 1.26.5
+CGO: disabled
+SHA-256: __MANAGER_SHA256__
+
+Control center
+--------------
+Version: 0.2.6-test
+Subsystem: Windows GUI (no console window)
+Quota view: protected loopback management route, redacted local cache, animated wave meters
+Theme: blue-white telemetry console with reduced-motion accessibility fallback
+SHA-256: __CONTROL_CENTER_SHA256__
+
+Backend
+-------
+Upstream: router-for-me/CLIProxyAPI v7.2.132
+Upstream commit: 78f0c4079e3e6273d65d03b5549cffc898703264
+Local build version: 7.2.132-zcode.9
+Go: 1.26.5
+CGO: disabled (dynamic plugins unavailable and disabled)
+SHA-256: __BACKEND_SHA256__
+
+Local backend patches
+---------------------
+1. OAuth loopback, Host/state checks, and PKCE S256.
+2. Windows current-user DPAPI, atomic storage, and runtime watcher decryption.
+3. Bounded capability probe, current Antigravity client-version refresh, and direct browser selection.
+4. Preserve Gemini 3.7 maxOutputTokens and publish accurate model capabilities.
+5. Finite onboarding propagation retry and side-effect-free auth reads.
+6. Close Windows git repository handles before recovery and preserve measured TTFT semantics.
+7. Translate ZCode base64 audio/video blocks to Gemini inlineData without weakening config-write guards.
+8. Publish thinking levels and map ZCode Low/Medium/High to Gemini thinkingLevel.
+9. Expose clean Gemini 3.7/3.6 Flash client IDs while routing to the exact upstream High entries.
+10. Provide a SHA-256 verified single-BAT installer with v2rayN TUN/proxy preflight.
+11. Stage and verify the payload, safely stop the recorded gateway, then deploy so same-version reruns cannot overwrite a running backend.
+12. Add a no-console control center that injects the Provider, manages the local bridge, and renders Antigravity quota as wave meters.
+13. Apply a blue-white visual system and purposeful status, action, counter, card, and two-layer wave motion.
+
+Verification completed on build host
+------------------------------------
+- Manager go test ./... and Windows x64 build: passed
+- Manager go test -race: not run (GCC unavailable on build host)
+- CLIProxyAPI go mod verify, go test ./..., and Windows x64 build: passed
+- Local end-to-end smoke with fake non-network credentials: passed
+- Default API port occupied -> automatic fallback to 18081: passed
+- /healthz, authenticated Anthropic /v1/models, ZCode merge/backup, stop: passed
+- Real Windows OAuth, project ID, DPAPI persistence, and runtime load: passed
+- Real gemini-3.6-flash-high inference and exact output assertion: passed
+- Antigravity 2.8.1 catalog: 21 models including Gemini 3.7 Flash Low/Medium/High
+- Exact gemini-3.7-flash-high inference: ZCODE_SMOKE_OK; response model gemini-3.7-flash
+- Gemini 3.7 image understanding: passed through the ZCode Anthropic Provider route
+- Gemini 3.7 video understanding: red -> green -> blue sequence passed through the ZCode route
+- Gemini 3.7 image generation: unsupported as declared; zero image data parts returned
+- Gemini 3.7 reasoning selector: Low/Medium/High request translation tests passed
+- ZCode model allowlist: exactly Gemini 3.7 Flash and Gemini 3.6 Flash; no High suffix in the UI
+- OAuth alias routing: clean client IDs -> exact upstream High IDs with response force-mapping
+- Single-BAT payload extraction and executable hash verification: passed
+- Same-version rerun with a locked backend: failure reproduced, staged-manager stop and redeploy passed
+- Control center Windows GUI subsystem, loopback session protection, quota cache redaction, and wave dashboard: passed
+- Native Windows GUI EXE installer embedded-payload extraction, three-EXE hash verification, isolated install, and same-version rerun: passed

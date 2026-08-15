@@ -1,0 +1,23 @@
+CLIProxyAPI
+===========
+
+Upstream project: https://github.com/router-for-me/CLIProxyAPI
+Pinned release: v7.2.132
+Pinned commit: 78f0c4079e3e6273d65d03b5549cffc898703264
+License: MIT (see LICENSE-CLIProxyAPI.txt)
+
+This package uses a locally built CGO-disabled Windows amd64 binary. Dynamic plugins are
+disabled and are not needed for the built-in Antigravity provider.
+
+Local source modifications
+--------------------------
+The patch restricts OAuth to loopback, validates callback Host/state, adds PKCE S256, protects
+Windows credentials with current-user DPAPI and atomic writes, bounds optional network probes,
+disables package-managed background version lookup, preserves Gemini 3.7 output limits, reports
+accurate model capabilities, and retries project propagation without unbounded auth-file reads.
+
+The exact redistributable patch is included as CLIProxyAPI-v7.2.132-zcode.patch.
+
+The API service is configured with host 127.0.0.1, plugins disabled, remote management and
+its control panel disabled, and detailed request logging disabled. A random per-user key protects
+the loopback-only management calls used by the local quota dashboard.

@@ -1,0 +1,33 @@
+# Private conversation exports and local operator data
+/conversation/
+/.zcode/
+/data/
+/logs/
+local-api-key
+quota-cache.json
+last-smoke-test.json
+state.json
+
+# Credentials and local environment
+.env
+.env.*
+!**/.env.example
+!**/.env.*.example
+*.pem
+*.p12
+*.pfx
+
+# Build and release outputs (published through GitHub Releases)
+*.exe
+*.dll
+*.zip
+*.7z
+/dist/
+/release/
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/

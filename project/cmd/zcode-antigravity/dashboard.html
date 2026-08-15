@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ZCode · Antigravity 控制中心</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #10213a;
+      --muted: #63748e;
+      --paper: #f4f7fc;
+      --panel: #ffffff;
+      --line: #dbe5f3;
+      --line-strong: #c4d3e8;
+      --accent: #0b63f6;
+      --accent-2: #4a9cff;
+      --accent-deep: #073b90;
+      --accent-soft: #eaf2ff;
+      --ok: #1675e8;
+      --warn: #a46b08;
+      --bad: #c44343;
+      --shadow: 0 24px 60px rgba(25, 64, 124, .12);
+      --ease: cubic-bezier(.22, 1, .36, 1);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--paper); color: var(--ink); }
+    body { font-family: "Segoe UI Variable", "Microsoft YaHei UI", "Segoe UI", sans-serif; letter-spacing: -.01em; }
+    button { font: inherit; }
+    .shell { min-height: 100vh; display: grid; grid-template-columns: 252px minmax(0, 1fr); }
+    .sidebar {
+      position: sticky; top: 0; height: 100vh; padding: 28px 22px 22px; overflow: hidden;
+      background: #071b3b; color: #f4f8ff; display: flex; flex-direction: column;
+      box-shadow: 18px 0 50px rgba(8, 37, 85, .12); animation: sideEnter .58s var(--ease) both;
+    }
+    .sidebar::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .16; background-image: linear-gradient(rgba(90,157,255,.22) 1px, transparent 1px), linear-gradient(90deg, rgba(90,157,255,.18) 1px, transparent 1px); background-size: 34px 34px; mask-image: linear-gradient(to bottom, #000, transparent 76%); }
+    .sidebar::after { content: ""; position: absolute; left: 0; right: 0; top: -2px; height: 2px; background: #5aa5ff; box-shadow: 0 0 18px 5px rgba(43,132,255,.45); animation: signalScan 5.5s ease-in-out infinite; opacity: .55; }
+    .sidebar > * { position: relative; z-index: 1; }
+    .brand { display: flex; gap: 13px; align-items: center; }
+    .brand-mark { position: relative; width: 40px; height: 40px; border: 1px solid #367ad5; display: grid; place-items: center; color: #82b9ff; font-weight: 800; font-size: 17px; box-shadow: inset 0 0 18px rgba(48,132,255,.14); transition: transform .2s var(--ease), border-color .2s ease, box-shadow .2s ease; }
+    .brand-mark::after { content: ""; position: absolute; inset: 5px; border: 1px solid rgba(115,176,255,.2); transform: rotate(45deg); transition: transform .4s var(--ease); }
+    .brand:hover .brand-mark { transform: translateY(-2px); border-color: #73b0ff; box-shadow: 0 8px 26px rgba(15,102,236,.28); }
+    .brand:hover .brand-mark::after { transform: rotate(135deg); }
+    .brand strong { display: block; font-size: 16px; letter-spacing: .01em; }
+    .brand span { display: block; color: #82a0c8; font-size: 12px; margin-top: 2px; }
+    .nav-label { margin: 42px 10px 12px; color: #6683aa; font-size: 11px; text-transform: uppercase; letter-spacing: .14em; }
+    .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-left: 2px solid transparent; color: #9db3d0; font-size: 14px; transition: color .18s ease, background .18s ease, transform .18s var(--ease); }
+    .nav-item:hover { color: #dceaff; transform: translateX(3px); }
+    .nav-item.active { color: #fff; background: #0d2d60; border-left-color: #63a9ff; box-shadow: inset 0 0 20px rgba(26,111,231,.12); }
+    .nav-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .72; }
+    .side-status { margin-top: auto; border-top: 1px solid #173765; padding-top: 18px; }
+    .side-status p { margin: 0 0 8px; color: #7692b8; font-size: 12px; }
+    .side-status strong { font-size: 12px; color: #d8e8ff; font-weight: 550; }
+    .main { position: relative; padding: 42px clamp(28px, 5vw, 76px) 56px; overflow: hidden; background-image: linear-gradient(rgba(31,100,199,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(31,100,199,.035) 1px, transparent 1px); background-size: 40px 40px; }
+    .main::before { content: ""; position: absolute; width: 420px; height: 420px; right: -260px; top: -230px; border: 68px solid rgba(28,110,235,.045); border-radius: 50%; pointer-events: none; }
+    .main > * { position: relative; z-index: 1; }
+    .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 30px; animation: riseIn .54s .08s var(--ease) both; }
+    h1 { margin: 0; font-size: clamp(28px, 3.3vw, 42px); line-height: 1.08; letter-spacing: -.045em; font-weight: 720; }
+    .subtitle { margin: 9px 0 0; color: var(--muted); font-size: 14px; }
+    .refresh { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line-strong); background: #fff; color: var(--ink); padding: 9px 13px; cursor: pointer; box-shadow: 0 6px 18px rgba(29,75,142,.06); transition: transform .18s var(--ease), border-color .18s ease, color .18s ease, box-shadow .18s ease; }
+    .refresh:hover { transform: translateY(-2px); border-color: var(--accent); color: var(--accent); box-shadow: 0 10px 25px rgba(11,99,246,.12); }
+    .refresh:active { transform: translateY(0) scale(.98); }
+    .refresh-icon { display: inline-block; font-size: 16px; line-height: 1; transform-origin: 50% 52%; }
+    .refresh.loading .refresh-icon { animation: spin .72s linear infinite; }
+    .refresh:focus-visible, .action:focus-visible { outline: 3px solid rgba(11,99,246,.22); outline-offset: 2px; }
+    .status-strip { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); border: 1px solid var(--line); background: var(--panel); box-shadow: 0 10px 28px rgba(29,75,142,.07); animation: riseIn .58s .14s var(--ease) both; }
+    .status-cell { min-width: 0; padding: 15px 16px; border-right: 1px solid var(--line); transition: background .18s ease, transform .18s var(--ease); }
+    .status-cell:hover { background: #f7faff; transform: translateY(-2px); }
+    .status-cell.changed { animation: statusFlash .52s var(--ease); }
+    .status-cell:last-child { border-right: 0; }
+    .status-kicker { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .09em; }
+    .lamp { position: relative; width: 8px; height: 8px; border-radius: 50%; background: #aab7c8; box-shadow: 0 0 0 3px #eef2f8; transition: background .2s ease, box-shadow .2s ease; }
+    .lamp.ok { background: var(--ok); box-shadow: 0 0 0 3px #dbeaff; }
+    .lamp.ok::after { content: ""; position: absolute; inset: -4px; border: 1px solid rgba(22,117,232,.48); border-radius: 50%; animation: statusPulse 2.3s ease-out infinite; }
+    .status-value { margin-top: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; font-weight: 620; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(270px, .72fr); gap: 22px; margin-top: 22px; }
+    .panel { background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); animation: riseIn .62s .2s var(--ease) both; }
+    .side-panel { animation-delay: .27s; }
+    .panel-head { padding: 22px 24px 16px; display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+    .eyebrow { color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: .14em; font-weight: 700; }
+    h2 { margin: 5px 0 0; font-size: 20px; letter-spacing: -.025em; }
+    .meta { margin-top: 5px; color: var(--muted); font-size: 12px; }
+    .badge { flex: none; border: 1px solid #c5d7f1; background: #f6f9ff; color: #48617f; padding: 5px 8px; font-size: 11px; transition: transform .2s var(--ease), background .2s ease; }
+    .badge:not(.stale) { animation: badgeBreathe 2.8s ease-in-out infinite; }
+    .badge.stale { border-color: #e3c78d; color: #815b16; background: #fff8e8; }
+    .plan-row { position: relative; overflow: hidden; margin: 0 24px 18px; padding: 15px 16px; border: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #f8faff; animation: riseIn .4s var(--ease) both; }
+    .plan-row::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(110deg, transparent 38%, rgba(78,151,255,.12) 48%, transparent 58%); transform: translateX(-120%); animation: planSweep 5s 1.2s ease-in-out infinite; }
+    .plan-row span { color: var(--muted); font-size: 12px; }
+    .plan-row strong { display: block; margin-top: 3px; font-size: 15px; }
+    .account { color: var(--muted); font-size: 12px; }
+    .wave-list { padding: 0 24px 24px; display: grid; gap: 14px; }
+    .wave-card { position: relative; min-height: 164px; overflow: hidden; border: 1px solid var(--line); background: #f7faff; opacity: 0; animation: quotaCardIn .52s calc(var(--delay, 0) * 90ms) var(--ease) forwards; transition: transform .2s var(--ease), border-color .2s ease, box-shadow .2s ease; }
+    .wave-card:hover { transform: translateY(-3px); border-color: #a9c8f4; box-shadow: 0 15px 35px rgba(21,82,171,.11); }
+    .wave-card::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-top: 1px solid rgba(255,255,255,.78); }
+    .wave-copy { position: relative; z-index: 2; display: flex; justify-content: space-between; gap: 20px; padding: 18px 18px 0; }
+    .wave-title { font-size: 14px; font-weight: 650; }
+    .wave-desc { margin-top: 5px; max-width: 450px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .percent { font-size: 34px; line-height: 1; font-weight: 730; letter-spacing: -.05em; color: var(--accent-deep); text-shadow: 0 5px 18px rgba(11,99,246,.1); }
+    .percent small { font-size: 16px; letter-spacing: 0; }
+    .wave-canvas { position: absolute; inset: 48px 0 0; width: 100%; height: calc(100% - 48px); z-index: 1; }
+    .reset { position: absolute; z-index: 3; left: 18px; bottom: 13px; font-size: 11px; color: #48617f; background: rgba(255,255,255,.84); padding: 3px 6px; backdrop-filter: blur(5px); }
+    .empty { margin: 0 24px 24px; padding: 30px 20px; border: 1px dashed var(--line-strong); color: var(--muted); text-align: center; font-size: 13px; }
+    .side-panel { box-shadow: 0 15px 38px rgba(29,75,142,.09); }
+    .actions { padding: 4px 20px 22px; display: grid; gap: 9px; }
+    .action { position: relative; width: 100%; border: 1px solid var(--line-strong); background: #fff; color: var(--ink); text-align: left; padding: 12px 36px 12px 13px; cursor: pointer; overflow: hidden; transition: transform .18s var(--ease), border-color .18s ease, box-shadow .18s ease, background .18s ease; }
+    .action::after { content: "→"; position: absolute; right: 13px; top: 50%; color: #7c92ad; transform: translate(-4px,-50%); opacity: 0; transition: transform .2s var(--ease), opacity .18s ease, color .18s ease; }
+    .action strong { display: block; font-size: 13px; }
+    .action span { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+    .action:hover { transform: translateY(-2px); border-color: #8bb9f8; box-shadow: 0 10px 24px rgba(24,92,188,.09); background: #f9fbff; }
+    .action:hover::after { opacity: 1; transform: translate(0,-50%); color: var(--accent); }
+    .action:active { transform: translateY(0) scale(.992); }
+    .action.primary { border-color: var(--accent); background: var(--accent); color: #fff; box-shadow: 0 10px 24px rgba(11,99,246,.22); }
+    .action.primary span { color: #d7e8ff; }
+    .action.primary::after { color: #fff; }
+    .action.primary:hover { background: #0759e2; border-color: #0759e2; box-shadow: 0 14px 30px rgba(11,99,246,.28); }
+    .action.primary:hover::after { color: #fff; }
+    .action:disabled { opacity: .5; cursor: wait; transform: none; }
+    .operation { position: relative; overflow: hidden; margin: 0 20px 20px; padding: 13px; border-left: 3px solid var(--accent); background: var(--accent-soft); font-size: 12px; line-height: 1.55; animation: operationIn .32s var(--ease) both; }
+    .operation::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); transform: translateX(-100%); animation: operationScan 1.5s ease-in-out infinite; }
+    .operation.error { border-left-color: var(--bad); background: #fff0ee; color: #84372f; }
+    .operation.error::after { display: none; }
+    .operation[hidden] { display: none; }
+    .models { margin: 0 20px 22px; border-top: 1px solid var(--line); padding-top: 17px; }
+    .models-title { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
+    .model-pill { display: inline-block; margin: 9px 6px 0 0; padding: 5px 8px; background: #edf4ff; color: #315a91; border: 1px solid #dbe9fc; font: 11px Consolas, monospace; animation: modelIn .38s var(--ease) both; }
+    .credit { margin: 0 24px 24px; padding: 13px 15px; border-left: 3px solid #4c92ed; background: #eef5ff; display: flex; justify-content: space-between; align-items: center; gap: 12px; animation: riseIn .44s .06s var(--ease) both; }
+    .credit span { color: #48688f; font-size: 11px; }
+    .credit strong { display: block; margin-top: 3px; font-size: 15px; }
+    .toast { position: fixed; right: 24px; bottom: 24px; max-width: 420px; padding: 13px 15px; background: #092755; color: #fff; border: 1px solid #1b4f94; box-shadow: var(--shadow); font-size: 12px; line-height: 1.5; transform: translateY(18px) scale(.98); opacity: 0; pointer-events: none; transition: transform .24s var(--ease), opacity .18s ease; z-index: 9; }
+    .toast.show { transform: none; opacity: 1; }
+    .toast.bad { background: #71332e; }
+    @media (max-width: 940px) {
+      .shell { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; padding: 18px 22px; flex-direction: row; align-items: center; }
+      .nav-label, .nav-item, .side-status { display: none; }
+      .grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 680px) {
+      .main { padding: 28px 16px 40px; }
+      .topbar { align-items: center; }
+      .status-strip { grid-template-columns: 1fr 1fr; }
+      .status-cell:nth-child(2) { border-right: 0; }
+      .status-cell:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+      .panel-head, .wave-list { padding-left: 16px; padding-right: 16px; }
+      .plan-row, .credit { margin-left: 16px; margin-right: 16px; }
+    }
+    @keyframes riseIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    @keyframes sideEnter { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+    @keyframes quotaCardIn { from { opacity: 0; transform: translateY(12px) scale(.992); } to { opacity: 1; transform: none; } }
+    @keyframes modelIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+    @keyframes operationIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+    @keyframes signalScan { 0%, 100% { transform: translateY(0); opacity: .18; } 45%, 55% { opacity: .58; } 50% { transform: translateY(100vh); } }
+    @keyframes statusPulse { 0% { transform: scale(.65); opacity: .9; } 70%, 100% { transform: scale(1.45); opacity: 0; } }
+    @keyframes statusFlash { 0% { background: rgba(33,126,255,.14); } 100% { background: transparent; } }
+    @keyframes badgeBreathe { 0%, 100% { box-shadow: 0 0 0 0 rgba(11,99,246,0); } 50% { box-shadow: 0 0 0 4px rgba(11,99,246,.07); } }
+    @keyframes planSweep { 0%, 72% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+    @keyframes operationScan { to { transform: translateX(100%); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; animation: none !important; } .wave-card { opacity: 1; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">ZA</div><div><strong>ZCode Bridge</strong><span>Antigravity Control</span></div></div>
+      <div class="nav-label">控制中心</div>
+      <div class="nav-item active"><i class="nav-dot"></i>模型与额度</div>
+      <div class="nav-item"><i class="nav-dot"></i>连接状态</div>
+      <div class="nav-item"><i class="nav-dot"></i>本机操作</div>
+      <div class="side-status"><p>本地安全边界</p><strong>127.0.0.1 · 当前用户密钥</strong></div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div><h1>模型与额度</h1><p class="subtitle">直接接入 ZCode，并查看 Antigravity 返回的真实模型余量。</p></div>
+        <button class="refresh" id="refreshBtn"><span class="refresh-icon" aria-hidden="true">↻</span><span id="refreshLabel">刷新数据</span></button>
+      </header>
+
+      <section class="status-strip" aria-label="连接状态">
+        <div class="status-cell"><div class="status-kicker"><i class="lamp" id="tunLamp"></i>TUN</div><div class="status-value" id="tunText">检查中…</div></div>
+        <div class="status-cell"><div class="status-kicker"><i class="lamp" id="proxyLamp"></i>代理</div><div class="status-value" id="proxyText">检查中…</div></div>
+        <div class="status-cell"><div class="status-kicker"><i class="lamp" id="gatewayLamp"></i>Bridge</div><div class="status-value" id="gatewayText">检查中…</div></div>
+        <div class="status-cell"><div class="status-kicker"><i class="lamp" id="zcodeLamp"></i>ZCode</div><div class="status-value" id="zcodeText">检查中…</div></div>
+      </section>
+
+      <div class="grid">
+        <section class="panel">
+          <div class="panel-head">
+            <div><div class="eyebrow">Antigravity Usage</div><h2>Gemini 模型额度</h2><div class="meta" id="quotaMeta">等待首次刷新</div></div>
+            <span class="badge" id="sourceBadge">实时接口</span>
+          </div>
+          <div id="quotaContent"><div class="empty">启动网关后即可读取每周与 5 小时剩余额度。</div></div>
+        </section>
+
+        <aside class="panel side-panel">
+          <div class="panel-head"><div><div class="eyebrow">Local Actions</div><h2>接入控制</h2><div class="meta">所有操作均在本机完成</div></div></div>
+          <div class="operation" id="operation" role="status" aria-live="polite" hidden></div>
+          <div class="actions">
+            <button class="action primary" data-action="setup"><strong>一键接入 ZCode</strong><span>登录、启动网关、只注入 3.7 / 3.6 Flash</span></button>
+            <button class="action" data-action="login"><strong>登录 / 添加账号</strong><span>通过浏览器完成 Google OAuth</span></button>
+            <button class="action" data-action="sync"><strong>修复并重新同步</strong><span>重新校验网关与 ZCode Provider</span></button>
+            <button class="action" data-action="open-zcode"><strong>打开 ZCode</strong><span>接入完成后直接开始使用</span></button>
+            <button class="action" data-action="stop"><strong>停止本地网关</strong><span>不会删除账号和 ZCode 聊天</span></button>
+          </div>
+          <div class="models"><div class="models-title">ZCode 允许模型</div><div id="models"><span class="model-pill">gemini-3.7-flash</span><span class="model-pill">gemini-3.6-flash</span></div></div>
+        </aside>
+      </div>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script>
+    const sessionToken = __SESSION_TOKEN__;
+    const appVersion = __APP_VERSION__;
+    const api = async (path, options = {}) => {
+      const headers = Object.assign({'X-ZCAB-Session': sessionToken}, options.headers || {});
+      const response = await fetch(path, Object.assign({}, options, {headers, cache: 'no-store'}));
+      const text = await response.text();
+      let body = {}; try { body = text ? JSON.parse(text) : {}; } catch { body = {error: text}; }
+      if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+      return body;
+    };
+    const state = {status: null, quota: null, quotaLoading: false, waveFrames: new Map(), operationWasRunning: false};
+    const $ = id => document.getElementById(id);
+    const setLamp = (id, ok) => $(id).classList.toggle('ok', !!ok);
+    const setStatusItem = (prefix, item) => {
+      const text = $(prefix + 'Text'), cell = text.closest('.status-cell'), next = item ? item.label : '未知';
+      if (text.textContent !== next && !text.textContent.includes('检查中')) {
+        cell.classList.remove('changed'); void cell.offsetWidth; cell.classList.add('changed');
+      }
+      setLamp(prefix + 'Lamp', item && item.ok); text.textContent = next; text.title = item?.detail || '';
+    };
+    const toast = (message, bad = false) => { const el = $('toast'); el.textContent = message; el.className = 'toast show' + (bad ? ' bad' : ''); clearTimeout(toast.timer); toast.timer = setTimeout(() => el.className = 'toast', 4200); };
+    const escapeHTML = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+
+    async function refreshStatus() {
+      try {
+        state.status = await api('/api/status');
+        setStatusItem('tun', state.status.tun); setStatusItem('proxy', state.status.proxy); setStatusItem('gateway', state.status.gateway); setStatusItem('zcode', state.status.zcode);
+        const op = state.status.operation || {}; const box = $('operation');
+        if (op.running || op.message || op.error) { box.hidden = false; box.classList.toggle('error', !!op.error); box.textContent = op.error || op.message; } else box.hidden = true;
+        document.querySelectorAll('[data-action]').forEach(b => b.disabled = !!op.running);
+        if (Array.isArray(state.status.models) && state.status.models.length) $('models').innerHTML = state.status.models.map(m => `<span class="model-pill">${escapeHTML(m)}</span>`).join('');
+        if (state.operationWasRunning && !op.running && !op.error) refreshQuota();
+        state.operationWasRunning = !!op.running;
+        if (op.running) setTimeout(refreshStatus, 1200);
+      } catch (error) { toast('状态刷新失败：' + error.message, true); }
+    }
+
+    function formatTime(value) {
+      if (!value) return '上游未提供重置时间';
+      const date = new Date(value); if (Number.isNaN(date.getTime())) return '重置时间未知';
+      const delta = date.getTime() - Date.now();
+      if (delta <= 0) return '即将刷新';
+      const totalMinutes = Math.ceil(delta / 60000), days = Math.floor(totalMinutes / 1440), hours = Math.floor((totalMinutes % 1440) / 60), mins = totalMinutes % 60;
+      const remain = [days ? `${days} 天` : '', hours ? `${hours} 小时` : '', (!days && mins) ? `${mins} 分钟` : ''].filter(Boolean).join(' ');
+      return `预计 ${remain}后刷新 · ${date.toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}`;
+    }
+    const bucketRank = b => /周|week/i.test(b.name) ? 0 : /5|五|hour/i.test(b.name) ? 1 : 2;
+    function renderQuota(report) {
+      state.quota = report; const account = report.accounts?.[0];
+      $('quotaMeta').textContent = report.fetchedAt ? `更新于 ${new Date(report.fetchedAt).toLocaleString('zh-CN')} · ${account?.account || '账号未知'}` : '更新时间未知';
+      const badge = $('sourceBadge'); badge.textContent = report.stale ? '缓存数据' : '实时接口'; badge.classList.toggle('stale', !!report.stale);
+      if (!account) { $('quotaContent').innerHTML = '<div class="empty">Antigravity 没有返回可显示的账号额度。</div>'; return; }
+      const groups = account.groups || [];
+      const gemini = groups.find(g => /gemini/i.test(g.name)) || groups[0];
+      const buckets = [...(gemini?.buckets || [])].sort((a,b) => bucketRank(a)-bucketRank(b));
+      let html = `<div class="plan-row"><div><span>当前套餐</span><strong>${escapeHTML(account.plan || 'Antigravity 未提供套餐名称')}</strong></div><div class="account">${escapeHTML(account.account)} · ${escapeHTML(account.status || 'ready')}</div></div>`;
+      if (account.credits) html += `<div class="credit"><div><span>${escapeHTML(account.credits.upstreamLabel || 'AI Credits')}</span><strong>${Number(account.credits.amount).toLocaleString()}</strong></div><span>${account.credits.available ? '可用' : '低于最小使用额度'} · 此项不是周额度</span></div>`;
+      if (!buckets.length) html += `<div class="empty">${escapeHTML(account.error || '上游暂未提供每周 / 5 小时额度。')}</div>`;
+      else html += `<div class="wave-list">${buckets.map((bucket, index) => {
+        const known = typeof bucket.remainingPercent === 'number'; const pct = known ? Math.max(0, Math.min(100, bucket.remainingPercent)) : null;
+        return `<article class="wave-card" style="--delay:${index + 1}"><div class="wave-copy"><div><div class="wave-title">${escapeHTML(bucket.name || '模型额度')}</div><div class="wave-desc">${escapeHTML(bucket.description || bucket.window || 'Antigravity 模型配额窗口')}</div></div><div class="percent" data-count="${known ? pct : ''}">${known ? '0<small>%</small>' : '—'}</div></div><canvas class="wave-canvas" data-wave="${index}" data-percent="${known ? pct : ''}" aria-label="${escapeHTML(bucket.name)} ${known ? pct + '%' : '未知'}"></canvas><div class="reset">${escapeHTML(formatTime(bucket.resetTime))}</div></article>`;
+      }).join('')}</div>`;
+      for (const frame of state.waveFrames.values()) cancelAnimationFrame(frame);
+      state.waveFrames.clear();
+      $('quotaContent').innerHTML = html;
+      document.querySelectorAll('[data-wave]').forEach(canvas => animateWave(canvas));
+      document.querySelectorAll('[data-count]').forEach(node => animateCount(node));
+      if (report.warning) toast(report.warning, !!report.stale);
+    }
+
+    function animateCount(node) {
+      const target = Number(node.dataset.count); if (!Number.isFinite(target)) return;
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const start = performance.now(), duration = 760;
+      const render = now => {
+        const progress = reduced ? 1 : Math.min(1, (now - start) / duration);
+        const eased = 1 - Math.pow(1 - progress, 3), value = target * eased;
+        node.innerHTML = `${value.toLocaleString(undefined,{maximumFractionDigits: target % 1 ? 1 : 0})}<small>%</small>`;
+        if (progress < 1) requestAnimationFrame(render);
+      };
+      requestAnimationFrame(render);
+    }
+
+    function animateWave(canvas) {
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches; const value = Number(canvas.dataset.percent); const known = Number.isFinite(value) && canvas.dataset.percent !== '';
+      const ctx = canvas.getContext('2d'); let phase = 0; const startedAt = performance.now();
+      const drawPath = (w, base, phaseOffset, amp, frequency) => {
+        ctx.beginPath();
+        for(let x=0;x<=w;x+=3){ const y=base + Math.sin(x/frequency+phase+phaseOffset)*amp + Math.sin(x/76-phase*.65)*1.7; x===0?ctx.moveTo(x,y):ctx.lineTo(x,y); }
+      };
+      const draw = now => {
+        const dpr = Math.min(devicePixelRatio || 1, 2), rect = canvas.getBoundingClientRect(); const w = Math.max(1, rect.width), h = Math.max(1, rect.height);
+        if (canvas.width !== Math.round(w*dpr) || canvas.height !== Math.round(h*dpr)) { canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr); }
+        ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+        const target = known ? Math.max(0,Math.min(100,value)) : 48;
+        const reveal = reduced ? 1 : Math.min(1, (now - startedAt) / 950), eased = 1 - Math.pow(1 - reveal, 3);
+        const pct = known ? target * eased : target; const base = h - (pct/100)*(h-16) - 8; const amp = known ? 5 : 3;
+        drawPath(w, base, 0, amp, 32);
+        if(known){ ctx.lineTo(w,h); ctx.lineTo(0,h); ctx.closePath(); const grad=ctx.createLinearGradient(0,base,0,h); grad.addColorStop(0,'rgba(45,137,255,.34)'); grad.addColorStop(.52,'rgba(24,111,239,.20)'); grad.addColorStop(1,'rgba(11,99,246,.06)'); ctx.fillStyle=grad; ctx.fill(); }
+        drawPath(w, base, 0, amp, 32); ctx.strokeStyle=known?'#1675e8':'#9bacbf'; ctx.lineWidth=known?2.2:1.5; if(!known)ctx.setLineDash([6,6]); ctx.stroke(); ctx.setLineDash([]);
+        if(known){ drawPath(w, base+5, 2.1, Math.max(2,amp-1.5), 39); ctx.strokeStyle='rgba(91,164,255,.48)'; ctx.lineWidth=1.1; ctx.stroke(); }
+        phase += .024;
+        if(!reduced && document.body.contains(canvas)) state.waveFrames.set(canvas.dataset.wave, requestAnimationFrame(draw));
+      };
+      if (reduced) draw(performance.now() + 1000);
+      else state.waveFrames.set(canvas.dataset.wave, requestAnimationFrame(draw));
+    }
+
+    async function refreshQuota() {
+      if (state.quotaLoading) return; state.quotaLoading = true; $('refreshBtn').disabled = true; $('refreshBtn').classList.add('loading'); $('refreshLabel').textContent = '正在读取…';
+      try { renderQuota(await api('/api/quota')); } catch (error) { $('quotaContent').innerHTML = `<div class="empty">${escapeHTML(error.message)}</div>`; toast('额度刷新失败：' + error.message, true); }
+      finally { state.quotaLoading = false; $('refreshBtn').disabled = false; $('refreshBtn').classList.remove('loading'); $('refreshLabel').textContent = '刷新数据'; }
+    }
+    async function runAction(action) {
+      try { await api('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})}); toast(action==='open-zcode'?'ZCode 已打开':'操作已经开始'); await refreshStatus(); }
+      catch(error){ toast('操作失败：'+error.message,true); }
+    }
+    document.querySelectorAll('[data-action]').forEach(button => button.addEventListener('click', () => runAction(button.dataset.action)));
+    $('refreshBtn').addEventListener('click', async () => { await refreshStatus(); await refreshQuota(); });
+    setInterval(() => api('/api/heartbeat',{method:'POST'}).catch(()=>{}), 15000);
+    setInterval(refreshStatus, 8000);
+    (async () => {
+      await refreshStatus();
+      const params = new URLSearchParams(location.search);
+      if (params.get('auto') === '1') runAction('setup');
+      else refreshQuota();
+    })();
+  </script>
+</body>
+</html>

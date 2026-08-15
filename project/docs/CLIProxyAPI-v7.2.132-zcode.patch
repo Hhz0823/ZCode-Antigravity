@@ -1,0 +1,1162 @@
+diff --git a/cmd/server/main.go b/cmd/server/main.go
+index 0d8cdececede6f43d04c5bf1e4363edfdbec7065..30fb3fb15771aef6d18a27458ee3610ad5f947c0 100644
+--- a/cmd/server/main.go
++++ b/cmd/server/main.go
+@@ -90,6 +90,7 @@ func main() {
+ 	var tuiMode bool
+ 	var standalone bool
+ 	var localModel bool
++	var skipAntigravityVersionUpdate bool
+ 
+ 	// Define command-line flags for different operation modes.
+ 	flag.BoolVar(&codexLogin, "codex-login", false, "Login to Codex using OAuth")
+@@ -109,6 +110,7 @@ func main() {
+ 	flag.BoolVar(&tuiMode, "tui", false, "Start with terminal management UI")
+ 	flag.BoolVar(&standalone, "standalone", false, "In TUI mode, start an embedded local server")
+ 	flag.BoolVar(&localModel, "local-model", false, "Use embedded models.json and codex_client_models.json only, skip remote model catalog fetching")
++	flag.BoolVar(&skipAntigravityVersionUpdate, "skip-antigravity-version-update", false, "Use the embedded Antigravity client version and skip the background version lookup")
+ 
+ 	flag.CommandLine.Usage = func() {
+ 		out := flag.CommandLine.Output()
+@@ -676,7 +678,9 @@ func main() {
+ 			if standalone {
+ 				// Standalone mode: start an embedded local server and connect TUI client to it.
+ 				managementasset.StartAutoUpdater(context.Background(), configFilePath)
+-				misc.StartAntigravityVersionUpdater(context.Background())
++				if !skipAntigravityVersionUpdate {
++					misc.StartAntigravityVersionUpdater(context.Background())
++				}
+ 				startModelCatalogUpdaters(localModel, cfg.Home.Enabled)
+ 				hook := tui.NewLogHook(2000)
+ 				hook.SetFormatter(&logging.LogFormatter{})
+@@ -750,7 +754,9 @@ func main() {
+ 		} else {
+ 			// Start the main proxy service
+ 			managementasset.StartAutoUpdater(context.Background(), configFilePath)
+-			misc.StartAntigravityVersionUpdater(context.Background())
++			if !skipAntigravityVersionUpdate {
++				misc.StartAntigravityVersionUpdater(context.Background())
++			}
+ 			startModelCatalogUpdaters(localModel, cfg.Home.Enabled)
+ 			cmd.StartServiceWithPluginHost(cfg, configFilePath, password, pluginHost, serverOptions...)
+ 		}
+diff --git a/internal/api/handlers/management/auth_files_provider_oauth.go b/internal/api/handlers/management/auth_files_provider_oauth.go
+index 3928d605198e73644ef32a20cce567be8916b3bd..d6e217042f1c4628997b4c804328203fda04bd7f 100644
+--- a/internal/api/handlers/management/auth_files_provider_oauth.go
++++ b/internal/api/handlers/management/auth_files_provider_oauth.go
+@@ -355,9 +355,20 @@ func (h *Handler) RequestAntigravityToken(c *gin.Context) {
+ 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate state parameter"})
+ 		return
+ 	}
++	pkceCodes, errPKCE := antigravity.GeneratePKCECodes()
++	if errPKCE != nil {
++		log.Errorf("Failed to generate PKCE codes: %v", errPKCE)
++		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate PKCE codes"})
++		return
++	}
+ 
+ 	redirectURI := fmt.Sprintf("http://localhost:%d/oauth-callback", antigravity.CallbackPort)
+-	authURL := authSvc.BuildAuthURL(state, redirectURI)
++	authURL, errAuthURL := authSvc.BuildAuthURL(state, redirectURI, pkceCodes)
++	if errAuthURL != nil {
++		log.Errorf("Failed to build authorization URL: %v", errAuthURL)
++		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build authorization URL"})
++		return
++	}
+ 
+ 	RegisterOAuthSession(state, "antigravity")
+ 
+@@ -420,7 +431,7 @@ func (h *Handler) RequestAntigravityToken(c *gin.Context) {
+ 			time.Sleep(500 * time.Millisecond)
+ 		}
+ 
+-		tokenResp, errToken := authSvc.ExchangeCodeForTokens(ctx, authCode, redirectURI)
++		tokenResp, errToken := authSvc.ExchangeCodeForTokens(ctx, authCode, redirectURI, pkceCodes)
+ 		if errToken != nil {
+ 			log.Errorf("Failed to exchange token: %v", errToken)
+ 			SetOAuthSessionError(state, "Failed to exchange token")
+diff --git a/internal/auth/antigravity/auth.go b/internal/auth/antigravity/auth.go
+index 489d796f1fedde2cb9994a013a54d8fef0f6bce8..f2663c69654fc0e9bb8af3190b7cebc8d92e8e73 100644
+--- a/internal/auth/antigravity/auth.go
++++ b/internal/auth/antigravity/auth.go
+@@ -119,7 +119,10 @@ func defaultAntigravityTierID(loadResp map[string]any) string {
+ }
+ 
+ // BuildAuthURL generates the OAuth authorization URL.
+-func (o *AntigravityAuth) BuildAuthURL(state, redirectURI string) string {
++func (o *AntigravityAuth) BuildAuthURL(state, redirectURI string, pkceCodes *PKCECodes) (string, error) {
++	if pkceCodes == nil || strings.TrimSpace(pkceCodes.CodeChallenge) == "" {
++		return "", fmt.Errorf("antigravity auth URL: PKCE challenge is required")
++	}
+ 	if strings.TrimSpace(redirectURI) == "" {
+ 		redirectURI = fmt.Sprintf("http://localhost:%d/oauth-callback", CallbackPort)
+ 	}
+@@ -131,17 +134,23 @@ func (o *AntigravityAuth) BuildAuthURL(state, redirectURI string) string {
+ 	params.Set("response_type", "code")
+ 	params.Set("scope", strings.Join(Scopes, " "))
+ 	params.Set("state", state)
+-	return AuthEndpoint + "?" + params.Encode()
++	params.Set("code_challenge", pkceCodes.CodeChallenge)
++	params.Set("code_challenge_method", "S256")
++	return AuthEndpoint + "?" + params.Encode(), nil
+ }
+ 
+ // ExchangeCodeForTokens exchanges authorization code for access and refresh tokens
+-func (o *AntigravityAuth) ExchangeCodeForTokens(ctx context.Context, code, redirectURI string) (*TokenResponse, error) {
++func (o *AntigravityAuth) ExchangeCodeForTokens(ctx context.Context, code, redirectURI string, pkceCodes *PKCECodes) (*TokenResponse, error) {
++	if pkceCodes == nil || strings.TrimSpace(pkceCodes.CodeVerifier) == "" {
++		return nil, fmt.Errorf("antigravity token exchange: PKCE verifier is required")
++	}
+ 	data := url.Values{}
+ 	data.Set("code", code)
+ 	data.Set("client_id", ClientID)
+ 	data.Set("client_secret", ClientSecret)
+ 	data.Set("redirect_uri", redirectURI)
+ 	data.Set("grant_type", "authorization_code")
++	data.Set("code_verifier", pkceCodes.CodeVerifier)
+ 
+ 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, TokenEndpoint, strings.NewReader(data.Encode()))
+ 	if err != nil {
+@@ -355,7 +364,12 @@ func (o *AntigravityAuth) OnboardUser(ctx context.Context, accessToken, tierID s
+ 					return projectID, nil
+ 				}
+ 
+-				return "", fmt.Errorf("no project_id in response")
++				if attempt == maxAttempts {
++					return "", fmt.Errorf("project id unavailable after onboarding; the account may be ineligible or restricted")
++				}
++				// A completed onboarding response can precede project propagation.
++				time.Sleep(2 * time.Second)
++				continue
+ 			}
+ 
+ 			time.Sleep(2 * time.Second)
+diff --git a/internal/auth/antigravity/auth_test.go b/internal/auth/antigravity/auth_test.go
+index 7e8112ad0ed268342266ea492aba1cc253046550..d54943a43323ff7b3f5f8106ef09975a12ac8ccc 100644
+--- a/internal/auth/antigravity/auth_test.go
++++ b/internal/auth/antigravity/auth_test.go
+@@ -73,6 +73,33 @@ func TestFetchProjectIDFallsBackToDailyOnboardUser(t *testing.T) {
+ 	}
+ }
+ 
++func TestFetchProjectIDRetriesCompletedOnboardingUntilProjectPropagates(t *testing.T) {
++	attempts := 0
++	auth := NewAntigravityAuth(nil, &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
++		switch req.URL.String() {
++		case "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist":
++			return jsonResponse(`{"allowedTiers":[{"id":"standard-tier","isDefault":true}]}`), nil
++		case "https://daily-cloudcode-pa.googleapis.com/v1internal:onboardUser":
++			attempts++
++			if attempts == 1 {
++				return jsonResponse(`{"done":true,"response":{}}`), nil
++			}
++			return jsonResponse(`{"done":true,"response":{"cloudaicompanionProject":{"id":"propagated-project"}}}`), nil
++		default:
++			t.Fatalf("unexpected request URL: %s", req.URL.String())
++			return nil, nil
++		}
++	})})
++
++	projectID, err := auth.FetchProjectID(context.Background(), "access-token")
++	if err != nil {
++		t.Fatalf("FetchProjectID error: %v", err)
++	}
++	if projectID != "propagated-project" || attempts != 2 {
++		t.Fatalf("projectID=%q attempts=%d", projectID, attempts)
++	}
++}
++
+ func assertLoadCodeAssistHeaders(t *testing.T, req *http.Request) {
+ 	t.Helper()
+ 	if got := req.Header.Get("Authorization"); got != "Bearer access-token" {
+diff --git a/internal/browser/browser.go b/internal/browser/browser.go
+index b24dc5e112a9704b87585d22489c2e88f8022282..fa2e1fcc5d220ebc6f40c0fe28ae35cec3bbca43 100644
+--- a/internal/browser/browser.go
++++ b/internal/browser/browser.go
+@@ -4,8 +4,11 @@ package browser
+ 
+ import (
+ 	"fmt"
++	"os"
+ 	"os/exec"
++	"path/filepath"
+ 	"runtime"
++	"strings"
+ 
+ 	log "github.com/sirupsen/logrus"
+ 	"github.com/skratchdot/open-golang/open"
+@@ -21,7 +24,21 @@ import (
+ // Returns:
+ //   - An error if the URL cannot be opened, otherwise nil.
+ func OpenURL(url string) error {
+-	fmt.Printf("Attempting to open URL in browser: %s\n", url)
++	fmt.Println("Attempting to open the authentication URL in a browser")
++
++	if configured := strings.TrimSpace(os.Getenv("CLIPROXY_BROWSER")); configured != "" {
++		if !filepath.IsAbs(configured) {
++			return fmt.Errorf("CLIPROXY_BROWSER must be an absolute path")
++		}
++		info, errStat := os.Stat(configured)
++		if errStat != nil || info.IsDir() {
++			return fmt.Errorf("CLIPROXY_BROWSER is not an executable file: %s", configured)
++		}
++		if errStart := exec.Command(configured, "--new-window", url).Start(); errStart != nil {
++			return fmt.Errorf("start configured browser: %w", errStart)
++		}
++		return nil
++	}
+ 
+ 	// Try using the open-golang library first
+ 	err := open.Run(url)
+diff --git a/internal/misc/antigravity_version.go b/internal/misc/antigravity_version.go
+index 93b54d0b5bbab94fe1a9109245e730f9face25dc..8e4d2ed8f5691026d32e2724ad74e18b7db72001 100644
+--- a/internal/misc/antigravity_version.go
++++ b/internal/misc/antigravity_version.go
+@@ -16,7 +16,7 @@ import (
+ )
+ 
+ const (
+-	antigravityFallbackVersion = "2.2.1"
++	antigravityFallbackVersion = "2.8.1"
+ 	antigravityHubPlatform     = "darwin/arm64"
+ 	antigravityVersionCacheTTL = 6 * time.Hour
+ 	antigravityFetchTimeout    = 10 * time.Second
+diff --git a/internal/misc/antigravity_version_test.go b/internal/misc/antigravity_version_test.go
+index 645f2f7a1b2caa7e9367a0de99c79a839d81963b..70ec1e3bd12ac34ec37d316513253839c2fba95b 100644
+--- a/internal/misc/antigravity_version_test.go
++++ b/internal/misc/antigravity_version_test.go
+@@ -42,8 +42,8 @@ func TestAntigravityLatestVersionUsesCurrentHubFallback(t *testing.T) {
+ 	defer restore()
+ 
+ 	version := AntigravityLatestVersion()
+-	if version != "2.2.1" {
+-		t.Fatalf("AntigravityLatestVersion() = %q, want %q", version, "2.2.1")
++	if version != "2.8.1" {
++		t.Fatalf("AntigravityLatestVersion() = %q, want %q", version, "2.8.1")
+ 	}
+ }
+ 
+diff --git a/internal/registry/model_registry.go b/internal/registry/model_registry.go
+index ed904bc2716743a1b4b8ca290e91e3cd64f8cd48..1768d6ab09602e419894cff6033edf6198dfe680 100644
+--- a/internal/registry/model_registry.go
++++ b/internal/registry/model_registry.go
+@@ -1275,6 +1275,15 @@ func (r *ModelRegistry) convertModelToMap(model *ModelInfo, handlerType string)
+ 		}
+ 		result["max_input_tokens"] = maxInput
+ 		result["max_tokens"] = maxOutput
++		if len(model.SupportedInputModalities) > 0 {
++			result["supportedInputModalities"] = append([]string(nil), model.SupportedInputModalities...)
++		}
++		if len(model.SupportedOutputModalities) > 0 {
++			result["supportedOutputModalities"] = append([]string(nil), model.SupportedOutputModalities...)
++		}
++		if model.Thinking != nil {
++			result["thinking"] = cloneThinkingSupportMap(model.Thinking)
++		}
+ 		return result
+ 
+ 	case "gemini":
+@@ -1329,6 +1338,29 @@ func (r *ModelRegistry) convertModelToMap(model *ModelInfo, handlerType string)
+ 	}
+ }
+ 
++func cloneThinkingSupportMap(support *ThinkingSupport) map[string]any {
++	result := make(map[string]any)
++	if support == nil {
++		return result
++	}
++	if support.Min != 0 {
++		result["min"] = support.Min
++	}
++	if support.Max != 0 {
++		result["max"] = support.Max
++	}
++	if support.ZeroAllowed {
++		result["zero_allowed"] = true
++	}
++	if support.DynamicAllowed {
++		result["dynamic_allowed"] = true
++	}
++	if len(support.Levels) > 0 {
++		result["levels"] = append([]string(nil), support.Levels...)
++	}
++	return result
++}
++
+ // CleanupExpiredQuotas removes expired quota tracking entries
+ func (r *ModelRegistry) CleanupExpiredQuotas() {
+ 	r.mutex.Lock()
+diff --git a/internal/runtime/executor/antigravity_executor_buildrequest_test.go b/internal/runtime/executor/antigravity_executor_buildrequest_test.go
+index 66390cba3010862b24f446d042c140c460b51095..6a802b882965d36083fb0e66d8cb8733b5feac07 100644
+--- a/internal/runtime/executor/antigravity_executor_buildrequest_test.go
++++ b/internal/runtime/executor/antigravity_executor_buildrequest_test.go
+@@ -322,6 +322,23 @@ func assertNonSchemaRequestPreserved(t *testing.T, body map[string]any) {
+ 	}
+ }
+ 
++func TestBuildRequestPreservesGemini37MaxOutputTokens(t *testing.T) {
++	body := buildRequestBodyFromRawPayload(t, "gemini-3.7-flash-high", []byte(`{
++		"request": {
++			"contents": [{"role":"user","parts":[{"text":"hello"}]}],
++			"generationConfig": {"maxOutputTokens": 64}
++		}
++	}`))
++	request, ok := body["request"].(map[string]any)
++	if !ok {
++		t.Fatal("request missing")
++	}
++	generationConfig, ok := request["generationConfig"].(map[string]any)
++	if !ok || generationConfig["maxOutputTokens"] != float64(64) {
++		t.Fatalf("Gemini 3.7 maxOutputTokens was not preserved: %#v", generationConfig)
++	}
++}
++
+ func buildRequestBodyFromPayload(t *testing.T, modelName string) map[string]any {
+ 	t.Helper()
+ 	return buildRequestBodyFromRawPayload(t, modelName, []byte(`{
+diff --git a/internal/runtime/executor/antigravity_executor_request.go b/internal/runtime/executor/antigravity_executor_request.go
+index c8d3141a69d0bb0b2b883559ea008c29eb333478..fdba310a183fc39a34fff8bb47168c9db3fb59df 100644
+--- a/internal/runtime/executor/antigravity_executor_request.go
++++ b/internal/runtime/executor/antigravity_executor_request.go
+@@ -78,7 +78,7 @@ func (e *AntigravityExecutor) buildRequest(ctx context.Context, auth *cliproxyau
+ 		if strings.Contains(modelName, "claude") {
+ 			updated, _ := sjson.SetBytes([]byte(payloadStr), "request.toolConfig.functionCallingConfig.mode", "VALIDATED")
+ 			payloadStr = string(updated)
+-		} else {
++		} else if !preserveAntigravityMaxOutputTokens(modelName) {
+ 			payloadStr, _ = sjson.Delete(payloadStr, "request.generationConfig.maxOutputTokens")
+ 		}
+ 
+@@ -90,7 +90,7 @@ func (e *AntigravityExecutor) buildRequest(ctx context.Context, auth *cliproxyau
+ 	} else {
+ 		if strings.Contains(modelName, "claude") {
+ 			payload, _ = sjson.SetBytes(payload, "request.toolConfig.functionCallingConfig.mode", "VALIDATED")
+-		} else {
++		} else if !preserveAntigravityMaxOutputTokens(modelName) {
+ 			payload, _ = sjson.DeleteBytes(payload, "request.generationConfig.maxOutputTokens")
+ 		}
+ 
+@@ -155,6 +155,10 @@ func (e *AntigravityExecutor) buildRequest(ctx context.Context, auth *cliproxyau
+ 	return httpReq, nil
+ }
+ 
++func preserveAntigravityMaxOutputTokens(modelName string) bool {
++	return strings.EqualFold(strings.TrimSpace(modelName), "gemini-3.7-flash-high")
++}
++
+ // sanitizeAntigravityRequestSchemas cleans the JSON schemas carried by an Antigravity request.
+ //
+ // Cleaning is applied only to the payload locations that actually hold a JSON schema. The schema
+diff --git a/internal/runtime/executor/claude_executor_test.go b/internal/runtime/executor/claude_executor_test.go
+index 1a0582387c78fb658f8173c41d86f1baf6ba8a6f..cf2ab0a8466fadb76c49f636974af151731edcd8 100644
+--- a/internal/runtime/executor/claude_executor_test.go
++++ b/internal/runtime/executor/claude_executor_test.go
+@@ -611,7 +611,7 @@ func TestApplyClaudeHeaders_DisableDeviceProfileStabilization(t *testing.T) {
+ 		"X-Stainless-Arch":            []string{"x64"},
+ 	})
+ 	applyClaudeHeaders(thirdPartyReq, auth, "key-disable-stability", false, nil, nil, cfg, nil, false)
+-	assertClaudeFingerprint(t, thirdPartyReq.Header, "claude-cli/2.1.60 (external, cli)", "0.70.0", "v22.0.0", helps.MapStainlessOS(), helps.MapStainlessArch())
++	assertClaudeFingerprint(t, thirdPartyReq.Header, "claude-cli/2.1.60 (external, cli)", "0.70.0", "v22.0.0", "MacOS", "arm64")
+ 
+ 	lowerReq := newClaudeHeaderTestRequest(t, http.Header{
+ 		"User-Agent":                  []string{"claude-cli/2.1.61 (external, cli)"},
+@@ -653,7 +653,7 @@ func TestApplyClaudeHeaders_LegacyModePreservesConfiguredUserAgentOverrideForCla
+ 	})
+ 	applyClaudeHeaders(req, auth, "key-legacy-ua-override", false, nil, nil, cfg, nil, true)
+ 
+-	assertClaudeFingerprint(t, req.Header, "config-ua/1.0", "0.70.0", "v22.0.0", helps.MapStainlessOS(), helps.MapStainlessArch())
++	assertClaudeFingerprint(t, req.Header, "config-ua/1.0", "0.70.0", "v22.0.0", "MacOS", "arm64")
+ }
+ 
+ func TestApplyClaudeHeaders_LegacyThirdPartyUsesStableConfiguredOSArch(t *testing.T) {
+@@ -758,7 +758,7 @@ func TestClaudeExecutor_NonClaudeRequestUsesClaudeCode220CLIFingerprint(t *testi
+ 		t.Fatalf("Execute() error = %v", errExecute)
+ 	}
+ 
+-	assertClaudeFingerprint(t, seenHeaders, "claude-cli/2.1.220 (external, cli)", "0.94.0", "v26.3.0", helps.MapStainlessOS(), helps.MapStainlessArch())
++	assertClaudeFingerprint(t, seenHeaders, "claude-cli/2.1.220 (external, cli)", "0.94.0", "v26.3.0", "MacOS", "arm64")
+ 	if got := seenHeaders.Get("X-App"); got != "cli" {
+ 		t.Fatalf("X-App = %q, want cli", got)
+ 	}
+diff --git a/internal/runtime/executor/helps/thinking_test.go b/internal/runtime/executor/helps/thinking_test.go
+index 69b18fdab8d40ef36683fca125baf4beaf283330..97282ad809db8f1c2234941bba7079ea369bf187 100644
+--- a/internal/runtime/executor/helps/thinking_test.go
++++ b/internal/runtime/executor/helps/thinking_test.go
+@@ -5,6 +5,7 @@ import (
+ 	"testing"
+ 
+ 	helps "github.com/router-for-me/CLIProxyAPI/v7/internal/runtime/executor/helps"
++	_ "github.com/router-for-me/CLIProxyAPI/v7/internal/thinking/provider/antigravity"
+ 	_ "github.com/router-for-me/CLIProxyAPI/v7/internal/thinking/provider/gemini"
+ 	_ "github.com/router-for-me/CLIProxyAPI/v7/internal/translator"
+ 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v7/sdk/translator"
+@@ -98,3 +99,33 @@ func TestApplyThinkingWithSourcePayloadPreservesOriginalOnlySummary(t *testing.T
+ 		t.Fatalf("original disabled summary was not preserved: %s", out)
+ 	}
+ }
++
++func TestApplyThinkingWithSourcePayloadMapsZCodeGemini37Effort(t *testing.T) {
++	for _, level := range []string{"low", "medium", "high"} {
++		t.Run(level, func(t *testing.T) {
++			source := []byte(`{"model":"gemini-3.7-flash-high","thinking":{"type":"adaptive"},"output_config":{"effort":"` + level + `"}}`)
++			body := sdktranslator.TranslateRequest(
++				sdktranslator.FormatClaude,
++				sdktranslator.FormatAntigravity,
++				"gemini-3.7-flash-high",
++				source,
++				false,
++			)
++			out, err := helps.ApplyThinkingWithSourcePayload(
++				body,
++				source,
++				source,
++				"gemini-3.7-flash-high",
++				sdktranslator.FormatClaude.String(),
++				"antigravity",
++				"antigravity",
++			)
++			if err != nil {
++				t.Fatalf("ApplyThinkingWithSourcePayload() error = %v", err)
++			}
++			if got := gjson.GetBytes(out, "request.generationConfig.thinkingConfig.thinkingLevel").String(); got != level {
++				t.Fatalf("thinkingLevel = %q, want %q; body=%s", got, level, out)
++			}
++		})
++	}
++}
+diff --git a/internal/runtime/executor/helps/usage_helpers.go b/internal/runtime/executor/helps/usage_helpers.go
+index 04faf789898b279b7a7b17acfbccab73812b0633..ad34f7b91e83422dacdb72ab2dd2ec7dcec9d04d 100644
+--- a/internal/runtime/executor/helps/usage_helpers.go
++++ b/internal/runtime/executor/helps/usage_helpers.go
+@@ -329,8 +329,11 @@ func (r *UsageReporter) setTTFT(ttft time.Duration) {
+ 	if r == nil {
+ 		return
+ 	}
+-	if ttft < 0 {
+-		ttft = 0
++	if ttft <= 0 {
++		// Extremely fast in-process responses can fall within one Windows clock
++		// tick. Preserve the semantic distinction between "measured immediately"
++		// and "TTFT was never observed".
++		ttft = time.Nanosecond
+ 	}
+ 	r.ttftMu.Lock()
+ 	if r.ttftSet {
+diff --git a/internal/store/gitstore.go b/internal/store/gitstore.go
+index 7d01363d4a1e4453ac03ca86f7478eec7893fced..9c5a17adf4ce989344eebfeedb1ae2fc119dfd11 100644
+--- a/internal/store/gitstore.go
++++ b/internal/store/gitstore.go
+@@ -23,6 +23,7 @@ import (
+ 	"github.com/go-git/go-git/v6/plumbing/transport/http"
+ 	"github.com/go-git/go-git/v6/storage/filesystem/dotgit"
+ 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
++	log "github.com/sirupsen/logrus"
+ )
+ 
+ const (
+@@ -149,7 +150,8 @@ func (s *GitTokenStore) ensureRepositoryLocked() error {
+ 		if s.branch != "" {
+ 			cloneOpts.ReferenceName = plumbing.NewBranchReferenceName(s.branch)
+ 		}
+-		if _, errClone := git.PlainClone(repoDir, cloneOpts); errClone != nil {
++		clonedRepo, errClone := git.PlainClone(repoDir, cloneOpts)
++		if errClone != nil {
+ 			if errors.Is(errClone, transport.ErrEmptyRemoteRepository) {
+ 				_ = os.RemoveAll(gitDir)
+ 				repo, errInit := git.PlainInit(repoDir, false)
+@@ -157,6 +159,11 @@ func (s *GitTokenStore) ensureRepositoryLocked() error {
+ 					s.dirLock.Unlock()
+ 					return fmt.Errorf("git token store: init empty repo: %w", errInit)
+ 				}
++				defer func() {
++					if errClose := repo.Close(); errClose != nil {
++						log.WithError(errClose).Warn("git token store: close initialized repository")
++					}
++				}()
+ 				if s.branch != "" {
+ 					headRef := plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.NewBranchReferenceName(s.branch))
+ 					if errHead := repo.Storer.SetReference(headRef); errHead != nil {
+@@ -197,6 +204,9 @@ func (s *GitTokenStore) ensureRepositoryLocked() error {
+ 				s.dirLock.Unlock()
+ 				return fmt.Errorf("git token store: clone remote: %w", errClone)
+ 			}
++		} else if errClose := clonedRepo.Close(); errClose != nil {
++			s.dirLock.Unlock()
++			return fmt.Errorf("git token store: close cloned repository: %w", errClose)
+ 		}
+ 	} else if err != nil {
+ 		s.dirLock.Unlock()
+@@ -207,6 +217,13 @@ func (s *GitTokenStore) ensureRepositoryLocked() error {
+ 			s.dirLock.Unlock()
+ 			return fmt.Errorf("git token store: open repo: %w", errOpen)
+ 		}
++		defer func() {
++			if repo != nil {
++				if errClose := repo.Close(); errClose != nil {
++					log.WithError(errClose).Warn("git token store: close repository")
++				}
++			}
++		}()
+ 		worktree, errWorktree := repo.Worktree()
+ 		if errWorktree != nil {
+ 			s.dirLock.Unlock()
+@@ -217,7 +234,9 @@ func (s *GitTokenStore) ensureRepositoryLocked() error {
+ 				s.dirLock.Unlock()
+ 				return fmt.Errorf("git token store: verify repository before pull: %w", errVerify)
+ 			}
+-			if errRecover := s.recoverRepositoryLocked(repoDir, authMethod, nil, nil); errRecover != nil {
++			errRecover := s.recoverRepositoryLocked(repoDir, authMethod, repo, nil, nil)
++			repo = nil
++			if errRecover != nil {
+ 				s.dirLock.Unlock()
+ 				return fmt.Errorf("git token store: verify repository before pull: %w; recovery failed: %v", errVerify, errRecover)
+ 			}
+@@ -282,7 +301,9 @@ func (s *GitTokenStore) ensureRepositoryLocked() error {
+ 						s.dirLock.Unlock()
+ 						return fmt.Errorf("git token store: repair index after up-to-date pull: %w", errReset)
+ 					}
+-					if errRecover := s.recoverRepositoryLocked(repoDir, authMethod, prePullTree, dirtyPaths); errRecover != nil {
++					errRecover := s.recoverRepositoryLocked(repoDir, authMethod, repo, prePullTree, dirtyPaths)
++					repo = nil
++					if errRecover != nil {
+ 						s.dirLock.Unlock()
+ 						return fmt.Errorf("git token store: repair index after up-to-date pull: %w; recovery failed: %v", errReset, errRecover)
+ 					}
+@@ -298,7 +319,9 @@ func (s *GitTokenStore) ensureRepositoryLocked() error {
+ 						s.dirLock.Unlock()
+ 						return fmt.Errorf("git token store: reconcile remote changes: %w", errReconcile)
+ 					}
+-					if errRecover := s.recoverRepositoryLocked(repoDir, authMethod, prePullTree, dirtyPaths); errRecover != nil {
++					errRecover := s.recoverRepositoryLocked(repoDir, authMethod, repo, prePullTree, dirtyPaths)
++					repo = nil
++					if errRecover != nil {
+ 						s.dirLock.Unlock()
+ 						return fmt.Errorf("git token store: reconcile remote changes: %w; recovery failed: %v", errReconcile, errRecover)
+ 					}
+@@ -314,7 +337,9 @@ func (s *GitTokenStore) ensureRepositoryLocked() error {
+ 				}
+ 				// Ignore missing references only when following the remote default branch.
+ 			case isRepositoryCorruptionError(errPull):
+-				if errRecover := s.recoverRepositoryLocked(repoDir, authMethod, prePullTree, dirtyPaths); errRecover != nil {
++				errRecover := s.recoverRepositoryLocked(repoDir, authMethod, repo, prePullTree, dirtyPaths)
++				repo = nil
++				if errRecover != nil {
+ 					s.dirLock.Unlock()
+ 					return fmt.Errorf("git token store: pull: %w; recovery failed: %v", errPull, errRecover)
+ 				}
+@@ -330,7 +355,9 @@ func (s *GitTokenStore) ensureRepositoryLocked() error {
+ 					s.dirLock.Unlock()
+ 					return fmt.Errorf("git token store: verify repository after pull: %w", errVerify)
+ 				}
+-				if errRecover := s.recoverRepositoryLocked(repoDir, authMethod, prePullTree, dirtyPaths); errRecover != nil {
++				errRecover := s.recoverRepositoryLocked(repoDir, authMethod, repo, prePullTree, dirtyPaths)
++				repo = nil
++				if errRecover != nil {
+ 					s.dirLock.Unlock()
+ 					return fmt.Errorf("git token store: verify repository after pull: %w; recovery failed: %v", errVerify, errRecover)
+ 				}
+@@ -588,6 +615,11 @@ func (s *GitTokenStore) guardWatcherAuthRemovalLocked(message string, relPaths [
+ 	if errOpen != nil {
+ 		return true, fmt.Errorf("git token store: open repo for watcher removal guard: %w", errOpen)
+ 	}
++	defer func() {
++		if errClose := repo.Close(); errClose != nil {
++			log.WithError(errClose).Warn("git token store: close watcher guard repository")
++		}
++	}()
+ 	head, errHead := repo.Head()
+ 	if errHead != nil {
+ 		if errors.Is(errHead, plumbing.ErrReferenceNotFound) {
+@@ -766,6 +798,11 @@ func disableGitCommitSigning(repoDir string) error {
+ 	if errOpen != nil {
+ 		return fmt.Errorf("git token store: open repository config: %w", errOpen)
+ 	}
++	defer func() {
++		if errClose := repo.Close(); errClose != nil {
++			log.WithError(errClose).Warn("git token store: close config repository")
++		}
++	}()
+ 	cfg, errConfig := repo.Config()
+ 	if errConfig != nil {
+ 		return fmt.Errorf("git token store: get repository config: %w", errConfig)
+@@ -1101,7 +1138,23 @@ func applyTreePaths(tree *object.Tree, repoDir string, paths []string) error {
+ 	return nil
+ }
+ 
+-func (s *GitTokenStore) recoverRepositoryLocked(repoDir string, authMethod []client.Option, baselineTree *object.Tree, dirtyPaths map[string]struct{}) (errRecovery error) {
++func (s *GitTokenStore) recoverRepositoryLocked(repoDir string, authMethod []client.Option, localRepo *git.Repository, baselineTree *object.Tree, dirtyPaths map[string]struct{}) (errRecovery error) {
++	if localRepo == nil {
++		return fmt.Errorf("recover repository: local repository is nil")
++	}
++	localRepoOpen := true
++	defer func() {
++		if localRepoOpen {
++			if errClose := localRepo.Close(); errClose != nil {
++				errClose = fmt.Errorf("close local repository after recovery: %w", errClose)
++				if errRecovery == nil {
++					errRecovery = errClose
++				} else {
++					errRecovery = errors.Join(errRecovery, errClose)
++				}
++			}
++		}
++	}()
+ 	parentDir := filepath.Dir(repoDir)
+ 	recoveryRoot, errTemp := os.MkdirTemp(parentDir, ".gitstore-recovery-")
+ 	if errTemp != nil {
+@@ -1123,7 +1176,7 @@ func (s *GitTokenStore) recoverRepositoryLocked(repoDir string, authMethod []cli
+ 	}()
+ 
+ 	if baselineTree == nil {
+-		inspectedTree, inspectedDirtyPaths, errInspect := inspectRecoveryBaseline(repoDir)
++		inspectedTree, inspectedDirtyPaths, errInspect := inspectRecoveryBaseline(localRepo)
+ 		if errInspect != nil {
+ 			return fmt.Errorf("inspect recovery baseline: %w", errInspect)
+ 		}
+@@ -1139,6 +1192,19 @@ func (s *GitTokenStore) recoverRepositoryLocked(repoDir string, authMethod []cli
+ 	if errClone != nil {
+ 		return fmt.Errorf("clone remote repository: %w", errClone)
+ 	}
++	clonedRepoOpen := true
++	defer func() {
++		if clonedRepoOpen {
++			if errClose := clonedRepo.Close(); errClose != nil {
++				errClose = fmt.Errorf("close cloned repository after recovery: %w", errClose)
++				if errRecovery == nil {
++					errRecovery = errClose
++				} else {
++					errRecovery = errors.Join(errRecovery, errClose)
++				}
++			}
++		}
++	}()
+ 	if errVerify := verifyRepositoryHead(clonedRepo); errVerify != nil {
+ 		return fmt.Errorf("verify cloned repository: %w", errVerify)
+ 	}
+@@ -1161,6 +1227,14 @@ func (s *GitTokenStore) recoverRepositoryLocked(repoDir string, authMethod []cli
+ 	if errApply := applyRecoveryLocalChanges(repoDir, cloneDir, preservedPaths); errApply != nil {
+ 		return fmt.Errorf("preserve local worktree changes: %w", errApply)
+ 	}
++	if errClose := clonedRepo.Close(); errClose != nil {
++		return fmt.Errorf("close recovered clone before install: %w", errClose)
++	}
++	clonedRepoOpen = false
++	if errClose := localRepo.Close(); errClose != nil {
++		return fmt.Errorf("close corrupt repository before backup: %w", errClose)
++	}
++	localRepoOpen = false
+ 
+ 	backupWorktreeDir := filepath.Join(recoveryRoot, "worktree")
+ 	if errBackup := moveWorktreeEntries(repoDir, backupWorktreeDir); errBackup != nil {
+@@ -1191,6 +1265,14 @@ func (s *GitTokenStore) recoverRepositoryLocked(repoDir string, authMethod []cli
+ 	recoveredRepo, errOpen := git.PlainOpen(repoDir)
+ 	if errOpen == nil {
+ 		errOpen = verifyRepositoryHead(recoveredRepo)
++		if errClose := recoveredRepo.Close(); errClose != nil {
++			errClose = fmt.Errorf("close verified recovered repository: %w", errClose)
++			if errOpen == nil {
++				errOpen = errClose
++			} else {
++				errOpen = errors.Join(errOpen, errClose)
++			}
++		}
+ 	}
+ 	if errOpen != nil {
+ 		errRecovered := fmt.Errorf("verify recovered repository: %w", errOpen)
+@@ -1203,10 +1285,9 @@ func (s *GitTokenStore) recoverRepositoryLocked(repoDir string, authMethod []cli
+ 	return nil
+ }
+ 
+-func inspectRecoveryBaseline(repoDir string) (*object.Tree, map[string]struct{}, error) {
+-	repo, errOpen := git.PlainOpen(repoDir)
+-	if errOpen != nil {
+-		return nil, nil, fmt.Errorf("open repository: %w", errOpen)
++func inspectRecoveryBaseline(repo *git.Repository) (*object.Tree, map[string]struct{}, error) {
++	if repo == nil {
++		return nil, nil, fmt.Errorf("open repository: repository is nil")
+ 	}
+ 	worktree, errWorktree := repo.Worktree()
+ 	if errWorktree != nil {
+@@ -1525,6 +1606,11 @@ func (s *GitTokenStore) commitAndPushWithOptionsLocked(message string, allowMiss
+ 	if err != nil {
+ 		return fmt.Errorf("git token store: open repo: %w", err)
+ 	}
++	defer func() {
++		if errClose := repo.Close(); errClose != nil {
++			log.WithError(errClose).Warn("git token store: close commit repository")
++		}
++	}()
+ 	worktree, err := repo.Worktree()
+ 	if err != nil {
+ 		return fmt.Errorf("git token store: worktree: %w", err)
+@@ -1781,6 +1867,11 @@ func (s *GitTokenStore) maybeRunGC(repoDir string) {
+ 	if err != nil {
+ 		return
+ 	}
++	defer func() {
++		if errClose := repo.Close(); errClose != nil {
++			log.WithError(errClose).Warn("git token store: close gc repository")
++		}
++	}()
+ 
+ 	pruneOpts := git.PruneOptions{
+ 		OnlyObjectsOlderThan: now.Add(-gcPruneGracePeriod),
+diff --git a/internal/store/gitstore_test.go b/internal/store/gitstore_test.go
+index df82ff8fba645e1c42d427bdb51103da65281a34..e25d4710ce35cb8efaabb140e7543c02b232bc6b 100644
+--- a/internal/store/gitstore_test.go
++++ b/internal/store/gitstore_test.go
+@@ -1403,6 +1403,11 @@ func removeHeadFileObject(t *testing.T, repoDir, path string) {
+ 	if errOpen != nil {
+ 		t.Fatalf("open repository before object removal: %v", errOpen)
+ 	}
++	defer func() {
++		if errClose := repo.Close(); errClose != nil {
++			t.Errorf("close repository after corruption: %v", errClose)
++		}
++	}()
+ 	worktree, errWorktree := repo.Worktree()
+ 	if errWorktree != nil {
+ 		t.Fatalf("open worktree before object removal: %v", errWorktree)
+diff --git a/internal/translator/antigravity/claude/antigravity_claude_request.go b/internal/translator/antigravity/claude/antigravity_claude_request.go
+index 4cb8cefda1228f3d461fbc6f5c7e42e659a6c89a..2a09c70a9f42f1af530e663d4fe601219f9d0425 100644
+--- a/internal/translator/antigravity/claude/antigravity_claude_request.go
++++ b/internal/translator/antigravity/claude/antigravity_claude_request.go
+@@ -715,7 +715,7 @@ func ConvertClaudeRequestToAntigravity(modelName string, inputRawJSON []byte, _
+ 							partJSON, _ = sjson.SetRawBytes(partJSON, "functionResponse", functionResponseJSON)
+ 							partItems = append(partItems, partJSON)
+ 						}
+-					} else if contentTypeResult.Type == gjson.String && contentTypeResult.String() == "image" {
++					} else if contentTypeResult.Type == gjson.String && (contentTypeResult.String() == "image" || contentTypeResult.String() == "audio" || contentTypeResult.String() == "video") {
+ 						sourceResult := contentResult.Get("source")
+ 						if sourceResult.Get("type").String() == "base64" {
+ 							inlineDataJSON := []byte(`{}`)
+diff --git a/internal/translator/antigravity/claude/antigravity_claude_request_test.go b/internal/translator/antigravity/claude/antigravity_claude_request_test.go
+index 7344ff6127993c09a2c50ea59362204f8e23303b..a99bfc57dffff57fe510a87af4c840b16aef0fb2 100644
+--- a/internal/translator/antigravity/claude/antigravity_claude_request_test.go
++++ b/internal/translator/antigravity/claude/antigravity_claude_request_test.go
+@@ -2334,6 +2334,46 @@ func TestConvertClaudeRequestToAntigravity_ImageContent(t *testing.T) {
+ 	}
+ }
+ 
++func TestConvertClaudeRequestToAntigravity_AudioAndVideoContent(t *testing.T) {
++	inputJSON := []byte(`{
++		"model": "gemini-3.7-flash-high",
++		"messages": [
++			{
++				"role": "user",
++				"content": [
++					{
++						"type": "audio",
++						"source": {
++							"type": "base64",
++							"media_type": "audio/wav",
++							"data": "UklGRg=="
++						}
++					},
++					{
++						"type": "video",
++						"source": {
++							"type": "base64",
++							"media_type": "video/mp4",
++							"data": "AAAAIGZ0eXA="
++						}
++					}
++				]
++			}
++		]
++	}`)
++
++	output := ConvertClaudeRequestToAntigravity("gemini-3.7-flash-high", inputJSON, false)
++
++	audio := gjson.GetBytes(output, "request.contents.0.parts.0.inlineData")
++	if audio.Get("mimeType").String() != "audio/wav" || audio.Get("data").String() != "UklGRg==" {
++		t.Fatalf("audio inlineData mismatch: %s", audio.Raw)
++	}
++	video := gjson.GetBytes(output, "request.contents.0.parts.1.inlineData")
++	if video.Get("mimeType").String() != "video/mp4" || video.Get("data").String() != "AAAAIGZ0eXA=" {
++		t.Fatalf("video inlineData mismatch: %s", video.Raw)
++	}
++}
++
+ func TestConvertClaudeRequestToAntigravity_GenerationConfig(t *testing.T) {
+ 	inputJSON := []byte(`{
+ 		"model": "claude-3-5-sonnet-20240620",
+diff --git a/internal/watcher/synthesizer/file.go b/internal/watcher/synthesizer/file.go
+index dad21bd1c407aa9a4e2ccbd13b160443bd1bd469..e38888fc9184eb7b89ed79cd277778c8d25f0373 100644
+--- a/internal/watcher/synthesizer/file.go
++++ b/internal/watcher/synthesizer/file.go
+@@ -12,6 +12,7 @@ import (
+ 
+ 	"github.com/router-for-me/CLIProxyAPI/v7/internal/auth/codex"
+ 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
++	sdkauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/auth"
+ 	coreauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
+ 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/pluginapi"
+ 	log "github.com/sirupsen/logrus"
+@@ -77,8 +78,8 @@ func synthesizeFileAuths(ctx *SynthesisContext, fullPath string, data []byte) ([
+ 	}
+ 	now := ctx.Now
+ 	cfg := ctx.Config
+-	var metadata map[string]any
+-	if errUnmarshal := json.Unmarshal(data, &metadata); errUnmarshal != nil {
++	metadata, errUnmarshal := sdkauth.UnmarshalStoredMetadata(data)
++	if errUnmarshal != nil {
+ 		return nil, nil
+ 	}
+ 	if errWeight := coreauth.ValidateAuthWeight(&coreauth.Auth{Metadata: metadata}); errWeight != nil {
+diff --git a/internal/watcher/synthesizer/file_test.go b/internal/watcher/synthesizer/file_test.go
+index 20026080605b60a688a20926667328b05b0784eb..ffbb1ee1d6b4aab073be54da2a5c90f0d3caeac5 100644
+--- a/internal/watcher/synthesizer/file_test.go
++++ b/internal/watcher/synthesizer/file_test.go
+@@ -5,10 +5,13 @@ import (
+ 	"encoding/json"
+ 	"os"
+ 	"path/filepath"
++	"runtime"
++	"strings"
+ 	"testing"
+ 	"time"
+ 
+ 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
++	sdkauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/auth"
+ 	coreauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
+ 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/pluginapi"
+ )
+@@ -31,6 +34,64 @@ func TestFileSynthesizer_Synthesize_NilContext(t *testing.T) {
+ 	}
+ }
+ 
++func TestSynthesizeAuthFileUnprotectsStoredAntigravityCredentials(t *testing.T) {
++	tempDir := t.TempDir()
++	fileName := "antigravity-runtime.json"
++	accessToken := "test-access-token"
++	refreshToken := "test-refresh-token"
++
++	store := sdkauth.NewFileTokenStore()
++	store.SetBaseDir(tempDir)
++	auth := &coreauth.Auth{
++		ID:       fileName,
++		FileName: fileName,
++		Metadata: map[string]any{
++			"type":          "antigravity",
++			"access_token":  accessToken,
++			"refresh_token": refreshToken,
++			"project_id":    "test-project",
++		},
++	}
++	fullPath, errSave := store.Save(context.Background(), auth)
++	if errSave != nil {
++		t.Fatalf("Save() error = %v", errSave)
++	}
++	raw, errRead := os.ReadFile(fullPath)
++	if errRead != nil {
++		t.Fatalf("read stored auth: %v", errRead)
++	}
++	if runtime.GOOS == "windows" {
++		var stored map[string]any
++		if errUnmarshal := json.Unmarshal(raw, &stored); errUnmarshal != nil {
++			t.Fatalf("unmarshal stored auth: %v", errUnmarshal)
++		}
++		storedAccess, _ := stored["access_token"].(string)
++		if storedAccess == accessToken || !strings.HasPrefix(storedAccess, "dpapi:v1:") {
++			t.Fatalf("stored access token is not DPAPI protected")
++		}
++	}
++
++	ctx := &SynthesisContext{
++		Config:      &config.Config{},
++		AuthDir:     tempDir,
++		Now:         time.Now(),
++		IDGenerator: NewStableIDGenerator(),
++	}
++	auths, errSynthesize := SynthesizeAuthFile(ctx, fullPath, raw)
++	if errSynthesize != nil {
++		t.Fatalf("SynthesizeAuthFile() error = %v", errSynthesize)
++	}
++	if len(auths) != 1 {
++		t.Fatalf("SynthesizeAuthFile() len = %d, want 1", len(auths))
++	}
++	if got, _ := auths[0].Metadata["access_token"].(string); got != accessToken {
++		t.Errorf("runtime access token was not restored")
++	}
++	if got, _ := auths[0].Metadata["refresh_token"].(string); got != refreshToken {
++		t.Errorf("runtime refresh token was not restored")
++	}
++}
++
+ func TestFileSynthesizer_Synthesize_EmptyAuthDir(t *testing.T) {
+ 	synth := NewFileSynthesizer()
+ 	ctx := &SynthesisContext{
+diff --git a/sdk/auth/antigravity.go b/sdk/auth/antigravity.go
+index ee41cbdbd257a4cce05eaf797a0bce120ef4da06..47e8f2d12df2c57eea24e9a252ac4f801095c9a2 100644
+--- a/sdk/auth/antigravity.go
++++ b/sdk/auth/antigravity.go
+@@ -54,8 +54,12 @@ func (AntigravityAuthenticator) Login(ctx context.Context, cfg *config.Config, o
+ 	if err != nil {
+ 		return nil, fmt.Errorf("antigravity: failed to generate state: %w", err)
+ 	}
++	pkceCodes, errPKCE := antigravity.GeneratePKCECodes()
++	if errPKCE != nil {
++		return nil, errPKCE
++	}
+ 
+-	srv, port, cbChan, errServer := startAntigravityCallbackServer(callbackPort)
++	srv, port, cbChan, errServer := startAntigravityCallbackServer(callbackPort, state)
+ 	if errServer != nil {
+ 		return nil, fmt.Errorf("antigravity: failed to start callback server: %w", errServer)
+ 	}
+@@ -66,7 +70,10 @@ func (AntigravityAuthenticator) Login(ctx context.Context, cfg *config.Config, o
+ 	}()
+ 
+ 	redirectURI := fmt.Sprintf("http://localhost:%d/oauth-callback", port)
+-	authURL := authSvc.BuildAuthURL(state, redirectURI)
++	authURL, errAuthURL := authSvc.BuildAuthURL(state, redirectURI, pkceCodes)
++	if errAuthURL != nil {
++		return nil, errAuthURL
++	}
+ 
+ 	if !opts.NoBrowser {
+ 		fmt.Println("Opening browser for antigravity authentication")
+@@ -153,7 +160,7 @@ waitForCallback:
+ 		return nil, fmt.Errorf("antigravity: missing authorization code")
+ 	}
+ 
+-	tokenResp, errToken := authSvc.ExchangeCodeForTokens(ctx, cbRes.Code, redirectURI)
++	tokenResp, errToken := authSvc.ExchangeCodeForTokens(ctx, cbRes.Code, redirectURI, pkceCodes)
+ 	if errToken != nil {
+ 		return nil, fmt.Errorf("antigravity: token exchange failed: %w", errToken)
+ 	}
+@@ -228,12 +235,12 @@ type callbackResult struct {
+ 	State string
+ }
+ 
+-func startAntigravityCallbackServer(port int) (*http.Server, int, <-chan callbackResult, error) {
++func startAntigravityCallbackServer(port int, expectedState string) (*http.Server, int, <-chan callbackResult, error) {
+ 	if port <= 0 {
+ 		port = antigravity.CallbackPort
+ 	}
+-	addr := fmt.Sprintf(":%d", port)
+-	listener, err := net.Listen("tcp", addr)
++	addr := fmt.Sprintf("127.0.0.1:%d", port)
++	listener, err := net.Listen("tcp4", addr)
+ 	if err != nil {
+ 		return nil, 0, nil, err
+ 	}
+@@ -242,13 +249,32 @@ func startAntigravityCallbackServer(port int) (*http.Server, int, <-chan callbac
+ 
+ 	mux := http.NewServeMux()
+ 	mux.HandleFunc("/oauth-callback", func(w http.ResponseWriter, r *http.Request) {
++		if r.Method != http.MethodGet {
++			w.Header().Set("Allow", http.MethodGet)
++			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
++			return
++		}
++		host, hostPort, errHost := net.SplitHostPort(r.Host)
++		if errHost != nil || hostPort != fmt.Sprintf("%d", port) || (host != "localhost" && host != "127.0.0.1") {
++			http.Error(w, "invalid callback host", http.StatusBadRequest)
++			return
++		}
+ 		q := r.URL.Query()
+ 		res := callbackResult{
+ 			Code:  strings.TrimSpace(q.Get("code")),
+ 			Error: strings.TrimSpace(q.Get("error")),
+ 			State: strings.TrimSpace(q.Get("state")),
+ 		}
+-		resultCh <- res
++		if res.State == "" || res.State != expectedState {
++			http.Error(w, "invalid OAuth state", http.StatusBadRequest)
++			return
++		}
++		select {
++		case resultCh <- res:
++		default:
++			http.Error(w, "OAuth callback already received", http.StatusConflict)
++			return
++		}
+ 		if res.Code != "" && res.Error == "" {
+ 			_, _ = w.Write([]byte("<h1>Login successful</h1><p>You can close this window.</p>"))
+ 		} else {
+diff --git a/sdk/auth/filestore.go b/sdk/auth/filestore.go
+index 8abef89e153725dce3dde8ab16fb42a4aa91b71a..14ed67b7f04e4aaeb7f2015587528e88d0947da4 100644
+--- a/sdk/auth/filestore.go
++++ b/sdk/auth/filestore.go
+@@ -3,9 +3,9 @@ package auth
+ import (
+ 	"context"
+ 	"encoding/json"
++	"errors"
+ 	"fmt"
+ 	"io/fs"
+-	"net/http"
+ 	"os"
+ 	"path/filepath"
+ 	"runtime"
+@@ -35,6 +35,13 @@ type pluginAuthParserHolder struct {
+ 
+ var pluginAuthParserValue atomic.Value
+ 
++type malformedAuthJSONError struct {
++	err error
++}
++
++func (e *malformedAuthJSONError) Error() string { return "unmarshal auth json: " + e.err.Error() }
++func (e *malformedAuthJSONError) Unwrap() error { return e.err }
++
+ // RegisterPluginAuthParser registers the current plugin auth parser.
+ func RegisterPluginAuthParser(parser PluginAuthParser) {
+ 	pluginAuthParserValue.Store(pluginAuthParserHolder{parser: parser})
+@@ -121,30 +128,22 @@ func (s *FileTokenStore) Save(ctx context.Context, auth *cliproxyauth.Auth) (str
+ 		}
+ 	case auth.Metadata != nil:
+ 		auth.Metadata["disabled"] = auth.Disabled
+-		raw, errMarshal := json.Marshal(auth.Metadata)
++		raw, errMarshal := marshalAuthMetadataForStorage(auth.Metadata)
+ 		if errMarshal != nil {
+ 			return "", fmt.Errorf("auth filestore: marshal metadata failed: %w", errMarshal)
+ 		}
+ 		if existing, errRead := os.ReadFile(path); errRead == nil {
+-			if jsonEqual(existing, raw) {
++			if existingMetadata, errDecode := unmarshalAuthMetadataFromStorage(existing); errDecode == nil && deepEqualJSON(existingMetadata, auth.Metadata) {
+ 				break
+ 			}
+-			file, errOpen := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0o600)
+-			if errOpen != nil {
+-				return "", fmt.Errorf("auth filestore: open existing failed: %w", errOpen)
+-			}
+-			if _, errWrite := file.Write(raw); errWrite != nil {
+-				_ = file.Close()
+-				return "", fmt.Errorf("auth filestore: write existing failed: %w", errWrite)
+-			}
+-			if errClose := file.Close(); errClose != nil {
+-				return "", fmt.Errorf("auth filestore: close existing failed: %w", errClose)
++			if errWrite := writeAuthFileAtomic(path, raw, 0o600); errWrite != nil {
++				return "", fmt.Errorf("auth filestore: replace existing failed: %w", errWrite)
+ 			}
+ 			break
+ 		} else if !os.IsNotExist(errRead) {
+ 			return "", fmt.Errorf("auth filestore: read existing failed: %w", errRead)
+ 		}
+-		if errWrite := os.WriteFile(path, raw, 0o600); errWrite != nil {
++		if errWrite := writeAuthFileAtomic(path, raw, 0o600); errWrite != nil {
+ 			return "", fmt.Errorf("auth filestore: write file failed: %w", errWrite)
+ 		}
+ 	default:
+@@ -184,6 +183,10 @@ func (s *FileTokenStore) List(ctx context.Context) ([]*cliproxyauth.Auth, error)
+ 		}
+ 		auths, errReadAuths := s.readAuthFiles(path, dir)
+ 		if errReadAuths != nil {
++			var malformed *malformedAuthJSONError
++			if errors.As(errReadAuths, &malformed) {
++				return fmt.Errorf("auth filestore: load %s: %w", path, errReadAuths)
++			}
+ 			return nil
+ 		}
+ 		if len(auths) > 0 {
+@@ -232,9 +235,23 @@ func (s *FileTokenStore) readAuthFiles(path, baseDir string) ([]*cliproxyauth.Au
+ 	if len(data) == 0 {
+ 		return nil, nil
+ 	}
+-	metadata := make(map[string]any)
+-	if err = json.Unmarshal(data, &metadata); err != nil {
+-		return nil, fmt.Errorf("unmarshal auth json: %w", err)
++	metadata, err := unmarshalAuthMetadataFromStorage(data)
++	if err != nil {
++		return nil, &malformedAuthJSONError{err: err}
++	}
++	needsMigration, errMigrationCheck := authMetadataStorageNeedsMigration(data)
++	if errMigrationCheck != nil {
++		return nil, fmt.Errorf("inspect auth storage: %w", errMigrationCheck)
++	}
++	if needsMigration {
++		protectedData, errMarshal := marshalAuthMetadataForStorage(metadata)
++		if errMarshal != nil {
++			return nil, fmt.Errorf("protect legacy auth json: %w", errMarshal)
++		}
++		if errWrite := writeAuthFileAtomic(path, protectedData, 0o600); errWrite != nil {
++			return nil, fmt.Errorf("migrate legacy auth json: %w", errWrite)
++		}
++		data = protectedData
+ 	}
+ 	if errWeight := cliproxyauth.ValidateAuthWeight(&cliproxyauth.Auth{Metadata: metadata}); errWeight != nil {
+ 		return nil, errWeight
+@@ -295,27 +312,6 @@ func (s *FileTokenStore) readAuthFiles(path, baseDir string) ([]*cliproxyauth.Au
+ 	if provider == "" {
+ 		provider = "unknown"
+ 	}
+-	if provider == "antigravity" {
+-		projectID := ""
+-		if pid, ok := metadata["project_id"].(string); ok {
+-			projectID = strings.TrimSpace(pid)
+-		}
+-		if projectID == "" {
+-			accessToken := extractAccessToken(metadata)
+-			if accessToken != "" {
+-				fetchedProjectID, errFetch := FetchAntigravityProjectID(context.Background(), accessToken, http.DefaultClient)
+-				if errFetch == nil && strings.TrimSpace(fetchedProjectID) != "" {
+-					metadata["project_id"] = strings.TrimSpace(fetchedProjectID)
+-					if raw, errMarshal := json.Marshal(metadata); errMarshal == nil {
+-						if file, errOpen := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0o600); errOpen == nil {
+-							_, _ = file.Write(raw)
+-							_ = file.Close()
+-						}
+-					}
+-				}
+-			}
+-		}
+-	}
+ 	info, errStat = os.Stat(path)
+ 	if errStat != nil {
+ 		return nil, fmt.Errorf("stat file: %w", errStat)
+diff --git a/sdk/auth/filestore_test.go b/sdk/auth/filestore_test.go
+index e638ffee744f7a301ada8a085c8306aef456f1a7..b29d75f0f1451b6643c1435aeb00700c5ed0e922 100644
+--- a/sdk/auth/filestore_test.go
++++ b/sdk/auth/filestore_test.go
+@@ -2,6 +2,7 @@ package auth
+ 
+ import (
+ 	"context"
++	"encoding/json"
+ 	"os"
+ 	"path/filepath"
+ 	"testing"
+@@ -138,9 +139,17 @@ func TestFileTokenStoreSaveExistingMetadataSetsFileAttributes(t *testing.T) {
+ 			if errRead != nil {
+ 				t.Fatalf("read saved auth file: %v", errRead)
+ 			}
++			decoded, errDecode := unmarshalAuthMetadataFromStorage(persisted)
++			if errDecode != nil {
++				t.Fatalf("decode saved auth file: %v", errDecode)
++			}
+ 			expected := []byte(`{"type":"antigravity","access_token":"` + tt.savedToken + `","disabled":false}`)
+-			if !jsonEqual(persisted, expected) {
+-				t.Errorf("saved auth file = %s, want JSON equal to %s", persisted, expected)
++			decodedJSON, errMarshal := json.Marshal(decoded)
++			if errMarshal != nil {
++				t.Fatalf("marshal decoded auth file: %v", errMarshal)
++			}
++			if !jsonEqual(decodedJSON, expected) {
++				t.Errorf("decoded saved auth file = %s, want JSON equal to %s", decodedJSON, expected)
+ 			}
+ 		})
+ 	}
+diff --git a/sdk/cliproxy/antigravity_models.go b/sdk/cliproxy/antigravity_models.go
+index 11f7c408d9aa95fe6988006e81054cda3c8e4fad..b9cdce63fda90dcafd6cf05326827c8cf1448122 100644
+--- a/sdk/cliproxy/antigravity_models.go
++++ b/sdk/cliproxy/antigravity_models.go
+@@ -6,6 +6,7 @@ import (
+ 	"io"
+ 	"net/http"
+ 	"strings"
++	"time"
+ 
+ 	"github.com/router-for-me/CLIProxyAPI/v7/internal/misc"
+ 	coreauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
+@@ -37,7 +38,7 @@ func (s *Service) fetchAntigravityModelCapabilityHintsForAuth(ctx context.Contex
+ 		return antigravityModelCapabilityHints{}
+ 	}
+ 
+-	client := &http.Client{}
++	client := &http.Client{Timeout: 10 * time.Second}
+ 	if transport, _, errProxy := proxyutil.BuildHTTPTransport(s.antigravityModelFetchProxyURL(auth)); errProxy == nil && transport != nil {
+ 		client.Transport = transport
+ 	}

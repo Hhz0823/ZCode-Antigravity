@@ -1,0 +1,205 @@
+ZCode Antigravity Bridge - Windows x64 test build
+=================================================
+
+Purpose
+-------
+This package lets ZCode use Gemini 3.7 Flash and Gemini 3.6 Flash through a local
+Antigravity Anthropic-compatible Provider. No other upstream model is written to ZCode.
+It is a local bridge, not an MCP server and not a ZCode skill.
+
+Important risk
+--------------
+This is an unofficial third-party bridge to undocumented Google Antigravity interfaces.
+Google has disrupted or suspended accounts used through third-party proxies. API access,
+Gemini CLI / Code Assist access, or the whole Google account may be affected. Do not test
+with your primary Gmail, Workspace, or Google Cloud owner account. A model shown in the
+list may still be unavailable to your account or out of quota; the first real request is
+the authoritative test.
+
+Requirements
+------------
+- Windows 10 or Windows 11, x64
+- ZCode 3.7.x installed and opened at least once
+- A browser and access to Google login / Antigravity
+- No administrator rights, Node.js, Go, Python, Docker, or firewall rule is required
+
+First test
+----------
+Recommended: fully exit ZCode from the tray, enable v2rayN TUN, and double-click
+ZCode-Antigravity-Setup-v0.2.6-test.exe. This is a native Windows GUI installer: it shows no
+terminal, verifies the embedded ZIP plus all three executables, installs only for the current
+user, creates Desktop/Start Menu shortcuts, and opens the control center after completion.
+
+For the single-BAT fallback, fully exit ZCode from the tray, enable v2rayN TUN, and double-click
+ZCode-Antigravity-OneClick-v0.2.6-test.bat. It verifies and extracts its embedded package,
+then opens the graphical control center without leaving a terminal window. The control center
+opens OAuth when needed, writes the verified ZCode Provider directly, and starts ZCode after
+successful readback.
+
+For the expanded package:
+1. Extract the ZIP completely. Do not run files from inside the ZIP preview.
+2. Double-click Verify-Package.bat and confirm all three checks say [OK].
+3. In the Windows system tray, right-click ZCode and choose Exit. Closing the ZCode window
+   normally leaves ZCode.exe running in the tray; the bridge refuses to edit while it runs.
+4. Double-click Setup-and-Start.bat. The graphical control center opens without a terminal window.
+5. Complete Google OAuth in the browser and keep the control center open until it reports success.
+6. The first model-directory load can take up to about 35 seconds on a poor connection.
+7. Reopen ZCode. Select Provider "Antigravity (Local Bridge)". The only choices are
+   gemini-3.7-flash and gemini-3.6-flash.
+8. Run Test-Gemini-3.7-Flash.bat once. It sends a small real inference request and writes a
+   redacted audit result to %LOCALAPPDATA%\ZCodeAntigravity\last-smoke-test.json.
+9. In ZCode, select gemini-3.7-flash and send one small prompt.
+
+Known model availability on 2026-08-15
+--------------------------------------
+Antigravity desktop 2.8.1 changed the upstream model catalog. With the matching 2.8.1 client
+identity, the tested account returned 21 live models including gemini-3.7-flash-low,
+gemini-3.7-flash-medium, and gemini-3.7-flash-high. A real gemini-3.7-flash-high request succeeded
+and returned response model gemini-3.7-flash with the exact output ZCODE_SMOKE_OK. This bridge does
+not alias Gemini 3.6 or another model to Gemini 3.7.
+
+Verified Gemini 3.7 multimodal boundary on 2026-08-15
+------------------------------------------------------
+- Text: passed through the ZCode Anthropic Provider path (ZCODE_SMOKE_OK).
+- Image understanding: passed; Gemini read the Antigravity screenshot, selected model, and
+  Low/Medium/High effort levels correctly.
+- Video understanding: passed after the bridge translated base64 video blocks to Gemini
+  inlineData; a three-second red -> green -> blue MP4 was identified in the correct order.
+- Model-declared inputs: text, image, audio, video. Model-declared output: text only.
+- Image generation: not supported by gemini-3.7-flash-high. Asking for TEXT+IMAGE returned
+  text/SVG and zero image data parts. Use a dedicated image-output model such as
+  gemini-3.1-flash-image when the account has quota; do not treat SVG text as generated raster data.
+
+Ports
+-----
+- Local API default: 127.0.0.1:18080
+- If occupied by another program: automatically scans 18081 through 18180
+- OAuth callback default: 127.0.0.1:51121
+- If occupied: automatically scans 51122 through 51221
+- The chosen API port is saved and the ZCode Provider base URL is updated automatically.
+- Neither the API nor the patched OAuth callback listens on LAN interfaces.
+
+Files and privacy
+-----------------
+- Google access/refresh tokens, the random local API key, logs, and runtime state are stored in:
+    %LOCALAPPDATA%\ZCodeAntigravity
+- On Windows, Antigravity access/refresh token fields are encrypted with current-user DPAPI.
+- They are NOT included in this ZIP and are not written into ZCode credentials.json.
+- ZCode config.json contains only the random local gateway key, not Google tokens.
+- The single BAT embeds program files only; it contains no OAuth token, account JSON, local
+  API key, logs, ZCode config, or runtime state.
+- Before every ZCode change, the original bytes are backed up under:
+    <ZCode data base>\.zcode\v2\backups\zcode-antigravity
+- Detailed request-body logging is disabled. The console log is:
+    %LOCALAPPDATA%\ZCodeAntigravity\logs\gateway-console.log
+- The quota cache is redacted and stores only display-ready values under:
+    %LOCALAPPDATA%\ZCodeAntigravity\quota-cache.json
+  It does not contain a complete email, project ID, access token, or refresh token.
+
+Graphical control center and quota
+----------------------------------
+- Desktop/Start Menu shortcut: ZCode Antigravity 控制中心
+- The window is a Windows GUI executable and does not create a terminal window.
+- It shows v2rayN TUN, proxy, bridge, ZCode, account, and two-model status in one view.
+- Gemini weekly and five-hour remaining quota use exact percentages, reset times, and animated
+  two-layer wave meters. AI credit balance is shown separately so it is not confused with model quota.
+- The blue-white telemetry theme adds entrance, status, counter, button, and operation feedback
+  animations. Windows/browser reduced-motion preference disables nonessential motion.
+- Quota is read through the already authenticated local bridge. Only a random-key-protected
+  loopback management route is enabled; remote management and the web control panel stay disabled.
+- If Antigravity temporarily cannot refresh, the last redacted result is shown with a stale badge
+  instead of presenting cached data as current.
+
+Available scripts
+-----------------
+- ZCode-Antigravity-ControlCenter.exe  No-console setup, status, actions, and quota dashboard
+- Run-Menu.bat                  Interactive menu
+- Setup-and-Start.bat           Open the GUI and start first-time setup
+- Login-Antigravity.bat         Add or refresh an Antigravity account
+- Start-ZCode-Antigravity.bat   Start/reuse the bridge and sync models
+- Sync-ZCode.bat                Refresh the ZCode model list
+- Status.bat                    Health, port, account-file count, and model list
+- Test-Gemini-3.6-Flash.bat     Verified 3.6 regression/fallback inference
+- Test-Gemini-3.7-Flash.bat     Current verified 3.7 High inference and audit artifact
+- Doctor.bat                    Static local checks
+- Stop-ZCode-Antigravity.bat    Stop only the process PID/path started by this bridge
+- Remove-ZCode-Provider.bat     Remove only the managed Provider from ZCode
+
+Installer formats
+-----------------
+- ZCode-Antigravity-Setup-v0.2.6-test.exe: recommended no-terminal current-user installer.
+- ZCode-Antigravity-OneClick-v0.2.6-test.bat: fallback single-file installer.
+- ZCode-Antigravity-Windows-x64-0.2.6-test.zip: manually verifiable expanded package.
+- The EXE installer is custom-built and unsigned. It does not require administrator rights or
+  7-Zip on the target computer; Windows SmartScreen may still require manual confirmation.
+
+Proxy
+-----
+This deployment requires v2rayN with TUN mode enabled. Start v2rayN, confirm the TUN adapter
+is up, and then start the bridge. The packaged default is the verified local mixed inbound:
+  "proxyURL": "http://127.0.0.1:10808"
+Supported schemes: http, https, socks5. If the v2rayN local port changes, stop the bridge
+and update settings.json to the new loopback port before starting it again.
+
+Troubleshooting
+---------------
+- Reconnecting / upstream timeout: confirm v2rayN is running and listening on the exact
+  loopback port configured by proxyURL, and confirm TUN mode is still enabled. Do not change
+  the v2rayN node or routing blindly.
+- "ZCode.exe is still running": a bridge restart is allowed when the Provider is already
+  identical, but any required config write is still blocked. Exit ZCode from the tray, then sync.
+- "config.json not found": open ZCode once, exit it fully, then run setup again.
+- ZCode opens as a solid gray/blank window: first back up .zcode\v2\setting.json, fully exit
+  the verified ZCode process tree, set desktopChromiumHardwareAccelerationEnabled to false,
+  and isolate only AppData\Roaming\ZCode\session\GPUCache. Do not delete the whole session
+  directory because it contains unrelated browser/session state.
+- Port occupied: no manual change is needed unless every configured port is occupied.
+- "The process cannot access ... cli-proxy-api.exe": use 0.2.4-test or newer. The installer now
+  verifies into a temporary staging directory and stops the recorded gateway before deployment,
+  so rerunning the same BAT no longer tries to overwrite a running backend.
+- 401 / no models: run Login-Antigravity.bat, then Start-ZCode-Antigravity.bat.
+- 403 / 429 / model unavailable: account entitlement, risk control, or quota is upstream.
+- Missing/404 for gemini-3.7-flash-high: verify Antigravity desktop is 2.8.1 or newer, restart this
+  bridge so its client-version refresh runs, then check the live account catalog and entitlement.
+- "project id unavailable": onboarding did not yield a usable project. The account may be
+  ineligible or restricted; use another dedicated test account instead of bypassing controls.
+- Windows SmartScreen: these custom Go binaries are not code-signed. Verify checksums first,
+  then use More info -> Run anyway only if the hashes pass.
+- Stopping does not delete or revoke Google tokens. Removing the Provider also does not revoke
+  Google authorization. Revoke access from your Google account separately if required.
+
+Security boundaries
+-------------------
+- API server: loopback only
+- OAuth callback: patched to IPv4 loopback only
+- OAuth authorization code flow: state validation, Host validation, and PKCE S256
+- Local API: random per-user key
+- Antigravity token files: current-user DPAPI and atomic replacement on Windows
+- Management API: random-key protected and loopback only; remote management disabled
+- Management control panel: disabled
+- Paid Antigravity credits fallback: disabled
+- Remote model-registry/plugins: disabled; Antigravity client-version refresh: enabled
+- Existing ZCode Provider collision: never overwritten
+- Broken/non-object ZCode JSON: never overwritten
+
+Gemini 3.7 reasoning selector
+-----------------------------
+The managed ZCode model entry exposes the same Low, Medium, and High reasoning choices as the
+Antigravity desktop selector. The selected value is sent as Anthropic adaptive-thinking effort
+and translated by the bridge to Gemini generationConfig.thinkingConfig.thinkingLevel.
+The client-visible model IDs intentionally omit the redundant -high suffix; the local gateway
+maps them to the exact upstream High catalog entries before inference and maps response IDs back.
+
+ZCode model allowlist
+---------------------
+Every setup and sync exposes exactly gemini-3.7-flash and gemini-3.6-flash to ZCode. They map to
+the exact upstream gemini-3.7-flash-high and gemini-3.6-flash-high entries. Setup fails clearly if
+either mapped model is absent. Extra Gemini, Claude, GPT, or agent models are not written to ZCode.
+
+Build versions
+--------------
+- ZCode Antigravity Bridge: 0.2.6-test
+- CLIProxyAPI base: v7.2.132, commit 78f0c4079e3e6273d65d03b5549cffc898703264
+- Local build: 7.2.132-zcode.9
+
+Read THIRD-PARTY-NOTICES.txt and LICENSE-CLIProxyAPI.txt for upstream details.

@@ -1,0 +1,47 @@
+Windows acceptance checklist
+============================
+
+[ ] ZCode-Antigravity-Setup-v0.2.6-test.exe opens a native confirmation dialog without a terminal.
+[ ] The EXE installer --extract-only workflow reproduces all 23 package files and hashes exactly.
+[ ] The EXE refuses installation while ZCode or the target control center is still running.
+[ ] Successful EXE installation creates current-user Desktop/Start Menu shortcuts and opens the GUI.
+[ ] Verify-Package.bat reports three [OK] lines.
+[ ] The single BAT --extract-only workflow verifies its embedded ZIP and all three executable hashes.
+[ ] Normal double-click returns immediately without leaving a terminal window and opens the control center.
+[ ] The control center shortcut is created on the Desktop and in the current-user Start Menu.
+[ ] Control center APIs listen only on 127.0.0.1 and reject requests without the per-launch session key.
+[ ] Weekly and five-hour remaining quota show exact percentages, reset times, and animated wave lines.
+[ ] Blue-white theme renders without overflow at 1200x900 and a narrow mobile-width viewport.
+[ ] Reduced-motion preference stops automatic entrance, pulse, sweep, and wave loops.
+[ ] Cached quota contains no complete email, project ID, access token, or refresh token.
+[ ] With the gateway running and ZCode fully exited, rerunning the same BAT stops the recorded
+    backend before deployment and does not report that cli-proxy-api.exe is in use.
+[ ] Doctor.bat finds ZCode config and the backend binary.
+[ ] v2rayN has TUN enabled, its TUN adapter is Up, and settings.json proxyURL matches the
+    active loopback mixed inbound (verified here as http://127.0.0.1:10808).
+[ ] With port 18080 free, setup reports http://127.0.0.1:18080.
+[ ] With another program listening on 18080, setup chooses 18081 or later.
+[ ] With another program listening on 51121, OAuth chooses 51122 or later.
+[ ] netstat -ano shows the service only on 127.0.0.1, not 0.0.0.0 or [::].
+[ ] ZCode refuses sync while ZCode.exe remains in the tray.
+[ ] After fully exiting ZCode, Sync-ZCode.bat creates a timestamped backup.
+[ ] ZCode shows Provider "Antigravity (Local Bridge)" and exactly two model entries.
+[ ] Model list contains gemini-3.7-flash with 1,048,576 context tokens and no redundant -high suffix.
+[ ] Model list contains gemini-3.6-flash and contains no Claude, GPT, agent, image, or other Gemini model.
+[ ] Gemini 3.7 Flash reasoning dropdown contains Low, Medium, and High.
+[ ] One request at each Gemini 3.7 reasoning level completes successfully.
+[ ] Test-Gemini-3.6-Flash.bat returns ZCODE_SMOKE_OK and writes last-smoke-test.json.
+[ ] In ZCode, one small gemini-3.6-flash prompt returns a real model response.
+[ ] Test-Gemini-3.7-Flash.bat returns ZCODE_SMOKE_OK and response model gemini-3.7-flash.
+[ ] Antigravity auth JSON contains dpapi:v1 markers and no plaintext token value.
+[ ] Status.bat reports the final port and model list.
+[ ] Stop-ZCode-Antigravity.bat stops only the recorded backend PID.
+[ ] Remove-ZCode-Provider.bat preserves every unrelated ZCode Provider/setting.
+
+When reporting a failure, attach only:
+- the exact error text
+- Windows version and ZCode version
+- Status.bat output
+- %LOCALAPPDATA%\ZCodeAntigravity\logs\gateway-console.log
+
+Review logs before sharing. Never share files from the auth directory or local-api-key.
