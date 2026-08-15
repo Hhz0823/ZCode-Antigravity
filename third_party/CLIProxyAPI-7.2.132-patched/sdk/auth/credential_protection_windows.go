@@ -11,6 +11,11 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+const (
+	credentialProtectionAvailable = true
+	platformCredentialPrefix      = protectedCredentialPrefix
+)
+
 func protectCredentialString(value string) (string, error) {
 	if value == "" || len(value) >= len(protectedCredentialPrefix) && value[:len(protectedCredentialPrefix)] == protectedCredentialPrefix {
 		return value, nil

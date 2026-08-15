@@ -2,6 +2,20 @@
 
 验证日期：2026-08-15（Asia/Shanghai）
 
+## macOS v0.2.7-test 新增验证
+
+- 管理器 macOS 平台实现：`open`、Chrome/Edge/Brave App 模式、`ZCode.app` 启动、
+  运行中 `ZCode` 检测、`utun` 检测及基于 `lsof` 可执行文件真实路径的安全停止。
+- macOS Antigravity token 存储：AES-256-GCM 随机 nonce、篡改拒绝、旧明文迁移和
+  FileTokenStore 写后读回测试通过；随机 256-bit 主密钥由登录钥匙串保存。
+- Apple Silicon 本机管理器测试、CLIProxyAPI 相关包测试及 `go mod verify` 通过。
+- 管理器和后端均构建为 `x86_64 + arm64` Universal Mach-O；`lipo -info` 与 `file` 复核通过。
+- `.app` 使用 ad-hoc 临时签名，`codesign --verify --deep --strict` 通过；未宣称具有
+  Apple Developer ID 签名或 Apple 公证。
+- 包内逐文件 SHA-256、ZIP CRC、隔离 `doctor`、版本输出和 `/Applications/ZCode.app`
+  识别通过；检查过程未读取或修改用户现有 ZCode 配置内容。
+- Intel 切片仅完成交叉编译、Mach-O、签名和归档结构检查，没有 Intel 实机启动证据。
+
 ## 已通过
 
 - 管理器 `go test ./...`、Windows x64 构建、`doctor`：通过。

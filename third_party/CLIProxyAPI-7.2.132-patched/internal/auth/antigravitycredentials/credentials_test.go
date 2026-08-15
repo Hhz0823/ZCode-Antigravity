@@ -33,3 +33,21 @@ func TestLoadReportsEveryMissingVariable(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadUsesLinkTimeFallback(t *testing.T) {
+	t.Setenv(ClientIDEnvironmentVariable, "")
+	t.Setenv(ClientSecretEnvironmentVariable, "")
+	previousID, previousSecret := embeddedClientID, embeddedClientSecret
+	embeddedClientID, embeddedClientSecret = "release-client-id", "release-client-secret"
+	t.Cleanup(func() {
+		embeddedClientID, embeddedClientSecret = previousID, previousSecret
+	})
+
+	client, errLoad := Load()
+	if errLoad != nil {
+		t.Fatalf("Load: %v", errLoad)
+	}
+	if client.ID != "release-client-id" || client.Secret != "release-client-secret" {
+		t.Fatalf("unexpected client: %#v", client)
+	}
+}

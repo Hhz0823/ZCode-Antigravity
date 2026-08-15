@@ -37,7 +37,7 @@ func (a *app) configureZCode(port int, models []modelInfo) (backup string, chang
 	raw, root, err := readJSONObject(a.paths.ZCodeConfig)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return "", false, fmt.Errorf("找不到 %s；请先安装并运行一次 ZCode，再执行 Sync-ZCode.bat", a.paths.ZCodeConfig)
+			return "", false, fmt.Errorf("找不到 %s；请先安装并运行一次 ZCode，再执行 sync 命令或平台同步脚本", a.paths.ZCodeConfig)
 		}
 		return "", false, err
 	}
@@ -98,7 +98,7 @@ func (a *app) configureZCode(port int, models []modelInfo) (backup string, chang
 		return "", false, nil
 	}
 	if a.zcodeRunning != nil && a.zcodeRunning() {
-		return "", false, fmt.Errorf("检测到 ZCode.exe 仍在运行（Windows 关闭窗口后通常还在托盘）；Provider 需要更新，请从托盘彻底退出 ZCode 后重试同步")
+		return "", false, fmt.Errorf("检测到 ZCode 仍在运行；Provider 需要更新，请彻底退出 ZCode 后重试同步")
 	}
 	backup, err = a.backupZCodeConfig(raw, "before-sync")
 	if err != nil {
@@ -205,7 +205,7 @@ func jsonSemanticallyEqual(left, right any) bool {
 
 func (a *app) removeZCodeProvider() error {
 	if a.zcodeRunning != nil && a.zcodeRunning() {
-		return fmt.Errorf("检测到 ZCode.exe 仍在运行；请从系统托盘彻底退出后再删除 Provider")
+		return fmt.Errorf("检测到 ZCode 仍在运行；请彻底退出后再删除 Provider")
 	}
 	raw, root, err := readJSONObject(a.paths.ZCodeConfig)
 	if err != nil {

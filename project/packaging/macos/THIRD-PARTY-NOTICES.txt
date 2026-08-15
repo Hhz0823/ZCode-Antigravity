@@ -1,0 +1,16 @@
+ZCode Antigravity Bridge - Third-Party Notices
+==============================================
+
+CLIProxyAPI
+-----------
+Upstream: https://github.com/router-for-me/CLIProxyAPI
+Pinned release: v7.2.132
+Pinned commit: 78f0c4079e3e6273d65d03b5549cffc898703264
+License: MIT
+
+The packaged backend includes local compatibility, loopback, model-routing,
+macOS Keychain credential-protection, and ZCode integration changes. See the
+repository source tree and project/docs/CLIProxyAPI-v7.2.132-zcode.patch.
+
+ZCode, Google, Gemini, Antigravity, macOS, and Apple are names or marks of their
+respective owners. This project is unofficial and is not endorsed by them.

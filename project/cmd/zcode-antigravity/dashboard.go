@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -225,15 +226,21 @@ func (g *guiRuntime) status() dashboardStatus {
 	}
 
 	proxyURL := strings.TrimSpace(g.app.settings.ProxyURL)
-	if reachable, detail := proxyEndpointStatus(proxyURL); reachable {
-		status.Proxy = dashboardItem{OK: true, Label: "v2rayN 代理在线", Detail: detail, Running: true}
+	if runtime.GOOS == "darwin" && proxyURL == "" {
+		status.Proxy = dashboardItem{OK: true, Label: "使用系统网络 / TUN", Detail: "未固定专用代理", Running: true}
+	} else if reachable, detail := proxyEndpointStatus(proxyURL); reachable {
+		status.Proxy = dashboardItem{OK: true, Label: "本机代理在线", Detail: detail, Running: true}
 	} else {
-		status.Proxy = dashboardItem{Label: "v2rayN 代理不可用", Detail: detail}
+		status.Proxy = dashboardItem{Label: "本机代理不可用", Detail: detail}
 	}
 	if name, ok := detectTunAdapter(); ok {
 		status.TUN = dashboardItem{OK: true, Label: "TUN 已开启", Detail: name, Running: true}
 	} else {
-		status.TUN = dashboardItem{Label: "TUN 未检测到", Detail: "请在 v2rayN 中开启 TUN 模式"}
+		detail := "请在 v2rayN 中开启 TUN 模式"
+		if runtime.GOOS == "darwin" {
+			detail = "未发现活动的 utun；如使用直连或显式代理可忽略"
+		}
+		status.TUN = dashboardItem{Label: "TUN 未检测到", Detail: detail}
 	}
 
 	configured, baseURL, errProvider := zcodeProviderStatus(g.app.paths.ZCodeConfig)

@@ -101,6 +101,13 @@ func newApp(rootOverride string) (*app, error) {
 	if runtime.GOOS == "windows" {
 		backendName += ".exe"
 	}
+	resourceRoot := absRoot
+	if runtime.GOOS == "darwin" && filepath.Base(absRoot) == "MacOS" {
+		candidate := filepath.Clean(filepath.Join(absRoot, "..", "Resources"))
+		if info, statErr := os.Stat(candidate); statErr == nil && info.IsDir() {
+			resourceRoot = candidate
+		}
+	}
 	runtimeData, err := resolveRuntimeDataDir(home)
 	if err != nil {
 		return nil, err
@@ -109,10 +116,10 @@ func newApp(rootOverride string) (*app, error) {
 		Root:          absRoot,
 		Data:          runtimeData,
 		Backend:       filepath.Join(absRoot, "backend", backendName),
-		Settings:      filepath.Join(absRoot, "settings.json"),
+		Settings:      filepath.Join(resourceRoot, "settings.json"),
 		ZCodeConfig:   zcodeConfig,
 		ZCodeBackups:  zcodeBackups,
-		PackageReadme: filepath.Join(absRoot, "README-Windows.txt"),
+		PackageReadme: filepath.Join(resourceRoot, packageReadmeName()),
 	}
 	p.Config = filepath.Join(p.Data, "config.yaml")
 	p.AuthDir = filepath.Join(p.Data, "auth")
@@ -136,6 +143,13 @@ func newApp(rootOverride string) (*app, error) {
 		return nil, err
 	}
 	return &app{paths: p, settings: s, apiKey: key, now: time.Now, zcodeRunning: isZCodeRunning}, nil
+}
+
+func packageReadmeName() string {
+	if runtime.GOOS == "darwin" {
+		return "README-macOS.txt"
+	}
+	return "README-Windows.txt"
 }
 
 func resolveRuntimeDataDir(userHome string) (string, error) {

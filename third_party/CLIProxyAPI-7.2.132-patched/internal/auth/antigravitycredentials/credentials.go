@@ -24,11 +24,24 @@ type OAuthClient struct {
 	Secret string
 }
 
+// Release maintainers may inject these values at link time with -X. Public
+// source builds leave both empty and continue to require the environment.
+var (
+	embeddedClientID     string
+	embeddedClientSecret string
+)
+
 // Load reads and validates the Antigravity OAuth client configuration.
 func Load() (OAuthClient, error) {
 	client := OAuthClient{
 		ID:     strings.TrimSpace(os.Getenv(ClientIDEnvironmentVariable)),
 		Secret: strings.TrimSpace(os.Getenv(ClientSecretEnvironmentVariable)),
+	}
+	if client.ID == "" {
+		client.ID = strings.TrimSpace(embeddedClientID)
+	}
+	if client.Secret == "" {
+		client.Secret = strings.TrimSpace(embeddedClientSecret)
 	}
 
 	missing := make([]string, 0, 2)

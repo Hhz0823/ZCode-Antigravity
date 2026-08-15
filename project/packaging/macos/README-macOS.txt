@@ -1,0 +1,77 @@
+ZCode Antigravity Bridge - macOS Universal test build
+====================================================
+
+版本：0.2.7-test
+架构：Apple Silicon (arm64) + Intel (x86_64)
+最低系统：macOS 12
+
+用途
+----
+本程序让 macOS 版 ZCode 通过只监听本机的 Anthropic-compatible Provider
+调用 Antigravity 中的 Gemini 3.7 Flash 与 Gemini 3.6 Flash。
+
+这是非官方测试版，会使用未公开的 Antigravity 接口。Google 可能限流、暂停
+API 权限或封禁账号。请只使用专门的测试账号，不要使用主 Gmail、Workspace
+或 Google Cloud 所有者账号。
+
+首次使用
+--------
+1. 完整解压 ZIP，不要直接在压缩包预览中运行。
+2. 双击 Verify-Package.command，确认所有文件均为 OK。
+3. 完全退出 ZCode；仅关闭窗口不一定会退出应用。
+4. 首次打开时，按住 Control 点击“ZCode Antigravity.app”，选择“打开”。
+   当前 App 使用临时签名，没有 Apple Developer ID，也没有公证。
+5. 双击 Setup-and-Start.command，或打开 App 后点击首次设置。
+6. 浏览器完成 Google OAuth；成功后重新打开 ZCode。
+7. 在 ZCode 中选择 Antigravity (Local Bridge)，先发送一条短消息验收。
+
+如果已把 App 拖入 /Applications，外层 .command 脚本仍会自动找到它。
+
+网络与代理
+----------
+默认不固定某个代理端口：macOS TUN 模式可透明接管流量，也可在 .env 中设置
+HTTP_PROXY / HTTPS_PROXY，或编辑 App 内 Contents/Resources/settings.json 的
+proxyURL。支持 http、https 和 socks5，且应只指向可信的本机代理。
+
+端口
+----
+- 本地 API：127.0.0.1:18080，冲突时扫描到 18180
+- OAuth callback：127.0.0.1:51121，冲突时扫描到 51221
+- 控制中心：127.0.0.1:18200-18250
+
+数据与安全
+----------
+- 运行数据：~/Library/Application Support/ZCodeAntigravity
+- ZCode 配置：~/.zcode/v2/config.json，或 setting.json 指向的数据目录
+- 修改 ZCode 配置前会建立有上限的备份。
+- 本地 API key 为随机值；API、OAuth callback 和控制中心只监听 127.0.0.1。
+- Google access/refresh token 用随机 AES-256-GCM 主密钥加密；主密钥保存在
+  macOS 登录钥匙串，服务名为 io.github.hhz0823.zcode-antigravity。
+- 发布包不包含用户 token、账号 JSON、本地 API key、日志或 ZCode 配置。
+- 停止 Bridge 或删除 Provider 不会撤销 Google 授权。
+
+源码构建
+--------
+公开源码不包含 OAuth 客户端身份。源码构建需复制 .env.example 为 .env，填入
+自己有权使用的桌面 OAuth 客户端配置，再通过 Run.command 启动。发布维护者也可在
+运行 Build-Universal.sh 时通过同名环境变量把配置注入二进制；脚本不会把它写入
+源码树或打包成明文配置文件。
+
+常用脚本
+--------
+- Setup-and-Start.command：首次登录、启动并写入 ZCode Provider
+- Login-Antigravity.command：添加或刷新账号
+- Start-ZCode-Antigravity.command：启动网关并同步模型
+- Status.command：查看状态
+- Doctor.command：本机静态检查
+- Test-Gemini-3.7-Flash.command：发送一次小型真实请求
+- Stop-ZCode-Antigravity.command：只停止本程序记录且路径匹配的网关
+- Remove-ZCode-Provider.command：只删除本程序管理的 Provider
+
+已验证与未验证边界
+------------------
+- 已在 Apple Silicon Mac 上完成单元测试、Universal 双架构构建、Mach-O 架构、
+  App 结构、临时签名、包内哈希、隔离数据目录和 ZCode 运行检测检查。
+- Intel 切片通过交叉编译和结构验证，但没有 Intel 实机启动测试。
+- 当前没有 Apple Developer ID 签名或 Apple 公证；Gatekeeper 可能提示开发者未知。
+- 账号资格、上游模型目录、额度和风控以用户第一次真实请求为准。

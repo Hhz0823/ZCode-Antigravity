@@ -43,6 +43,8 @@ func useAntigravityRefreshTestTransport(t *testing.T, targetHost string) {
 }
 
 func TestAntigravityRefresh_DeduplicatesConcurrentRefresh(t *testing.T) {
+	t.Setenv("ANTIGRAVITY_OAUTH_CLIENT_ID", "development-client-id")
+	t.Setenv("ANTIGRAVITY_OAUTH_CLIENT_SECRET", "development-client-secret")
 	resetAntigravityRefreshGroupForTest()
 	t.Cleanup(resetAntigravityRefreshGroupForTest)
 	resetAntigravityCreditsRetryState()
@@ -112,7 +114,11 @@ func TestAntigravityRefresh_DeduplicatesConcurrentRefresh(t *testing.T) {
 	}
 
 	go runRefresh(authA, nil)
-	<-started
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("first refresh did not reach the token endpoint")
+	}
 
 	secondLaunched := make(chan struct{})
 	go runRefresh(authB, secondLaunched)

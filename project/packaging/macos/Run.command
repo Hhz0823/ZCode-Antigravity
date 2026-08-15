@@ -1,0 +1,20 @@
+#!/bin/zsh
+set -euo pipefail
+
+package_root=${0:A:h}
+app_binary="$package_root/ZCode Antigravity.app/Contents/MacOS/ZCode-Antigravity"
+if [[ ! -x "$app_binary" ]]; then
+  app_binary="/Applications/ZCode Antigravity.app/Contents/MacOS/ZCode-Antigravity"
+fi
+if [[ ! -x "$app_binary" ]]; then
+  print -u2 "找不到 ZCode Antigravity.app。请保留完整解压目录，或把 App 放入 /Applications。"
+  exit 1
+fi
+
+if [[ -f "$package_root/.env" ]]; then
+  set -a
+  source "$package_root/.env"
+  set +a
+fi
+
+exec "$app_binary" "$@"

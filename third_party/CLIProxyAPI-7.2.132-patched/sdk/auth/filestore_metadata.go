@@ -34,8 +34,8 @@ func unmarshalAuthMetadataFromStorage(data []byte) (map[string]any, error) {
 }
 
 // UnmarshalStoredMetadata decodes auth metadata exactly as FileTokenStore persists it.
-// On Windows this also unprotects DPAPI-backed Antigravity credentials for the
-// current user so runtime consumers never mistake ciphertext for an access token.
+// On Windows and macOS this also unprotects platform-backed Antigravity credentials
+// for the current user so runtime consumers never mistake ciphertext for an access token.
 func UnmarshalStoredMetadata(data []byte) (map[string]any, error) {
 	return unmarshalAuthMetadataFromStorage(data)
 }

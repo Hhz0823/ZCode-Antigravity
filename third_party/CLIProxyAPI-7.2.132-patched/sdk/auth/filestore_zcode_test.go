@@ -3,7 +3,6 @@ package auth
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -33,12 +32,12 @@ func TestAntigravityFileStoreProtectsTokensAndReadsThemBack(t *testing.T) {
 	if errRead != nil {
 		t.Fatalf("read saved auth: %v", errRead)
 	}
-	if runtime.GOOS == "windows" {
+	if credentialProtectionAvailable {
 		if strings.Contains(string(raw), "plain-access-secret") || strings.Contains(string(raw), "plain-refresh-secret") {
-			t.Fatalf("saved Windows auth contains plaintext token: %s", raw)
+			t.Fatalf("saved auth contains plaintext token: %s", raw)
 		}
-		if !strings.Contains(string(raw), protectedCredentialPrefix) {
-			t.Fatalf("saved Windows auth lacks DPAPI marker: %s", raw)
+		if !strings.Contains(string(raw), platformCredentialPrefix) {
+			t.Fatalf("saved auth lacks platform protection marker: %s", raw)
 		}
 	}
 	listed, errList := store.List(t.Context())
@@ -66,8 +65,8 @@ func TestFileStoreFailsOnMalformedAuthJSON(t *testing.T) {
 }
 
 func TestAntigravityFileStoreMigratesLegacyPlaintextTokens(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("DPAPI migration is Windows-specific")
+	if !credentialProtectionAvailable {
+		t.Skip("credential migration is not enabled on this platform")
 	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "legacy.json")
@@ -91,7 +90,7 @@ func TestAntigravityFileStoreMigratesLegacyPlaintextTokens(t *testing.T) {
 	if strings.Contains(string(raw), "legacy-access") || strings.Contains(string(raw), "legacy-refresh") {
 		t.Fatalf("legacy auth remained plaintext: %s", raw)
 	}
-	if !strings.Contains(string(raw), protectedCredentialPrefix) {
-		t.Fatalf("migrated auth lacks DPAPI marker: %s", raw)
+	if !strings.Contains(string(raw), platformCredentialPrefix) {
+		t.Fatalf("migrated auth lacks platform protection marker: %s", raw)
 	}
 }

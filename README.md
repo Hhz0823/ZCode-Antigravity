@@ -3,8 +3,8 @@
 > 让 ZCode 通过本机 Anthropic-compatible Provider 调用 Antigravity 中的
 > Gemini 3.7 Flash 与 Gemini 3.6 Flash。
 
-**当前版本：** `v0.2.6-test`  
-**适用系统：** Windows 10 / 11 x64  
+**当前版本：** macOS `v0.2.7-test` / Windows `v0.2.6-test`
+**适用系统：** macOS 12+（Apple Silicon / Intel）、Windows 10 / 11 x64
 **项目状态：** 测试版
 
 
@@ -14,22 +14,43 @@
 - 支持 Low / Medium / High 思考等级，并转换为 Gemini `thinkingLevel`。
 - 支持文本、图片、音频和视频输入转换；当前 Gemini 3.7 Flash 声明输出仅为文本。
 - 提供无终端 Windows GUI 安装器，按当前用户安装，无需管理员权限。
+- 提供 macOS Universal `.app`，同一下载包兼容 Apple Silicon 与 Intel。
 - 蓝白控制中心统一显示代理、桥接、ZCode、账号、AI Credits 与额度状态。
 - 提供 v2rayN TUN / 代理预检、ZCode 配置备份、安全停止与同版本重装保护。
-- 本地密钥随机生成；Windows 凭据使用当前用户 DPAPI 保护；API 与 OAuth 回调仅监听 loopback。
+- 本地密钥随机生成；Windows 使用 DPAPI、macOS 使用登录钥匙串主密钥保护凭据；API 与 OAuth 回调仅监听 loopback。
 
 ## 下载
 
-前往 [GitHub Releases](../../releases/tag/v0.2.6-test) 下载。
+前往 [GitHub Releases](../../releases) 下载。
 
 | 文件 | 用途 | 建议 |
 | --- | --- | --- |
+| `ZCode-Antigravity-macOS-Universal-v0.2.7-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
 | `ZCode-Antigravity-Setup-v0.2.6-test.exe` | Windows 图形化安装器 | **普通用户首选** |
 | `ZCode-Antigravity-OneClick-v0.2.6-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
 | `ZCode-Antigravity-Windows-x64-0.2.6-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
 | `ZCode-Antigravity-Source-v0.2.6-test.zip` | 当前版本的干净源码快照 | 审计 / 构建 |
 
-## 快速安装
+## macOS 快速安装
+
+### 准备条件
+
+- macOS 12 或更新版本，Apple Silicon 与 Intel 均可。
+- 已安装 macOS 版 ZCode，并至少打开过一次。
+- 能正常访问 Google 登录与 Antigravity；可使用系统 TUN，或自行配置可信的本机 HTTP/SOCKS5 代理。
+
+### 安装步骤
+
+1. 完整解压 macOS Universal ZIP，双击 `Verify-Package.command` 校验包内文件。
+2. 完全退出 ZCode。当前 App 使用临时签名且尚未公证；首次运行请按住 Control 点击 `ZCode Antigravity.app`，选择“打开”。
+3. 双击 `Setup-and-Start.command`，在控制中心完成 Google OAuth、启动网关并同步 Provider。
+4. 重新打开 ZCode，选择 `Antigravity (Local Bridge)`，发送一条短消息验收。
+
+Mac 运行数据位于 `~/Library/Application Support/ZCodeAntigravity`。Google token 使用
+AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切片已完成交叉编译和
+结构校验，但当前尚未完成 Intel 实机启动测试；详见包内 `README-macOS.txt`。
+
+## Windows 快速安装
 
 ### 准备条件
 
@@ -56,10 +77,13 @@
 | 本地 API | `127.0.0.1:18080` | 自动扫描 `18081–18180` |
 | OAuth callback | `127.0.0.1:51121` | 自动扫描 `51122–51221` |
 | GUI 控制中心 | `127.0.0.1:18200–18250` | 在范围内选择可用端口 |
-| v2rayN 代理 | `http://127.0.0.1:10808` | 需与 `settings.json` 保持一致 |
+| Windows v2rayN 代理 | `http://127.0.0.1:10808` | 需与 `settings.json` 保持一致 |
 
 支持 `http`、`https` 和 `socks5` 代理方案。如果 v2rayN 本地端口已修改，
 请先停止 Bridge，再修改展开包中 `settings.json` 的 `proxyURL`。
+
+macOS 包默认不固定代理端口，可直接使用系统 TUN；也可以在包内 `.env` 设置
+`HTTP_PROXY` / `HTTPS_PROXY`，或修改 App 的 `Contents/Resources/settings.json`。
 
 安装前也可设置自定义代理端口：
 
@@ -78,12 +102,20 @@ $env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
 - 单 BAT 自解包、载荷和三 EXE 哈希校验、同版本重装通过。
 - 原生 EXE 安装器的隔离安装、再安装与无终端 GUI 行为通过。
 
+`v0.2.7-test` 的 macOS 新增验证包括：
+
+- 管理器、Keychain 凭据加密与后端相关测试通过。
+- 管理器和后端均为真正的 `x86_64 + arm64` Universal Mach-O。
+- App 临时签名、包内逐文件哈希、ZIP 完整性和隔离 `doctor` 检查通过。
+- 本机已识别 `/Applications/ZCode.app` 及运行中的 `ZCode` 进程；未修改用户现有配置。
+
 注意：上游模型目录、账号资格、风控和额度都可能随时变化。列表中看到模型并不代表当前账号一定可用。
 
 ## 隐私与安全边界
 
 - Google access / refresh token 和运行状态保存在 `%LOCALAPPDATA%\ZCodeAntigravity`。
 - Antigravity token 字段在 Windows 下使用当前用户 DPAPI 保护。
+- Antigravity token 字段在 macOS 下用登录钥匙串中的随机主密钥进行 AES-256-GCM 加密。
 - ZCode `config.json` 只写入随机本地网关密钥，不写入 Google token。
 - API、OAuth callback 和管理路由只监听 `127.0.0.1`，远程管理与 Web 控制面板默认关闭。
 - 每次修改 ZCode 配置前会创建有上限的备份。
@@ -97,19 +129,26 @@ $env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
 当前 EXE 为未签名的自定义 Go 二进制。先对照本页或 `SHA256SUMS.txt`
 校验哈希；仅在哈希完全一致时选择继续运行。
 
+### macOS 提示无法验证开发者
+
+当前 Mac App 使用临时签名，没有 Apple Developer ID 签名或公证。先运行
+`Verify-Package.command`；哈希通过后，按住 Control 点击 App 并选择“打开”。
+不要全局关闭 Gatekeeper。
+
 ### 一直重连或请求超时
 
-检查 v2rayN 是否在运行、TUN 是否仍然开启，以及 `settings.json` 中的
-`proxyURL` 是否指向真正监听的 loopback 端口。
+Windows 检查 v2rayN 是否运行、TUN 是否开启及 `settings.json` 的 `proxyURL`；
+macOS 检查系统 TUN，或 `.env` 中的 `HTTP_PROXY` / `HTTPS_PROXY` 是否指向
+真正监听的可信 loopback 端口。
 
-### 提示 ZCode.exe 仍在运行
+### 提示 ZCode 仍在运行
 
-在系统托盘右键 ZCode 并选择退出。Bridge 不会在 ZCode 仍运行时写入需要修改的配置。
+请彻底退出 ZCode。Bridge 不会在 ZCode 仍运行时写入需要修改的配置。
 
 ### 401 或没有模型
 
-在展开包中运行 `Login-Antigravity.bat`，然后运行
-`Start-ZCode-Antigravity.bat`。
+Windows 运行 `Login-Antigravity.bat` 和 `Start-ZCode-Antigravity.bat`；
+macOS 运行同名 `.command` 脚本。
 
 ### 403、429 或模型不可用
 
@@ -117,8 +156,8 @@ $env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
 
 ## 从源码构建
 
-源码包包含管理器、Windows 脚本、测试、文档、固定的 CLIProxyAPI v7.2.132
-源码和可重放补丁。已验证构建环境为 Go 1.26.5、Windows x64、`CGO_ENABLED=0`。
+源码包含管理器、Windows/macOS 脚本、测试、文档、固定的 CLIProxyAPI v7.2.132
+源码和可重放补丁。已验证 Windows x64 与 macOS Universal 的 `CGO_ENABLED=0` 构建。
 提交修改前请另见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
 
 GitHub 源码不内置 Google OAuth 客户端凭据。开发者需使用自己有权使用的
@@ -129,7 +168,20 @@ $env:ANTIGRAVITY_OAUTH_CLIENT_ID = '<your-client-id>'
 $env:ANTIGRAVITY_OAUTH_CLIENT_SECRET = '<your-client-secret>'
 ```
 
-这两个值只从进程环境中读取，不应提交到 Git。未配置时，OAuth 登录和 token 刷新会返回明确错误。
+macOS Universal 打包：
+
+```bash
+cd project/packaging/macos
+ANTIGRAVITY_OAUTH_CLIENT_ID='<your-client-id>' \
+ANTIGRAVITY_OAUTH_CLIENT_SECRET='<your-client-secret>' \
+./Build-Universal.sh
+```
+
+不提供 OAuth 环境变量时仍可构建，但运行时必须通过 `.env` 或进程环境提供它们。
+发布脚本生成双架构 Mach-O、临时签名 `.app`、包内 SHA-256 清单和 ZIP 校验文件。
+
+公开源码的默认构建从进程环境读取这两个值，不应提交到 Git。发布维护者可在链接时注入；
+两种方式都未配置时，OAuth 登录和 token 刷新会返回明确错误。
 
 ```powershell
 cd project

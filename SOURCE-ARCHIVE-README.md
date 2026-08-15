@@ -4,7 +4,7 @@
 
 ## 目录
 
-- `project/`：管理器、Windows 脚本、测试、文档和可重放本地补丁。
+- `project/`：管理器、Windows/macOS 脚本、测试、文档和可重放本地补丁。
 - `third_party/CLIProxyAPI-7.2.132-patched/`：完整的固定上游源码及本项目补丁。
 - `conversation/`：仅保留在本地归档的会话导出；GitHub 发布时由 `.gitignore` 明确排除。
 - `SOURCE-SHA256SUMS.txt`：除清单自身与 `.git` 元数据外公开源码文件的 SHA-256。
@@ -59,14 +59,22 @@ Antigravity 桌面版从 2.2.1 更新到 2.8.1 后，同一账户的实时目录
     双层波浪液面动效；系统启用“减少动态效果”时自动关闭非必要动画。
 14. 增加原生 Windows GUI EXE 安装器：内嵌完整 ZIP，解包前校验载荷 SHA-256、解包后再次校验三份
     EXE；隐藏运行当前用户部署脚本，保留 TUN/代理、ZCode 运行中和旧 Bridge PID/路径安全门。
+15. 增加 macOS 平台进程、浏览器、ZCode.app 与 `utun` 检测；停止网关前用 `lsof` 复核 PID 对应的
+    真实可执行文件路径，并提供 Apple Silicon + Intel Universal App 与 `.command` 维护脚本。
+16. macOS Antigravity access/refresh token 使用 AES-256-GCM 加密，随机主密钥保存在当前用户登录
+    钥匙串；公开源码继续不保存 OAuth 客户端身份，发布维护者可在链接时注入。
 
 ## 构建
 
-已验证：Go 1.26.5、Windows x64、`CGO_ENABLED=0`。
+已验证：Go 1.26.x、Windows x64、macOS Universal、`CGO_ENABLED=0`。
 
 GitHub 源码树不包含上游静态 Google OAuth 客户端凭据。构建的后端在运行 OAuth
 登录或 token 刷新前，需从 `ANTIGRAVITY_OAUTH_CLIENT_ID` 和
 `ANTIGRAVITY_OAUTH_CLIENT_SECRET` 环境变量读取开发者有权使用的配置。
+
+macOS Universal 发布包可运行 `project/packaging/macos/Build-Universal.sh` 构建。
+维护者提供上述两个环境变量时，脚本通过 Go 链接参数注入发布二进制；未提供时，
+生成的开发包仍需在运行时从 `.env` 或进程环境读取。
 
 ```powershell
 cd project
@@ -82,7 +90,7 @@ cd third_party/CLIProxyAPI-7.2.132-patched
 go mod verify
 $env:CGO_ENABLED='0'; $env:GOOS='windows'; $env:GOARCH='amd64'
 go build -buildvcs=false -trimpath `
-  -ldflags='-s -w -X main.Version=7.2.132-zcode.9 -X main.Commit=78f0c4079e3e6273d65d03b5549cffc898703264 -X main.BuildDate=<UTC>' `
+  -ldflags='-s -w -X main.Version=7.2.132-zcode.10 -X main.Commit=78f0c4079e3e6273d65d03b5549cffc898703264 -X main.BuildDate=<UTC>' `
   -o cli-proxy-api.exe ./cmd/server
 ```
 

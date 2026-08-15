@@ -264,7 +264,7 @@ func (a *app) startAndConfigure() (returnErr error) {
 		return errAccounts
 	}
 	if accounts == 0 {
-		return fmt.Errorf("没有有效 Antigravity 账号；请先运行 Login-Antigravity.bat")
+		return fmt.Errorf("没有有效 Antigravity 账号；请先运行 login 命令或平台登录脚本")
 	}
 	startedPID := 0
 	configurationComplete := false
@@ -451,8 +451,8 @@ func (a *app) login() error {
 		cmd.Env = append(os.Environ(), "CLIPROXY_BROWSER="+browserPath)
 	}
 	if a.guiMode {
-		// The GUI binary uses the Windows GUI subsystem and therefore has no valid
-		// console handles. OAuth still opens the browser, while all child output is
+		// A GUI launch may have no valid console handles. OAuth still opens the browser,
+		// while all child output is
 		// retained in memory for the same explicit success check below.
 		cmd.Stdout = &captured
 		cmd.Stderr = &captured
@@ -470,7 +470,7 @@ func (a *app) login() error {
 	if !hasRecentAntigravityAccount(a.paths.AuthDir, started.Add(-2*time.Second)) {
 		return fmt.Errorf("登录程序报告成功，但未找到新凭据文件；不会继续覆盖 ZCode 配置")
 	}
-	fmt.Printf("Antigravity 登录成功。凭据只保存在当前 Windows 用户目录: %s\n", a.paths.AuthDir)
+	fmt.Printf("Antigravity 登录成功。凭据只保存在当前用户目录: %s\n", a.paths.AuthDir)
 	return nil
 }
 
@@ -507,7 +507,7 @@ func (a *app) syncZCode() error {
 		return errAccounts
 	}
 	if accounts == 0 {
-		return fmt.Errorf("没有 Antigravity 账号，请先运行 Login-Antigravity.bat")
+		return fmt.Errorf("没有 Antigravity 账号，请先运行 login 命令或平台登录脚本")
 	}
 	catalog, err := a.waitForModels(current.Port, 35*time.Second)
 	if err != nil {
@@ -708,7 +708,7 @@ func (a *app) smokeModel(model string) error {
 func (a *app) doctor() error {
 	problems := make([]string, 0)
 	if info, err := os.Stat(a.paths.Backend); err != nil {
-		problems = append(problems, "缺少 backend/cli-proxy-api.exe")
+		problems = append(problems, "缺少 backend/"+filepath.Base(a.paths.Backend))
 	} else if info.IsDir() || info.Size() < 1<<20 {
 		problems = append(problems, "网关二进制大小异常")
 	} else {
@@ -725,7 +725,7 @@ func (a *app) doctor() error {
 		}
 	}
 	if a.settings.ProxyURL == "" {
-		fmt.Println("[INFO] 未设置专用代理；会继承 Windows 的 HTTP_PROXY/HTTPS_PROXY 环境变量。")
+		fmt.Println("[INFO] 未设置专用代理；会继承当前系统的 HTTP_PROXY/HTTPS_PROXY 环境变量。")
 	} else {
 		fmt.Printf("[OK] 专用代理: %s\n", redactURLUserinfo(a.settings.ProxyURL))
 	}

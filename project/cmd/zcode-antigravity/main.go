@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const version = "0.2.6-test"
+const version = "0.2.7-test"
 
 var defaultCommand = "menu"
 
@@ -106,17 +106,17 @@ func printHelp() {
 	fmt.Println(`ZCode Antigravity Bridge
 
 用法:
-  ZCode-Antigravity.exe setup            首次登录、启动并配置 ZCode
-  ZCode-Antigravity.exe login            登录/添加 Antigravity 账号
-  ZCode-Antigravity.exe start            启动网关并同步 ZCode Provider
-  ZCode-Antigravity.exe sync             重新同步模型列表到 ZCode
-  ZCode-Antigravity.exe status           查看端口、账号和模型状态
-  ZCode-Antigravity.exe quota            读取 Antigravity 模型额度
-  ZCode-Antigravity.exe gui              打开无终端图形控制中心
-  ZCode-Antigravity.exe doctor           运行本机检查
-  ZCode-Antigravity.exe smoke [model]    发送一次真实的小型模型请求
-  ZCode-Antigravity.exe stop             停止本程序启动的网关
-  ZCode-Antigravity.exe remove-provider  只从 ZCode 删除本 Provider
+  ZCode-Antigravity setup            首次登录、启动并配置 ZCode
+  ZCode-Antigravity login            登录/添加 Antigravity 账号
+  ZCode-Antigravity start            启动网关并同步 ZCode Provider
+  ZCode-Antigravity sync             重新同步模型列表到 ZCode
+  ZCode-Antigravity status           查看端口、账号和模型状态
+  ZCode-Antigravity quota            读取 Antigravity 模型额度
+  ZCode-Antigravity gui              打开图形控制中心
+  ZCode-Antigravity doctor           运行本机检查
+  ZCode-Antigravity smoke [model]    发送一次真实的小型模型请求
+  ZCode-Antigravity stop             停止本程序启动的网关
+  ZCode-Antigravity remove-provider  只从 ZCode 删除本 Provider
 
 无参数运行会显示交互菜单。`)
 }
