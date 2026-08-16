@@ -1,7 +1,8 @@
 Windows acceptance checklist
 ============================
 
-[ ] ZCode-Antigravity-Setup-v0.2.6-test.exe opens a native confirmation dialog without a terminal.
+[ ] ZCode-Antigravity-Setup-v0.2.8-test.exe opens a native confirmation dialog without a terminal.
+[ ] The native EXE writes install.ps1 with exactly one EF BB BF UTF-8 BOM before Windows PowerShell 5.1 parses it.
 [ ] The EXE installer --extract-only workflow reproduces all 23 package files and hashes exactly.
 [ ] The EXE refuses installation while ZCode or the target control center is still running.
 [ ] Successful EXE installation creates current-user Desktop/Start Menu shortcuts and opens the GUI.

@@ -3,7 +3,7 @@
 > 让 ZCode 通过本机 Anthropic-compatible Provider 调用 Antigravity 中的
 > Gemini 3.7 Flash 与 Gemini 3.6 Flash。
 
-**当前版本：** macOS `v0.2.7-test` / Windows `v0.2.6-test`
+**当前版本：** macOS `v0.2.7-test` / Windows `v0.2.8-test`
 **适用系统：** macOS 12+（Apple Silicon / Intel）、Windows 10 / 11 x64
 **项目状态：** 测试版
 
@@ -26,10 +26,10 @@
 | 文件 | 用途 | 建议 |
 | --- | --- | --- |
 | `ZCode-Antigravity-macOS-Universal-v0.2.7-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
-| `ZCode-Antigravity-Setup-v0.2.6-test.exe` | Windows 图形化安装器 | **普通用户首选** |
-| `ZCode-Antigravity-OneClick-v0.2.6-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
-| `ZCode-Antigravity-Windows-x64-0.2.6-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
-| `ZCode-Antigravity-Source-v0.2.6-test.zip` | 当前版本的干净源码快照 | 审计 / 构建 |
+| `ZCode-Antigravity-Setup-v0.2.8-test.exe` | Windows 图形化安装器 | **普通用户首选** |
+| `ZCode-Antigravity-OneClick-v0.2.8-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
+| `ZCode-Antigravity-Windows-x64-0.2.8-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
+| `ZCode-Antigravity-Source-v0.2.8-test.zip` | 当前版本的干净源码快照 | 审计 / 构建 |
 
 ## macOS 快速安装
 
@@ -64,7 +64,7 @@ AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切�
 
 1. 从 Windows 系统托盘完全退出 ZCode。仅关闭窗口可能仍会留下 `ZCode.exe` 进程。
 2. 确认 v2rayN 已开启 TUN，且本地代理端口与配置一致。
-3. 下载 `ZCode-Antigravity-Setup-v0.2.6-test.exe`，并先校验 SHA-256。
+3. 下载 `ZCode-Antigravity-Setup-v0.2.8-test.exe`，并先校验 SHA-256。请勿继续使用会在中文 Windows 上触发脚本解析错误的 `v0.2.6-test` EXE。
 4. 双击安装器。程序会校验内嵌 ZIP 和三个 EXE，然后安装到当前用户目录。
 5. 在控制中心中完成 Google OAuth，等待状态检查通过。
 6. 重新打开 ZCode，选择 Provider `Antigravity (Local Bridge)`。
@@ -93,7 +93,7 @@ $env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
 
 ## 已验证范围
 
-`v0.2.6-test` 的本地测试记录包括：
+Windows 基线与 `v0.2.8-test` 新增的构建主机测试记录包括：
 
 - 管理器与 CLIProxyAPI 的 Go 测试、Windows x64 构建和静态检查通过。
 - OAuth PKCE / callback、DPAPI 凭据存储、原子替换和 loopback 约束通过。
@@ -101,6 +101,8 @@ $env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
 - 图片理解与视频时序理解通过；当前不宣称支持原生位图生成。
 - 单 BAT 自解包、载荷和三 EXE 哈希校验、同版本重装通过。
 - 原生 EXE 安装器的隔离安装、再安装与无终端 GUI 行为通过。
+- EXE 内嵌 PowerShell 脚本现在由构建器和运行时双重保证 UTF-8 BOM，并加入中文脚本编码回归测试，修复 Windows PowerShell 5.1 的 `ParserError: UnexpectedToken`。
+- 已在构建主机复现中文代码页 936 会产生 `UnexpectedToken`，并确认新 EXE 只内嵌一个 `EF BB BF + param(` 脚本头；`v0.2.8-test` 仍需在目标 Windows 10/11 上完成最终双击回归。
 
 `v0.2.7-test` 的 macOS 新增验证包括：
 

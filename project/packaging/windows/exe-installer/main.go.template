@@ -107,7 +107,7 @@ func install() (string, string, error) {
 		return "", "", err
 	}
 	scriptPath := filepath.Join(stage, "install.ps1")
-	if err := os.WriteFile(scriptPath, installScript, 0o600); err != nil {
+	if err := writeWindowsPowerShellScript(scriptPath, installScript); err != nil {
 		return "", "", fmt.Errorf("准备安装脚本: %w", err)
 	}
 

@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$PackageDir,
     [Parameter(Mandatory = $true)][string]$OutputFile,
-    [string]$PackageVersion = '0.2.6-test'
+    [string]$PackageVersion = '0.2.8-test'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -9,11 +9,12 @@ $packageFull = [IO.Path]::GetFullPath($PackageDir)
 $outputFull = [IO.Path]::GetFullPath($OutputFile)
 $templateDir = Join-Path $PSScriptRoot 'exe-installer'
 $mainTemplate = Join-Path $templateDir 'main.go.template'
+$encodingSource = Join-Path $templateDir 'encoding.go'
 $installScript = Join-Path $templateDir 'Install-From-Package.ps1'
 $manager = Join-Path $packageFull 'ZCode-Antigravity.exe'
 $controlCenter = Join-Path $packageFull 'ZCode-Antigravity-ControlCenter.exe'
 $backend = Join-Path $packageFull 'backend\cli-proxy-api.exe'
-foreach ($required in @($mainTemplate, $installScript, $manager, $controlCenter, $backend)) {
+foreach ($required in @($mainTemplate, $encodingSource, $installScript, $manager, $controlCenter, $backend)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
         throw "Missing EXE installer build input: $required"
     }
@@ -45,8 +46,18 @@ try {
     if ($main -match '__[A-Z0-9_]+__') {
         throw "Unresolved EXE installer placeholder: $($Matches[0])"
     }
-    [IO.File]::WriteAllText((Join-Path $buildRoot 'main.go'), $main, [Text.UTF8Encoding]::new($false))
-    Copy-Item -LiteralPath $installScript -Destination (Join-Path $buildRoot 'install.ps1')
+    $mainSource = Join-Path $buildRoot 'main.go'
+    $encodingBuildSource = Join-Path $buildRoot 'encoding.go'
+    [IO.File]::WriteAllText($mainSource, $main, [Text.UTF8Encoding]::new($false))
+    Copy-Item -LiteralPath $encodingSource -Destination $encodingBuildSource
+    $installText = [IO.File]::ReadAllText($installScript, [Text.Encoding]::UTF8)
+    [void][ScriptBlock]::Create($installText)
+    $embeddedInstallScript = Join-Path $buildRoot 'install.ps1'
+    [IO.File]::WriteAllText($embeddedInstallScript, $installText, [Text.UTF8Encoding]::new($true))
+    $embeddedBytes = [IO.File]::ReadAllBytes($embeddedInstallScript)
+    if ($embeddedBytes.Length -lt 3 -or $embeddedBytes[0] -ne 0xEF -or $embeddedBytes[1] -ne 0xBB -or $embeddedBytes[2] -ne 0xBF) {
+        throw 'Embedded Windows PowerShell script is missing its UTF-8 BOM.'
+    }
 
     $parent = Split-Path -Parent $outputFull
     if (-not [string]::IsNullOrWhiteSpace($parent)) {
@@ -59,7 +70,7 @@ try {
         $env:CGO_ENABLED = '0'
         $env:GOOS = 'windows'
         $env:GOARCH = 'amd64'
-        & go build -trimpath -ldflags '-s -w -H windowsgui' -o $outputFull (Join-Path $buildRoot 'main.go')
+        & go build -trimpath -ldflags '-s -w -H windowsgui' -o $outputFull $mainSource $encodingBuildSource
         if ($LASTEXITCODE -ne 0) { throw "go build failed with exit code $LASTEXITCODE" }
     }
     finally {
