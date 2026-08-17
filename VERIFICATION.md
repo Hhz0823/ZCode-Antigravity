@@ -2,6 +2,17 @@
 
 最新验证日期：2026-08-17（Asia/Shanghai）
 
+## v0.4.2-test Antigravity 额度 HTTP 403 修复
+
+- 用户 Windows 实机截图确认 Google OAuth 已显示 `Login successful`，控制中心也识别到账号与
+  `Google AI Pro`，但 `retrieveUserQuotaSummary` 返回 HTTP 403；因此登录与 token 持久化不是故障点。
+- 额度读取现在依次尝试 sandbox、daily 与 production 端点；携带项目 ID 返回 403 时，自动用空请求体
+  在同一端点重试，覆盖当前上游对项目字段权限不一致的行为。
+- 完整汇总仍被拒绝时，使用 `fetchAvailableModels` 读取 Gemini 逐模型剩余额度，并在状态文字中明确
+  标为回退数据，不把它冒充完整的每周 / 5 小时汇总。
+- 新增两项本机可执行回归：403 后无项目重试，以及三个汇总端点拒绝后逐模型额度降级。
+- 构建机无法代替目标 Windows 账号进行真实上游刷新；发布后仍需用户点击“刷新”确认该账号实际返回值。
+
 ## v0.4.1-test Windows 启动修复
 
 - 用户实机截图确认 v0.4.0 Rust 客户端启动时报告 `missing field baseUrl`。根因是 Go

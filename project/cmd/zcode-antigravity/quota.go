@@ -10,13 +10,26 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
 
-const antigravityQuotaUserAgent = "antigravity/hub/2.8.1 darwin/arm64"
+const antigravityQuotaClientVersion = "2.8.1"
+
+var antigravityQuotaSummaryEndpoints = []string{
+	"https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:retrieveUserQuotaSummary",
+	"https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+	"https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+}
+
+var antigravityAvailableModelsEndpoints = []string{
+	"https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:fetchAvailableModels",
+	"https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels",
+	"https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels",
+}
 
 type quotaReport struct {
 	FetchedAt time.Time      `json:"fetchedAt"`
@@ -106,6 +119,28 @@ type upstreamQuotaBucket struct {
 	TokenType         string   `json:"tokenType"`
 }
 
+type upstreamAvailableModels struct {
+	Models map[string]upstreamAvailableModel `json:"models"`
+}
+
+type upstreamAvailableModel struct {
+	DisplayName string                       `json:"displayName"`
+	QuotaInfo   *upstreamAvailableModelQuota `json:"quotaInfo"`
+}
+
+type upstreamAvailableModelQuota struct {
+	RemainingFraction *float64 `json:"remainingFraction"`
+	ResetTime         string   `json:"resetTime"`
+}
+
+type upstreamCallError struct {
+	StatusCode int
+}
+
+func (e upstreamCallError) Error() string {
+	return fmt.Sprintf("上游额度接口返回 HTTP %d", e.StatusCode)
+}
+
 func (a *app) quotaCachePath() string {
 	return filepath.Join(a.paths.Data, "quota-cache.json")
 }
@@ -143,7 +178,7 @@ func (a *app) fetchQuotaReport() (quotaReport, error) {
 	report := quotaReport{
 		FetchedAt: a.now().UTC(),
 		Provider:  "antigravity",
-		Source:    "Antigravity retrieveUserQuotaSummary",
+		Source:    "Antigravity quota APIs",
 		Accounts:  make([]quotaAccount, 0, len(authFiles.Files)),
 	}
 	for _, authFile := range authFiles.Files {
@@ -167,11 +202,15 @@ func (a *app) fetchQuotaReport() (quotaReport, error) {
 			continue
 		}
 
-		summary, errSummary := a.retrieveQuotaSummary(current.Port, authFile.AuthIndex, projectID)
+		summary, quotaSource, errSummary := a.retrieveQuotaSummary(current.Port, authFile.AuthIndex, projectID)
 		if errSummary != nil {
 			account.Error = errSummary.Error()
 		} else {
 			account.Groups = convertQuotaGroups(summary)
+			if quotaSource != "retrieveUserQuotaSummary" {
+				account.StatusMessage = "汇总额度接口无权限，当前显示逐模型额度"
+			}
+			report.Source = "Antigravity " + quotaSource
 		}
 		plan, credits, errCredits := a.retrievePlanAndCredits(current.Port, authFile.AuthIndex)
 		if errCredits == nil {
@@ -192,35 +231,107 @@ func (a *app) fetchQuotaReport() (quotaReport, error) {
 	return report, nil
 }
 
-func (a *app) retrieveQuotaSummary(port int, authIndex, projectID string) (upstreamQuotaSummary, error) {
+func (a *app) retrieveQuotaSummary(port int, authIndex, projectID string) (upstreamQuotaSummary, string, error) {
+	data, errJSON := json.Marshal(map[string]string{"project": projectID})
+	if errJSON != nil {
+		return upstreamQuotaSummary{}, "", errJSON
+	}
+	var lastErr error
+	for _, endpoint := range antigravityQuotaSummaryEndpoints {
+		payload := string(data)
+		for attempt := 0; attempt < 2; attempt++ {
+			body, errCall := a.managementAPICall(port, authIndex, endpoint, payload)
+			if errCall != nil {
+				lastErr = errCall
+				var upstreamErr upstreamCallError
+				if attempt == 0 && errors.As(errCall, &upstreamErr) && upstreamErr.StatusCode == http.StatusForbidden {
+					payload = `{}`
+					continue
+				}
+				break
+			}
+			var summary upstreamQuotaSummary
+			if errDecode := json.Unmarshal(body, &summary); errDecode != nil {
+				lastErr = errors.New("额度响应不是有效 JSON")
+				break
+			}
+			if len(summary.Buckets) == 0 && len(summary.Groups) == 0 {
+				lastErr = errors.New("Antigravity 未返回模型额度桶")
+				break
+			}
+			return summary, "retrieveUserQuotaSummary", nil
+		}
+	}
+
+	available, errAvailable := a.retrieveAvailableModelQuota(port, authIndex, projectID)
+	if errAvailable == nil {
+		return available, "fetchAvailableModels fallback", nil
+	}
+	lastErr = errAvailable
+	if lastErr == nil {
+		lastErr = errors.New("额度端点不可用")
+	}
+	return upstreamQuotaSummary{}, "", lastErr
+}
+
+func (a *app) retrieveAvailableModelQuota(port int, authIndex, projectID string) (upstreamQuotaSummary, error) {
 	data, errJSON := json.Marshal(map[string]string{"project": projectID})
 	if errJSON != nil {
 		return upstreamQuotaSummary{}, errJSON
 	}
-	endpoints := []string{
-		"https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
-		"https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
-	}
 	var lastErr error
-	for _, endpoint := range endpoints {
-		body, errCall := a.managementAPICall(port, authIndex, endpoint, string(data))
-		if errCall != nil {
-			lastErr = errCall
-			continue
+	for _, endpoint := range antigravityAvailableModelsEndpoints {
+		payload := string(data)
+		for attempt := 0; attempt < 2; attempt++ {
+			body, errCall := a.managementAPICall(port, authIndex, endpoint, payload)
+			if errCall != nil {
+				lastErr = errCall
+				var upstreamErr upstreamCallError
+				if attempt == 0 && errors.As(errCall, &upstreamErr) && upstreamErr.StatusCode == http.StatusForbidden {
+					payload = `{}`
+					continue
+				}
+				break
+			}
+
+			var response upstreamAvailableModels
+			if errDecode := json.Unmarshal(body, &response); errDecode != nil {
+				lastErr = errors.New("逐模型额度响应不是有效 JSON")
+				break
+			}
+			modelIDs := make([]string, 0, len(response.Models))
+			for modelID, model := range response.Models {
+				if strings.HasPrefix(strings.ToLower(modelID), "gemini") && model.QuotaInfo != nil && model.QuotaInfo.RemainingFraction != nil {
+					modelIDs = append(modelIDs, modelID)
+				}
+			}
+			sort.Strings(modelIDs)
+			buckets := make([]upstreamQuotaBucket, 0, len(modelIDs))
+			for _, modelID := range modelIDs {
+				model := response.Models[modelID]
+				buckets = append(buckets, upstreamQuotaBucket{
+					BucketID:          modelID,
+					DisplayName:       firstText(model.DisplayName, modelID),
+					Description:       "逐模型额度回退数据",
+					Window:            "model",
+					RemainingFraction: model.QuotaInfo.RemainingFraction,
+					ResetTime:         model.QuotaInfo.ResetTime,
+					ModelID:           modelID,
+				})
+			}
+			if len(buckets) == 0 {
+				lastErr = errors.New("Antigravity 未返回可用的逐模型额度")
+				break
+			}
+			return upstreamQuotaSummary{Groups: []upstreamQuotaGroup{{
+				DisplayName: "Gemini 逐模型额度",
+				Description: "汇总额度不可用时的回退数据",
+				Buckets:     buckets,
+			}}}, nil
 		}
-		var summary upstreamQuotaSummary
-		if errDecode := json.Unmarshal(body, &summary); errDecode != nil {
-			lastErr = fmt.Errorf("额度响应不是有效 JSON")
-			continue
-		}
-		if len(summary.Buckets) == 0 && len(summary.Groups) == 0 {
-			lastErr = fmt.Errorf("Antigravity 未返回模型额度桶")
-			continue
-		}
-		return summary, nil
 	}
 	if lastErr == nil {
-		lastErr = errors.New("额度端点不可用")
+		lastErr = errors.New("逐模型额度端点不可用")
 	}
 	return upstreamQuotaSummary{}, lastErr
 }
@@ -267,8 +378,12 @@ func (a *app) managementAPICall(port int, authIndex, endpoint, data string) ([]b
 		"Authorization": "Bearer $TOKEN$",
 		"Accept":        "*/*",
 		"Content-Type":  "application/json",
-		"User-Agent":    antigravityQuotaUserAgent,
+		"User-Agent":    antigravityQuotaUserAgent(),
 	})
+}
+
+func antigravityQuotaUserAgent() string {
+	return fmt.Sprintf("antigravity/hub/%s %s/%s", antigravityQuotaClientVersion, runtime.GOOS, runtime.GOARCH)
 }
 
 func (a *app) managementAPICallRequest(port int, authIndex, method, endpoint, data string, headers map[string]string) ([]byte, error) {
@@ -284,7 +399,7 @@ func (a *app) managementAPICallRequest(port int, authIndex, method, endpoint, da
 		return nil, err
 	}
 	if result.StatusCode < http.StatusOK || result.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("上游额度接口返回 HTTP %d", result.StatusCode)
+		return nil, upstreamCallError{StatusCode: result.StatusCode}
 	}
 	return []byte(result.Body), nil
 }

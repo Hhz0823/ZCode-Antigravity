@@ -1,6 +1,6 @@
 [package]
 name = "zcode-antigravity-native"
-version = "0.4.1-test"
+version = "0.4.2-test"
 edition = "2024"
 license = "LicenseRef-Proprietary"
 publish = false

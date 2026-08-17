@@ -144,6 +144,112 @@ func writeAPICallTestResponse(t *testing.T, w http.ResponseWriter, upstream any)
 	_ = json.NewEncoder(w).Encode(managementAPICallResponse{StatusCode: http.StatusOK, Body: string(raw)})
 }
 
+func TestRetrieveQuotaSummaryRetriesWithoutProjectAfterForbidden(t *testing.T) {
+	a := testApp(t)
+	requests := make([]struct {
+		URL  string
+		Data string
+	}, 0, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			URL    string            `json:"url"`
+			Data   string            `json:"data"`
+			Header map[string]string `json:"header"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		if request.Header["Authorization"] != "Bearer $TOKEN$" || !strings.Contains(request.Header["User-Agent"], "antigravity/hub/") {
+			t.Fatalf("unexpected upstream headers: %#v", request.Header)
+		}
+		requests = append(requests, struct {
+			URL  string
+			Data string
+		}{request.URL, request.Data})
+		if strings.Contains(request.Data, "private-project") {
+			_ = json.NewEncoder(w).Encode(managementAPICallResponse{StatusCode: http.StatusForbidden, Body: `{"error":"forbidden"}`})
+			return
+		}
+		writeAPICallTestResponse(t, w, map[string]any{"groups": []map[string]any{{
+			"displayName": "Gemini Models",
+			"buckets": []map[string]any{{
+				"bucketId":          "weekly",
+				"remainingFraction": 0.75,
+			}},
+		}}})
+	}))
+	defer server.Close()
+
+	port := testServerPort(t, server.URL)
+	summary, source, err := a.retrieveQuotaSummary(port, "auth-index", "private-project")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if source != "retrieveUserQuotaSummary" || len(summary.Groups) != 1 {
+		t.Fatalf("source=%q summary=%+v", source, summary)
+	}
+	if len(requests) != 2 || requests[0].URL != antigravityQuotaSummaryEndpoints[0] || !strings.Contains(requests[0].Data, "private-project") || strings.TrimSpace(requests[1].Data) != `{}` {
+		t.Fatalf("requests = %#v", requests)
+	}
+}
+
+func TestRetrieveQuotaSummaryFallsBackToAvailableModels(t *testing.T) {
+	a := testApp(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			URL string `json:"url"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(request.URL, "retrieveUserQuotaSummary") {
+			_ = json.NewEncoder(w).Encode(managementAPICallResponse{StatusCode: http.StatusForbidden, Body: `{"error":"forbidden"}`})
+			return
+		}
+		if request.URL != antigravityAvailableModelsEndpoints[0] {
+			t.Fatalf("unexpected fallback endpoint: %s", request.URL)
+		}
+		writeAPICallTestResponse(t, w, map[string]any{"models": map[string]any{
+			"gemini-3.7-flash": map[string]any{
+				"displayName": "Gemini 3.7 Flash",
+				"quotaInfo": map[string]any{
+					"remainingFraction": 0.42,
+					"resetTime":         "2026-08-18T00:00:00Z",
+				},
+			},
+			"internal-chat": map[string]any{
+				"quotaInfo": map[string]any{"remainingFraction": 1.0},
+			},
+		}})
+	}))
+	defer server.Close()
+
+	summary, source, err := a.retrieveQuotaSummary(testServerPort(t, server.URL), "auth-index", "private-project")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if source != "fetchAvailableModels fallback" || len(summary.Groups) != 1 || len(summary.Groups[0].Buckets) != 1 {
+		t.Fatalf("source=%q summary=%+v", source, summary)
+	}
+	bucket := summary.Groups[0].Buckets[0]
+	if bucket.ModelID != "gemini-3.7-flash" || bucket.RemainingFraction == nil || *bucket.RemainingFraction != 0.42 {
+		t.Fatalf("bucket = %+v", bucket)
+	}
+}
+
+func testServerPort(t *testing.T, serverURL string) int {
+	t.Helper()
+	parsed, err := url.Parse(serverURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(parsed.Port())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return port
+}
+
 func TestCachedQuotaReportMarksDataStale(t *testing.T) {
 	a := testApp(t)
 	report := quotaReport{FetchedAt: time.Now().UTC(), Source: "test", Accounts: []quotaAccount{{Account: "q***@example.com"}}}
