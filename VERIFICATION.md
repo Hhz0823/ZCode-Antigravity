@@ -2,6 +2,20 @@
 
 最新验证日期：2026-08-17（Asia/Shanghai）
 
+## v0.4.3-test Windows 原生界面恢复
+
+- 用户实机截图确认 `v0.4.2-test` 功能虽可用，但界面退化为灰色 Win32 默认控件，标题字号在
+  高 DPI 下异常放大，不再符合此前蓝白控制中心视觉。
+- Windows Rust 客户端现使用 owner-draw 按钮、深蓝侧栏、蓝白状态卡、浅色网格背景、原生进度条与
+  Microsoft YaHei UI；没有退回 Chrome/WebView，也没有改变本地安全 API 架构。
+- 字体高度改为真正的 point-to-DPI 换算；窗口按所在显示器的实际 DPI 与工作区创建，
+  `WM_DPICHANGED` 会重建字体并重新布局。
+- 修复了原生控件重绘回调在持有全局状态锁时可能造成的 UI 线程死锁；刷新数据和移动控件现在先复制
+  所需状态再调用 Win32 UI API。
+- 在用户 Windows 11 x64 实机、144 DPI（150%）显示器上完成验证：窗口物理尺寸
+  `1702 × 1136`，四个状态卡、额度卡和七个操作按钮完整可见；真实 Google AI Pro 额度成功刷新，
+  窗口保持响应。
+
 ## v0.4.2-test Antigravity 额度 HTTP 403 修复
 
 - 用户 Windows 实机截图确认 Google OAuth 已显示 `Login successful`，控制中心也识别到账号与

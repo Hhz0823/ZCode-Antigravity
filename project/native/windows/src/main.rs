@@ -24,12 +24,25 @@ use windows_sys::Win32::UI::HiDpi::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-const VERSION: &str = "0.4.2-test";
+const VERSION: &str = "0.4.3-test";
 const SS_LEFT: u32 = 0;
 const CF_UNICODETEXT_VALUE: u32 = 13;
 const WM_REFRESH_READY: u32 = WM_APP + 1;
 const WM_TRAY: u32 = WM_APP + 20;
 const TIMER_REFRESH: usize = 1;
+
+const COLOR_SIDEBAR: COLORREF = 0x00442308;
+const COLOR_SIDEBAR_ACTIVE: COLORREF = 0x008C4A16;
+const COLOR_BACKGROUND: COLORREF = 0x00FFF9F4;
+const COLOR_CARD: COLORREF = 0x00FFFFFF;
+const COLOR_BORDER: COLORREF = 0x00F0E3D3;
+const COLOR_GRID: COLORREF = 0x00F8F0E7;
+const COLOR_PRIMARY: COLORREF = 0x00F56B16;
+const COLOR_PRIMARY_DARK: COLORREF = 0x00CF5710;
+const COLOR_PRIMARY_SOFT: COLORREF = 0x00FFF2E9;
+const COLOR_TEXT: COLORREF = 0x00422A16;
+const COLOR_MUTED: COLORREF = 0x00907762;
+const COLOR_LIGHT_TEXT: COLORREF = 0x00F8E9DC;
 
 const ID_PROVIDER_ANTIGRAVITY: i32 = 100;
 const ID_PROVIDER_GROK: i32 = 101;
@@ -191,7 +204,7 @@ struct RefreshResult {
     connectors: Result<ConnectorResponse, String>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 struct Controls {
     subtitle: isize,
     provider_antigravity: isize,
@@ -300,10 +313,11 @@ unsafe fn create_control(
 }
 
 unsafe fn create_font(point_size: i32, weight: i32, dpi: u32) -> isize {
-    let face = wide("Segoe UI Variable Text");
+    let face = wide("Microsoft YaHei UI");
+    let pixel_height = -((point_size * dpi as i32 + 36) / 72).max(1);
     unsafe {
         CreateFontW(
-            -scale(point_size, dpi),
+            pixel_height,
             0,
             0,
             0,
@@ -325,16 +339,12 @@ unsafe fn create_controls(hwnd: HWND) {
     let Some(state_lock) = STATE.get() else {
         return;
     };
-    let mut state = state_lock.lock().unwrap();
-    state.dpi = unsafe { GetDpiForWindow(hwnd) }.max(96);
-    state.font = unsafe { create_font(14, FW_NORMAL as i32, state.dpi) };
-    state.font_bold = unsafe { create_font(14, FW_SEMIBOLD as i32, state.dpi) };
-    state.font_title = unsafe { create_font(26, FW_SEMIBOLD as i32, state.dpi) };
-
-    let font = state.font;
-    let font_bold = state.font_bold;
-    let font_title = state.font_title;
-    let c = &mut state.controls;
+    let dpi = unsafe { GetDpiForWindow(hwnd) }.max(96);
+    let font = unsafe { create_font(10, FW_NORMAL as i32, dpi) };
+    let font_bold = unsafe { create_font(10, FW_SEMIBOLD as i32, dpi) };
+    let font_title = unsafe { create_font(17, FW_SEMIBOLD as i32, dpi) };
+    let mut controls = Controls::default();
+    let c = &mut controls;
     c.subtitle = unsafe {
         create_control(
             hwnd,
@@ -350,7 +360,7 @@ unsafe fn create_controls(hwnd: HWND) {
             hwnd,
             "BUTTON",
             "Antigravity",
-            BS_AUTORADIOBUTTON as u32 | WS_GROUP,
+            BS_OWNERDRAW as u32 | WS_GROUP,
             ID_PROVIDER_ANTIGRAVITY,
             font_bold,
         )
@@ -360,7 +370,7 @@ unsafe fn create_controls(hwnd: HWND) {
             hwnd,
             "BUTTON",
             "Grok / xAI",
-            BS_AUTORADIOBUTTON as u32,
+            BS_OWNERDRAW as u32,
             ID_PROVIDER_GROK,
             font_bold,
         )
@@ -370,51 +380,19 @@ unsafe fn create_controls(hwnd: HWND) {
             hwnd,
             "BUTTON",
             "刷新",
-            BS_PUSHBUTTON as u32,
+            BS_OWNERDRAW as u32,
             ID_REFRESH,
             font,
         )
     };
-    c.status_tun = unsafe {
-        create_control(
-            hwnd,
-            "STATIC",
-            "TUN\r\n正在检查",
-            SS_LEFT | WS_BORDER,
-            0,
-            font,
-        )
-    };
-    c.status_proxy = unsafe {
-        create_control(
-            hwnd,
-            "STATIC",
-            "PROXY\r\n正在检查",
-            SS_LEFT | WS_BORDER,
-            0,
-            font,
-        )
-    };
-    c.status_bridge = unsafe {
-        create_control(
-            hwnd,
-            "STATIC",
-            "BRIDGE\r\n正在检查",
-            SS_LEFT | WS_BORDER,
-            0,
-            font,
-        )
-    };
-    c.status_zcode = unsafe {
-        create_control(
-            hwnd,
-            "STATIC",
-            "ZCODE\r\n正在检查",
-            SS_LEFT | WS_BORDER,
-            0,
-            font,
-        )
-    };
+    c.status_tun =
+        unsafe { create_control(hwnd, "STATIC", "TUN\r\n正在检查", SS_LEFT, 0, font) };
+    c.status_proxy =
+        unsafe { create_control(hwnd, "STATIC", "PROXY\r\n正在检查", SS_LEFT, 0, font) };
+    c.status_bridge =
+        unsafe { create_control(hwnd, "STATIC", "BRIDGE\r\n正在检查", SS_LEFT, 0, font) };
+    c.status_zcode =
+        unsafe { create_control(hwnd, "STATIC", "ZCODE\r\n正在检查", SS_LEFT, 0, font) };
     c.quota_title =
         unsafe { create_control(hwnd, "STATIC", "Gemini 模型额度", SS_LEFT, 0, font_title) };
     c.quota_body =
@@ -431,7 +409,7 @@ unsafe fn create_controls(hwnd: HWND) {
             hwnd,
             "BUTTON",
             "一键接入 ZCode",
-            BS_DEFPUSHBUTTON as u32,
+            BS_OWNERDRAW as u32,
             ID_SETUP,
             font_bold,
         )
@@ -441,7 +419,7 @@ unsafe fn create_controls(hwnd: HWND) {
             hwnd,
             "BUTTON",
             "登录 Antigravity",
-            BS_PUSHBUTTON as u32,
+            BS_OWNERDRAW as u32,
             ID_LOGIN_ANTIGRAVITY,
             font,
         )
@@ -451,7 +429,7 @@ unsafe fn create_controls(hwnd: HWND) {
             hwnd,
             "BUTTON",
             "登录 Grok / xAI",
-            BS_PUSHBUTTON as u32,
+            BS_OWNERDRAW as u32,
             ID_LOGIN_GROK,
             font,
         )
@@ -461,7 +439,7 @@ unsafe fn create_controls(hwnd: HWND) {
             hwnd,
             "BUTTON",
             "修复并重新同步",
-            BS_PUSHBUTTON as u32,
+            BS_OWNERDRAW as u32,
             ID_SYNC,
             font,
         )
@@ -471,7 +449,7 @@ unsafe fn create_controls(hwnd: HWND) {
             hwnd,
             "BUTTON",
             "打开 ZCode",
-            BS_PUSHBUTTON as u32,
+            BS_OWNERDRAW as u32,
             ID_OPEN_ZCODE,
             font,
         )
@@ -481,7 +459,7 @@ unsafe fn create_controls(hwnd: HWND) {
             hwnd,
             "BUTTON",
             "停止本地网关",
-            BS_PUSHBUTTON as u32,
+            BS_OWNERDRAW as u32,
             ID_STOP,
             font,
         )
@@ -491,7 +469,7 @@ unsafe fn create_controls(hwnd: HWND) {
             hwnd,
             "BUTTON",
             "复制当前 Agent 配置",
-            BS_PUSHBUTTON as u32,
+            BS_OWNERDRAW as u32,
             ID_COPY_CONNECTORS,
             font,
         )
@@ -514,151 +492,641 @@ unsafe fn create_controls(hwnd: HWND) {
             0,
         )
     };
+    unsafe {
+        SendMessageW(
+            c.quota_progress as HWND,
+            PBM_SETBARCOLOR,
+            0,
+            COLOR_PRIMARY as LPARAM,
+        );
+        SendMessageW(
+            c.quota_progress as HWND,
+            PBM_SETBKCOLOR,
+            0,
+            COLOR_PRIMARY_SOFT as LPARAM,
+        );
+    }
+    let mut state = state_lock.lock().unwrap();
+    state.dpi = dpi;
+    state.font = font;
+    state.font_bold = font_bold;
+    state.font_title = font_title;
+    state.controls = controls;
+}
+
+#[derive(Clone, Copy)]
+struct LayoutMetrics {
+    width: i32,
+    height: i32,
+    dpi: u32,
+    sidebar_w: i32,
+    main_x: i32,
+    main_w: i32,
+    gap: i32,
+    provider_y: i32,
+    provider_w: i32,
+    provider_h: i32,
+    status_y: i32,
+    status_h: i32,
+    status_w: i32,
+    content_top: i32,
+    content_bottom: i32,
+    left_w: i32,
+    action_x: i32,
+    action_w: i32,
+    button_h: i32,
+    button_gap: i32,
+}
+
+unsafe fn layout_metrics(hwnd: HWND, dpi: u32) -> LayoutMetrics {
+    let mut rect = RECT::default();
+    unsafe { GetClientRect(hwnd, &mut rect) };
+    let width = rect.right.max(1);
+    let height = rect.bottom.max(1);
+    let sidebar_w = scale(210, dpi).min(width / 3);
+    let margin = scale(26, dpi);
+    let gap = scale(12, dpi);
+    let main_x = sidebar_w + margin;
+    let main_w = (width - sidebar_w - margin * 2).max(scale(640, dpi));
+    let provider_y = scale(76, dpi);
+    let provider_w = scale(150, dpi);
+    let provider_h = scale(38, dpi);
+    let status_y = scale(126, dpi);
+    let status_h = scale(76, dpi);
+    let status_w = (main_w - gap * 3) / 4;
+    let content_top = scale(222, dpi);
+    let content_bottom = height - scale(24, dpi);
+    let action_w = scale(284, dpi).min(main_w * 36 / 100);
+    let action_x = main_x + main_w - action_w;
+    let left_w = action_x - gap - main_x;
+    LayoutMetrics {
+        width,
+        height,
+        dpi,
+        sidebar_w,
+        main_x,
+        main_w,
+        gap,
+        provider_y,
+        provider_w,
+        provider_h,
+        status_y,
+        status_h,
+        status_w,
+        content_top,
+        content_bottom,
+        left_w,
+        action_x,
+        action_w,
+        button_h: scale(40, dpi),
+        button_gap: scale(9, dpi),
+    }
 }
 
 unsafe fn layout(hwnd: HWND) {
     let Some(state_lock) = STATE.get() else {
         return;
     };
-    let state = state_lock.lock().unwrap();
-    let dpi = state.dpi;
-    let mut rect = RECT::default();
-    unsafe { GetClientRect(hwnd, &mut rect) };
-    let width = rect.right - rect.left;
-    let margin = scale(28, dpi);
-    let gap = scale(12, dpi);
-    let top = scale(24, dpi);
-    let provider_y = scale(70, dpi);
-    let provider_w = scale(150, dpi);
-    let status_y = scale(120, dpi);
-    let status_h = scale(72, dpi);
-    let status_w = (width - margin * 2 - gap * 3) / 4;
-    let action_w = scale(300, dpi);
-    let action_x = width - margin - action_w;
-    let content_top = scale(220, dpi);
-    let left_w = (action_x - gap - margin).max(scale(420, dpi));
-    let button_h = scale(42, dpi);
+    let (dpi, controls) = {
+        let state = state_lock.lock().unwrap();
+        (state.dpi, state.controls)
+    };
+    let m = unsafe { layout_metrics(hwnd, dpi) };
+    let inset = scale(20, m.dpi);
+    let models_h = scale(76, m.dpi);
+    let models_y = (m.content_bottom - inset - models_h).max(m.content_top + scale(250, m.dpi));
+    let quota_body_y = m.content_top + scale(92, m.dpi);
 
     let move_control = |handle: isize, x: i32, y: i32, w: i32, h: i32| unsafe {
         if handle != 0 {
-            MoveWindow(handle as HWND, x, y, w, h, 1)
+            MoveWindow(handle as HWND, x, y, w.max(1), h.max(1), 1)
         } else {
             0
         }
     };
     move_control(
-        state.controls.subtitle,
-        margin,
-        top,
-        width - margin * 2,
-        scale(34, dpi),
+        controls.subtitle,
+        m.main_x,
+        scale(48, m.dpi),
+        m.main_w,
+        scale(22, m.dpi),
     );
     move_control(
-        state.controls.provider_antigravity,
-        margin,
-        provider_y,
-        provider_w,
-        scale(34, dpi),
+        controls.provider_antigravity,
+        m.main_x,
+        m.provider_y,
+        m.provider_w,
+        m.provider_h,
     );
     move_control(
-        state.controls.provider_grok,
-        margin + provider_w + gap,
-        provider_y,
-        provider_w,
-        scale(34, dpi),
+        controls.provider_grok,
+        m.main_x + m.provider_w + m.gap,
+        m.provider_y,
+        m.provider_w,
+        m.provider_h,
     );
     move_control(
-        state.controls.refresh,
-        width - margin - scale(90, dpi),
-        provider_y,
-        scale(90, dpi),
-        scale(34, dpi),
+        controls.refresh,
+        m.main_x + m.main_w - scale(92, m.dpi),
+        m.provider_y,
+        scale(92, m.dpi),
+        m.provider_h,
     );
     for (index, handle) in [
-        state.controls.status_tun,
-        state.controls.status_proxy,
-        state.controls.status_bridge,
-        state.controls.status_zcode,
+        controls.status_tun,
+        controls.status_proxy,
+        controls.status_bridge,
+        controls.status_zcode,
     ]
     .iter()
     .enumerate()
     {
         move_control(
             *handle,
-            margin + index as i32 * (status_w + gap),
-            status_y,
-            status_w,
-            status_h,
+            m.main_x + index as i32 * (m.status_w + m.gap) + scale(14, m.dpi),
+            m.status_y + scale(13, m.dpi),
+            m.status_w - scale(28, m.dpi),
+            m.status_h - scale(24, m.dpi),
         );
     }
     move_control(
-        state.controls.quota_title,
-        margin,
-        content_top,
-        left_w,
-        scale(40, dpi),
+        controls.quota_title,
+        m.main_x + inset,
+        m.content_top + scale(18, m.dpi),
+        m.left_w - inset * 2,
+        scale(34, m.dpi),
     );
     move_control(
-        state.controls.quota_progress,
-        margin,
-        content_top + scale(52, dpi),
-        left_w,
-        scale(18, dpi),
+        controls.quota_progress,
+        m.main_x + inset,
+        m.content_top + scale(62, m.dpi),
+        m.left_w - inset * 2,
+        scale(10, m.dpi),
     );
     move_control(
-        state.controls.quota_body,
-        margin,
-        content_top + scale(82, dpi),
-        left_w,
-        scale(270, dpi),
+        controls.quota_body,
+        m.main_x + inset,
+        quota_body_y,
+        m.left_w - inset * 2,
+        models_y - quota_body_y - scale(12, m.dpi),
     );
     move_control(
-        state.controls.models,
-        margin,
-        content_top + scale(360, dpi),
-        left_w,
-        scale(92, dpi),
+        controls.models,
+        m.main_x + inset,
+        models_y,
+        m.left_w - inset * 2,
+        models_h,
     );
     move_control(
-        state.controls.action_header,
-        action_x,
-        content_top,
-        action_w,
-        scale(40, dpi),
+        controls.action_header,
+        m.action_x + inset,
+        m.content_top + scale(18, m.dpi),
+        m.action_w - inset * 2,
+        scale(34, m.dpi),
     );
     for (index, handle) in [
-        state.controls.setup,
-        state.controls.login_antigravity,
-        state.controls.login_grok,
-        state.controls.sync,
-        state.controls.open_zcode,
-        state.controls.stop,
+        controls.setup,
+        controls.login_antigravity,
+        controls.login_grok,
+        controls.sync,
+        controls.open_zcode,
+        controls.stop,
+        controls.copy_connectors,
     ]
     .iter()
     .enumerate()
     {
         move_control(
             *handle,
-            action_x,
-            content_top + scale(52, dpi) + index as i32 * (button_h + gap),
-            action_w,
-            button_h,
+            m.action_x + inset,
+            m.content_top + scale(62, m.dpi) + index as i32 * (m.button_h + m.button_gap),
+            m.action_w - inset * 2,
+            m.button_h,
         );
     }
     move_control(
-        state.controls.copy_connectors,
-        action_x,
-        content_top + scale(52, dpi) + 6 * (button_h + gap),
-        action_w,
-        button_h,
+        controls.footer,
+        scale(20, m.dpi),
+        m.height - scale(55, m.dpi),
+        m.sidebar_w - scale(40, m.dpi),
+        scale(36, m.dpi),
     );
-    move_control(
-        state.controls.footer,
-        margin,
-        rect.bottom - scale(32, dpi),
-        width - margin * 2,
-        scale(22, dpi),
-    );
+}
+
+unsafe fn recreate_fonts(hwnd: HWND, dpi: u32) {
+    let Some(state_lock) = STATE.get() else {
+        return;
+    };
+    let new_font = unsafe { create_font(10, FW_NORMAL as i32, dpi) };
+    let new_bold = unsafe { create_font(10, FW_SEMIBOLD as i32, dpi) };
+    let new_title = unsafe { create_font(17, FW_SEMIBOLD as i32, dpi) };
+    let (controls, old_font, old_bold, old_title) = {
+        let mut state = state_lock.lock().unwrap();
+        let old_font = std::mem::replace(&mut state.font, new_font);
+        let old_bold = std::mem::replace(&mut state.font_bold, new_bold);
+        let old_title = std::mem::replace(&mut state.font_title, new_title);
+        state.dpi = dpi;
+        (state.controls, old_font, old_bold, old_title)
+    };
+    let normal_controls = [
+        controls.subtitle,
+        controls.refresh,
+        controls.status_tun,
+        controls.status_proxy,
+        controls.status_bridge,
+        controls.status_zcode,
+        controls.quota_body,
+        controls.models,
+        controls.login_antigravity,
+        controls.login_grok,
+        controls.sync,
+        controls.open_zcode,
+        controls.stop,
+        controls.copy_connectors,
+        controls.footer,
+    ];
+    let bold_controls = [
+        controls.provider_antigravity,
+        controls.provider_grok,
+        controls.setup,
+    ];
+    let title_controls = [controls.quota_title, controls.action_header];
+    for handle in normal_controls {
+        if handle != 0 {
+            unsafe { SendMessageW(handle as HWND, WM_SETFONT, new_font as WPARAM, 0) };
+        }
+    }
+    for handle in bold_controls {
+        if handle != 0 {
+            unsafe { SendMessageW(handle as HWND, WM_SETFONT, new_bold as WPARAM, 0) };
+        }
+    }
+    for handle in title_controls {
+        if handle != 0 {
+            unsafe { SendMessageW(handle as HWND, WM_SETFONT, new_title as WPARAM, 0) };
+        }
+    }
+    unsafe {
+        if old_font != 0 {
+            DeleteObject(old_font as HGDIOBJ);
+        }
+        if old_bold != 0 {
+            DeleteObject(old_bold as HGDIOBJ);
+        }
+        if old_title != 0 {
+            DeleteObject(old_title as HGDIOBJ);
+        }
+    }
+    unsafe { InvalidateRect(hwnd, null(), 1) };
+}
+
+unsafe fn fill_color(hdc: HDC, rect: &RECT, color: COLORREF) {
+    let brush = unsafe { CreateSolidBrush(color) };
+    unsafe {
+        FillRect(hdc, rect, brush);
+        DeleteObject(brush as HGDIOBJ);
+    }
+}
+
+unsafe fn rounded_box(hdc: HDC, rect: &RECT, fill: COLORREF, border: COLORREF, radius: i32) {
+    let brush = unsafe { CreateSolidBrush(fill) };
+    let pen = unsafe { CreatePen(PS_SOLID, 1, border) };
+    let old_brush = unsafe { SelectObject(hdc, brush as HGDIOBJ) };
+    let old_pen = unsafe { SelectObject(hdc, pen as HGDIOBJ) };
+    unsafe {
+        RoundRect(
+            hdc,
+            rect.left,
+            rect.top,
+            rect.right,
+            rect.bottom,
+            radius,
+            radius,
+        );
+        SelectObject(hdc, old_brush);
+        SelectObject(hdc, old_pen);
+        DeleteObject(brush as HGDIOBJ);
+        DeleteObject(pen as HGDIOBJ);
+    }
+}
+
+unsafe fn draw_label(
+    hdc: HDC,
+    text: &str,
+    mut rect: RECT,
+    font: isize,
+    color: COLORREF,
+    format: u32,
+) {
+    let text = wide(text);
+    let old_font = unsafe { SelectObject(hdc, font as HGDIOBJ) };
+    unsafe {
+        SetBkMode(hdc, TRANSPARENT as i32);
+        SetTextColor(hdc, color);
+        DrawTextW(hdc, text.as_ptr(), -1, &mut rect, format);
+        SelectObject(hdc, old_font);
+    }
+}
+
+unsafe fn paint_dashboard(hwnd: HWND) {
+    let Some(state_lock) = STATE.get() else {
+        return;
+    };
+    let mut paint = PAINTSTRUCT::default();
+    let hdc = unsafe { BeginPaint(hwnd, &mut paint) };
+    let state = state_lock.lock().unwrap();
+    let m = unsafe { layout_metrics(hwnd, state.dpi) };
+    let client = RECT {
+        left: 0,
+        top: 0,
+        right: m.width,
+        bottom: m.height,
+    };
+    unsafe { fill_color(hdc, &client, COLOR_BACKGROUND) };
+    let sidebar = RECT {
+        left: 0,
+        top: 0,
+        right: m.sidebar_w,
+        bottom: m.height,
+    };
+    unsafe { fill_color(hdc, &sidebar, COLOR_SIDEBAR) };
+
+    let grid_pen = unsafe { CreatePen(PS_SOLID, 1, COLOR_GRID) };
+    let old_pen = unsafe { SelectObject(hdc, grid_pen as HGDIOBJ) };
+    let grid = scale(48, m.dpi).max(1);
+    let mut x = m.sidebar_w;
+    while x < m.width {
+        unsafe {
+            MoveToEx(hdc, x, 0, null_mut());
+            LineTo(hdc, x, m.height);
+        }
+        x += grid;
+    }
+    let mut y = 0;
+    while y < m.height {
+        unsafe {
+            MoveToEx(hdc, m.sidebar_w, y, null_mut());
+            LineTo(hdc, m.width, y);
+        }
+        y += grid;
+    }
+    unsafe {
+        SelectObject(hdc, old_pen);
+        DeleteObject(grid_pen as HGDIOBJ);
+    }
+
+    let logo = RECT {
+        left: scale(20, m.dpi),
+        top: scale(26, m.dpi),
+        right: scale(60, m.dpi),
+        bottom: scale(66, m.dpi),
+    };
+    unsafe { rounded_box(hdc, &logo, COLOR_SIDEBAR, COLOR_PRIMARY, scale(4, m.dpi)) };
+    unsafe {
+        draw_label(
+            hdc,
+            "ZA",
+            logo,
+            state.font_bold,
+            COLOR_LIGHT_TEXT,
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE,
+        );
+        draw_label(
+            hdc,
+            "ZCode Bridge",
+            RECT {
+                left: scale(72, m.dpi),
+                top: scale(25, m.dpi),
+                right: m.sidebar_w - scale(12, m.dpi),
+                bottom: scale(49, m.dpi),
+            },
+            state.font_bold,
+            COLOR_CARD,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+        );
+        draw_label(
+            hdc,
+            "Antigravity Control",
+            RECT {
+                left: scale(72, m.dpi),
+                top: scale(48, m.dpi),
+                right: m.sidebar_w - scale(10, m.dpi),
+                bottom: scale(70, m.dpi),
+            },
+            state.font,
+            COLOR_MUTED,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+        );
+        draw_label(
+            hdc,
+            "控制中心",
+            RECT {
+                left: scale(24, m.dpi),
+                top: scale(112, m.dpi),
+                right: m.sidebar_w,
+                bottom: scale(138, m.dpi),
+            },
+            state.font,
+            COLOR_MUTED,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+        );
+    }
+    let active_nav = RECT {
+        left: scale(16, m.dpi),
+        top: scale(146, m.dpi),
+        right: m.sidebar_w - scale(12, m.dpi),
+        bottom: scale(190, m.dpi),
+    };
+    unsafe {
+        rounded_box(
+            hdc,
+            &active_nav,
+            COLOR_SIDEBAR_ACTIVE,
+            COLOR_SIDEBAR_ACTIVE,
+            scale(4, m.dpi),
+        )
+    };
+    unsafe {
+        draw_label(
+            hdc,
+            "●   模型与额度",
+            active_nav,
+            state.font_bold,
+            COLOR_CARD,
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE,
+        );
+        draw_label(
+            hdc,
+            "●   连接状态",
+            RECT {
+                left: scale(28, m.dpi),
+                top: scale(199, m.dpi),
+                right: m.sidebar_w,
+                bottom: scale(235, m.dpi),
+            },
+            state.font,
+            COLOR_MUTED,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+        );
+        draw_label(
+            hdc,
+            "●   本机操作",
+            RECT {
+                left: scale(28, m.dpi),
+                top: scale(239, m.dpi),
+                right: m.sidebar_w,
+                bottom: scale(275, m.dpi),
+            },
+            state.font,
+            COLOR_MUTED,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+        );
+        draw_label(
+            hdc,
+            "本地安全边界",
+            RECT {
+                left: scale(20, m.dpi),
+                top: m.height - scale(86, m.dpi),
+                right: m.sidebar_w - scale(16, m.dpi),
+                bottom: m.height - scale(60, m.dpi),
+            },
+            state.font,
+            COLOR_MUTED,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+        );
+        draw_label(
+            hdc,
+            "模型与额度",
+            RECT {
+                left: m.main_x,
+                top: scale(14, m.dpi),
+                right: m.main_x + m.main_w,
+                bottom: scale(48, m.dpi),
+            },
+            state.font_title,
+            COLOR_TEXT,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+        );
+    }
+
+    for index in 0..4 {
+        let left = m.main_x + index * (m.status_w + m.gap);
+        let card = RECT {
+            left,
+            top: m.status_y,
+            right: left + m.status_w,
+            bottom: m.status_y + m.status_h,
+        };
+        unsafe { rounded_box(hdc, &card, COLOR_CARD, COLOR_BORDER, scale(5, m.dpi)) };
+    }
+    let quota_card = RECT {
+        left: m.main_x,
+        top: m.content_top,
+        right: m.main_x + m.left_w,
+        bottom: m.content_bottom,
+    };
+    let action_card = RECT {
+        left: m.action_x,
+        top: m.content_top,
+        right: m.action_x + m.action_w,
+        bottom: m.content_bottom,
+    };
+    unsafe {
+        rounded_box(hdc, &quota_card, COLOR_CARD, COLOR_BORDER, scale(7, m.dpi));
+        rounded_box(hdc, &action_card, COLOR_CARD, COLOR_BORDER, scale(7, m.dpi));
+    }
+    drop(state);
+    unsafe { EndPaint(hwnd, &paint) };
+}
+
+unsafe fn draw_owner_button(draw: &DRAWITEMSTRUCT) {
+    let id = draw.CtlID as i32;
+    let pressed = draw.itemState & ODS_SELECTED != 0;
+    let provider_selected = STATE
+        .get()
+        .map(|state| {
+            let provider = &state.lock().unwrap().provider;
+            (id == ID_PROVIDER_ANTIGRAVITY && provider != "xai")
+                || (id == ID_PROVIDER_GROK && provider == "xai")
+        })
+        .unwrap_or(false);
+    let primary = id == ID_SETUP;
+    let (fill, border, text_color) = if primary {
+        (
+            if pressed {
+                COLOR_PRIMARY_DARK
+            } else {
+                COLOR_PRIMARY
+            },
+            COLOR_PRIMARY,
+            COLOR_CARD,
+        )
+    } else if provider_selected {
+        (
+            if pressed {
+                COLOR_BORDER
+            } else {
+                COLOR_PRIMARY_SOFT
+            },
+            COLOR_PRIMARY,
+            COLOR_PRIMARY,
+        )
+    } else {
+        (
+            if pressed {
+                COLOR_PRIMARY_SOFT
+            } else {
+                COLOR_CARD
+            },
+            COLOR_BORDER,
+            COLOR_TEXT,
+        )
+    };
+    unsafe { rounded_box(draw.hDC, &draw.rcItem, fill, border, 5) };
+    let mut label = [0u16; 256];
+    let length = unsafe { GetWindowTextW(draw.hwndItem, label.as_mut_ptr(), label.len() as i32) };
+    let text = String::from_utf16_lossy(&label[..length.max(0) as usize]);
+    let font = if primary || provider_selected {
+        STATE
+            .get()
+            .map(|state| state.lock().unwrap().font_bold)
+            .unwrap_or(0)
+    } else {
+        STATE
+            .get()
+            .map(|state| state.lock().unwrap().font)
+            .unwrap_or(0)
+    };
+    unsafe {
+        draw_label(
+            draw.hDC,
+            &text,
+            draw.rcItem,
+            font,
+            text_color,
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE,
+        )
+    };
+}
+
+unsafe fn static_control_color(hdc: HDC, control: HWND) -> LRESULT {
+    let Some(state_lock) = STATE.get() else {
+        return 0;
+    };
+    let state = state_lock.lock().unwrap();
+    let handle = control as isize;
+    let color = if handle == state.controls.footer {
+        COLOR_LIGHT_TEXT
+    } else if handle == state.controls.subtitle {
+        COLOR_MUTED
+    } else {
+        COLOR_TEXT
+    };
+    unsafe {
+        SetBkMode(hdc, TRANSPARENT as i32);
+        SetTextColor(hdc, color);
+        GetStockObject(NULL_BRUSH) as LRESULT
+    }
 }
 
 fn api_get<T: for<'de> Deserialize<'de>>(
@@ -809,120 +1277,122 @@ unsafe fn apply_refresh(update: RefreshResult) {
     let Some(state_lock) = STATE.get() else {
         return;
     };
-    let mut state = state_lock.lock().unwrap();
-    state.refreshing = false;
-    match update.status {
-        Ok(status) => {
+    let RefreshResult {
+        status,
+        quota,
+        connectors,
+    } = update;
+    let (controls, hwnd, provider) = {
+        let mut state = state_lock.lock().unwrap();
+        state.refreshing = false;
+        if let Ok(status) = &status {
             state.provider = status.selected_provider.clone();
-            unsafe {
-                let operation_message = status
-                    .operation
-                    .error
-                    .as_deref()
-                    .or(status.operation.message.as_deref());
-                set_text(
-                    state.controls.subtitle,
-                    operation_message.unwrap_or(if status.operation.running {
-                        "本地操作正在进行…"
-                    } else if status.gateway.ok {
-                        "本地安全核心在线"
-                    } else {
-                        "请选择提供商并执行一键接入"
-                    }),
-                );
-                set_text(state.controls.status_tun, &format_item("TUN", &status.tun));
-                set_text(
-                    state.controls.status_proxy,
-                    &format_item("PROXY", &status.proxy),
-                );
-                set_text(
-                    state.controls.status_bridge,
-                    &format_item("BRIDGE", &status.gateway),
-                );
-                set_text(
-                    state.controls.status_zcode,
-                    &format_item("ZCODE", &status.zcode),
-                );
-                set_text(
-                    state.controls.models,
-                    &format!(
-                        "当前模型（{}）\r\n{}",
-                        status.models.len(),
-                        if status.models.is_empty() {
-                            "等待网关同步".to_string()
-                        } else {
-                            status.models.join("  ·  ")
-                        }
-                    ),
-                );
-                set_text(
-                    state.controls.provider_antigravity,
-                    &format!("Antigravity  {}", status.provider_accounts.antigravity),
-                );
-                set_text(
-                    state.controls.provider_grok,
-                    &format!("Grok / xAI  {}", status.provider_accounts.xai),
-                );
-                SendMessageW(
-                    state.controls.provider_antigravity as HWND,
-                    BM_SETCHECK,
-                    if state.provider == "xai" {
-                        BST_UNCHECKED
-                    } else {
-                        BST_CHECKED
-                    } as WPARAM,
-                    0,
-                );
-                SendMessageW(
-                    state.controls.provider_grok as HWND,
-                    BM_SETCHECK,
-                    if state.provider == "xai" {
-                        BST_CHECKED
-                    } else {
-                        BST_UNCHECKED
-                    } as WPARAM,
-                    0,
-                );
-                set_text(
-                    state.controls.quota_title,
-                    if state.provider == "xai" {
-                        "Grok 共享额度"
-                    } else {
-                        "Gemini 模型额度"
-                    },
-                );
-            }
         }
+        if let Ok(connectors) = &connectors {
+            state.connectors_text = connectors_text(connectors);
+        }
+        (state.controls, state.hwnd as HWND, state.provider.clone())
+    };
+    match status {
+        Ok(status) => unsafe {
+            let operation_message = status
+                .operation
+                .error
+                .as_deref()
+                .or(status.operation.message.as_deref());
+            set_text(
+                controls.subtitle,
+                operation_message.unwrap_or(if status.operation.running {
+                    "本地操作正在进行…"
+                } else if status.gateway.ok {
+                    "本地安全核心在线"
+                } else {
+                    "请选择提供商并执行一键接入"
+                }),
+            );
+            set_text(controls.status_tun, &format_item("TUN", &status.tun));
+            set_text(controls.status_proxy, &format_item("PROXY", &status.proxy));
+            set_text(
+                controls.status_bridge,
+                &format_item("BRIDGE", &status.gateway),
+            );
+            set_text(controls.status_zcode, &format_item("ZCODE", &status.zcode));
+            set_text(
+                controls.models,
+                &format!(
+                    "当前模型（{}）\r\n{}",
+                    status.models.len(),
+                    if status.models.is_empty() {
+                        "等待网关同步".to_string()
+                    } else {
+                        status.models.join("  ·  ")
+                    }
+                ),
+            );
+            set_text(
+                controls.provider_antigravity,
+                &format!("Antigravity  {}", status.provider_accounts.antigravity),
+            );
+            set_text(
+                controls.provider_grok,
+                &format!("Grok / xAI  {}", status.provider_accounts.xai),
+            );
+            SendMessageW(
+                controls.provider_antigravity as HWND,
+                BM_SETCHECK,
+                if provider == "xai" {
+                    BST_UNCHECKED
+                } else {
+                    BST_CHECKED
+                } as WPARAM,
+                0,
+            );
+            SendMessageW(
+                controls.provider_grok as HWND,
+                BM_SETCHECK,
+                if provider == "xai" {
+                    BST_CHECKED
+                } else {
+                    BST_UNCHECKED
+                } as WPARAM,
+                0,
+            );
+            set_text(
+                controls.quota_title,
+                if provider == "xai" {
+                    "Grok 共享额度"
+                } else {
+                    "Gemini 模型额度"
+                },
+            );
+        },
         Err(error) => unsafe {
-            set_text(state.controls.subtitle, &format!("状态刷新失败：{error}"))
+            set_text(controls.subtitle, &format!("状态刷新失败：{error}"))
         },
     }
-    match update.quota {
+    match quota {
         Ok(quota) => {
             let (text, percent) = quota_text(&quota);
             unsafe {
-                set_text(state.controls.quota_body, &text);
+                set_text(controls.quota_body, &text);
                 SendMessageW(
-                    state.controls.quota_progress as HWND,
+                    controls.quota_progress as HWND,
                     PBM_SETPOS,
                     percent as WPARAM,
                     0,
                 );
             }
-            update_tray(&state, Some(percent));
+            update_tray(hwnd, &provider, Some(percent));
         }
         Err(error) => {
-            unsafe {
-                set_text(
-                    state.controls.quota_body,
-                    &format!("额度暂不可用\r\n{error}"),
-                )
-            };
-            update_tray(&state, None);
+            unsafe { set_text(controls.quota_body, &format!("额度暂不可用\r\n{error}")) };
+            update_tray(hwnd, &provider, None);
         }
     }
-    if let Ok(connectors) = update.connectors {
-        state.connectors_text = connectors_text(&connectors);
+    unsafe {
+        InvalidateRect(hwnd, null(), 0);
+        InvalidateRect(controls.provider_antigravity as HWND, null(), 1);
+        InvalidateRect(controls.provider_grok as HWND, null(), 1);
     }
 }
 
@@ -945,7 +1415,19 @@ fn select_provider(hwnd: HWND, provider: &'static str) {
     let Some(state_lock) = STATE.get() else {
         return;
     };
-    let connection = state_lock.lock().unwrap().host.connection.clone();
+    let (connection, antigravity, grok) = {
+        let mut state = state_lock.lock().unwrap();
+        state.provider = provider.to_string();
+        (
+            state.host.connection.clone(),
+            state.controls.provider_antigravity as HWND,
+            state.controls.provider_grok as HWND,
+        )
+    };
+    unsafe {
+        InvalidateRect(antigravity, null(), 1);
+        InvalidateRect(grok, null(), 1);
+    }
     let hwnd_value = hwnd as isize;
     thread::spawn(move || {
         let _ = api_post(&connection, "/api/provider", json!({"provider": provider}));
@@ -1011,13 +1493,13 @@ fn copy_wide_fixed<const N: usize>(target: &mut [u16; N], text: &str) {
     target[encoded.len()] = 0;
 }
 
-fn update_tray(state: &AppState, percent: Option<i32>) {
+fn update_tray(hwnd: HWND, provider: &str, percent: Option<i32>) {
     let mut data: NOTIFYICONDATAW = unsafe { std::mem::zeroed() };
     data.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
-    data.hWnd = state.hwnd as HWND;
+    data.hWnd = hwnd;
     data.uID = 1;
     data.uFlags = NIF_TIP;
-    let provider = if state.provider == "xai" {
+    let provider = if provider == "xai" {
         "Grok"
     } else {
         "Antigravity"
@@ -1102,6 +1584,21 @@ unsafe extern "system" fn window_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     match message {
+        WM_ERASEBKGND => 1,
+        WM_PAINT => {
+            unsafe { paint_dashboard(hwnd) };
+            0
+        }
+        WM_CTLCOLORSTATIC => unsafe { static_control_color(wparam as HDC, lparam as HWND) },
+        WM_DRAWITEM => {
+            let draw = lparam as *const DRAWITEMSTRUCT;
+            if !draw.is_null() {
+                unsafe { draw_owner_button(&*draw) };
+                1
+            } else {
+                0
+            }
+        }
         WM_CREATE => {
             if let Some(state) = STATE.get() {
                 state.lock().unwrap().hwnd = hwnd as isize;
@@ -1116,13 +1613,14 @@ unsafe extern "system" fn window_proc(
             0
         }
         WM_SIZE => {
-            unsafe { layout(hwnd) };
+            unsafe {
+                layout(hwnd);
+                InvalidateRect(hwnd, null(), 0);
+            }
             0
         }
         WM_DPICHANGED => {
-            if let Some(state) = STATE.get() {
-                state.lock().unwrap().dpi = (wparam >> 16) as u32;
-            }
+            let dpi = ((wparam >> 16) as u32).max(96);
             let suggested = lparam as *const RECT;
             if !suggested.is_null() {
                 let rect = unsafe { *suggested };
@@ -1138,7 +1636,11 @@ unsafe extern "system" fn window_proc(
                     )
                 };
             }
-            unsafe { layout(hwnd) };
+            unsafe {
+                recreate_fonts(hwnd, dpi);
+                layout(hwnd);
+                InvalidateRect(hwnd, null(), 1);
+            }
             0
         }
         WM_GETMINMAXINFO => {
@@ -1190,11 +1692,12 @@ unsafe extern "system" fn window_proc(
                             )
                         };
                     } else {
+                        let subtitle = STATE
+                            .get()
+                            .map(|state| state.lock().unwrap().controls.subtitle)
+                            .unwrap_or(0);
                         unsafe {
-                            set_text(
-                                STATE.get().unwrap().lock().unwrap().controls.subtitle,
-                                "Agent 配置已复制到剪贴板，请勿发给他人",
-                            )
+                            set_text(subtitle, "Agent 配置已复制到剪贴板，请勿发给他人")
                         };
                     }
                 }
@@ -1308,7 +1811,7 @@ fn main() {
             hInstance: instance,
             hIcon: load_app_icon(),
             hCursor: LoadCursorW(null_mut(), IDC_ARROW),
-            hbrBackground: (COLOR_WINDOW + 1) as HBRUSH,
+            hbrBackground: null_mut(),
             lpszMenuName: null(),
             lpszClassName: class_name.as_ptr(),
             hIconSm: load_app_icon(),
@@ -1318,15 +1821,17 @@ fn main() {
             return;
         }
         let title = wide(&format!("ZCode · Antigravity 控制中心 · Rust {VERSION}"));
+        let window_style = WS_OVERLAPPEDWINDOW;
+        let window_ex_style = WS_EX_APPWINDOW;
         let hwnd = CreateWindowExW(
-            WS_EX_APPWINDOW,
+            window_ex_style,
             class_name.as_ptr(),
             title.as_ptr(),
-            WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+            window_style,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            1120,
-            780,
+            900,
+            670,
             null_mut(),
             null_mut(),
             instance,
@@ -1336,7 +1841,41 @@ fn main() {
             show_fatal("无法创建 Windows 原生窗口");
             return;
         }
+        let window_dpi = GetDpiForWindow(hwnd).max(96);
+        let mut desired = RECT {
+            left: 0,
+            top: 0,
+            right: scale(1120, window_dpi),
+            bottom: scale(720, window_dpi),
+        };
+        AdjustWindowRectExForDpi(&mut desired, window_style, 0, window_ex_style, window_dpi);
+        let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        let mut monitor_info: MONITORINFO = std::mem::zeroed();
+        monitor_info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+        GetMonitorInfoW(monitor, &mut monitor_info);
+        let work = monitor_info.rcWork;
+        let work_width = work.right - work.left;
+        let work_height = work.bottom - work.top;
+        let available_width = (work_width - scale(24, window_dpi)).max(1);
+        let available_height = (work_height - scale(24, window_dpi)).max(1);
+        let minimum_width = scale(900, window_dpi).min(available_width);
+        let minimum_height = scale(670, window_dpi).min(available_height);
+        let window_width = (desired.right - desired.left)
+            .min(available_width)
+            .max(minimum_width);
+        let window_height = (desired.bottom - desired.top)
+            .min(available_height)
+            .max(minimum_height);
         ShowWindow(hwnd, SW_SHOW);
+        SetWindowPos(
+            hwnd,
+            null_mut(),
+            work.left + (work_width - window_width) / 2,
+            work.top + (work_height - window_height) / 2,
+            window_width,
+            window_height,
+            SWP_NOZORDER | SWP_NOACTIVATE,
+        );
         UpdateWindow(hwnd);
         let mut message = MSG::default();
         while GetMessageW(&mut message, null_mut(), 0, 0) > 0 {
