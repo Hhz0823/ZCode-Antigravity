@@ -51,6 +51,33 @@ func TestDashboardTokenComparisonIsExact(t *testing.T) {
 	}
 }
 
+func TestGatewayNeedsRecoveryOnlyForUnexpectedBridgeExit(t *testing.T) {
+	recorded := state{Port: 18080, PID: 3210}
+	account := providerAccountCounts{Antigravity: 1}
+	for _, test := range []struct {
+		name            string
+		current         state
+		gatewayHealthy  bool
+		processAlive    bool
+		accounts        providerAccountCounts
+		zcodeConfigured bool
+		wantRecovery    bool
+	}{
+		{name: "crashed bridge", current: recorded, accounts: account, zcodeConfigured: true, wantRecovery: true},
+		{name: "healthy bridge", current: recorded, gatewayHealthy: true, accounts: account, zcodeConfigured: true},
+		{name: "still starting", current: recorded, processAlive: true, accounts: account, zcodeConfigured: true},
+		{name: "intentional stop", current: state{Port: 18080}, accounts: account, zcodeConfigured: true},
+		{name: "no account", current: recorded, zcodeConfigured: true},
+		{name: "provider not installed", current: recorded, accounts: account},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := gatewayNeedsRecovery(test.current, test.gatewayHealthy, test.processAlive, test.accounts, test.zcodeConfigured); got != test.wantRecovery {
+				t.Fatalf("gatewayNeedsRecovery() = %t, want %t", got, test.wantRecovery)
+			}
+		})
+	}
+}
+
 func TestDashboardThemeIncludesCrispResponsiveMotion(t *testing.T) {
 	for _, expected := range []string{
 		"--accent: #0b63f6",

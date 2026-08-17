@@ -141,6 +141,7 @@ func (a *app) runUIHost(autoSetup, launchBrowser bool) error {
 		serveErrCh <- server.Serve(listener)
 	}()
 	go runtime.monitorUsage(shutdownCh)
+	go runtime.monitorGatewayRecovery(shutdownCh)
 	if launchBrowser && !platformTraySupported() {
 		go runtime.stopWhenInactive(shutdownCh)
 	}
@@ -505,6 +506,8 @@ func (g *guiRuntime) runOperation(action string) {
 			}
 		case "sync":
 			errOperation = g.app.startAndConfigure()
+		case "recover":
+			errOperation = g.app.startAndConfigure()
 		case "stop":
 			errOperation = g.app.stop()
 		}
@@ -531,6 +534,8 @@ func operationStartMessage(action string) string {
 		return "正在打开 xAI 设备授权…"
 	case "sync":
 		return "正在同步 Gemini / Grok 模型…"
+	case "recover":
+		return "检测到网关意外退出，正在自动恢复…"
 	case "stop":
 		return "正在安全停止本地网关…"
 	default:
@@ -548,11 +553,62 @@ func operationSuccessMessage(action string) string {
 		return "Grok / xAI 登录成功"
 	case "sync":
 		return "Gemini / Grok 模型已同步"
+	case "recover":
+		return "本地网关已自动恢复"
 	case "stop":
 		return "本地网关已停止"
 	default:
 		return "操作完成"
 	}
+}
+
+func gatewayNeedsRecovery(current state, gatewayHealthy, recordedProcessAlive bool, accounts providerAccountCounts, zcodeConfigured bool) bool {
+	return current.Port > 0 &&
+		current.PID > 0 &&
+		!gatewayHealthy &&
+		!recordedProcessAlive &&
+		accounts.total() > 0 &&
+		zcodeConfigured
+}
+
+// monitorGatewayRecovery repairs a provider that still points at a recorded
+// bridge whose process has exited. An intentional Stop clears state.PID, so it
+// is never undone by this monitor.
+func (g *guiRuntime) monitorGatewayRecovery(shutdown <-chan struct{}) {
+	timer := time.NewTimer(2 * time.Second)
+	defer timer.Stop()
+	for {
+		select {
+		case <-shutdown:
+			return
+		case <-timer.C:
+			g.recoverGatewayIfStale()
+			timer.Reset(15 * time.Second)
+		}
+	}
+}
+
+func (g *guiRuntime) recoverGatewayIfStale() {
+	current, errState := g.app.loadState()
+	if errState != nil || current.Port <= 0 || current.PID <= 0 {
+		return
+	}
+	gatewayHealthy := g.app.probeGateway(current.Port) == nil
+	if gatewayHealthy {
+		return
+	}
+	accounts, errAccounts := countProviderAccounts(g.app.paths.AuthDir)
+	if errAccounts != nil {
+		return
+	}
+	configured, _, errProvider := zcodeProviderStatus(g.app.paths.ZCodeConfig)
+	if errProvider != nil || !gatewayNeedsRecovery(current, gatewayHealthy, processExists(current.PID), accounts, configured) {
+		return
+	}
+	if !g.beginOperation("recover") {
+		return
+	}
+	go g.runOperation("recover")
 }
 
 func (g *guiRuntime) serveHeartbeat(w http.ResponseWriter, r *http.Request) {

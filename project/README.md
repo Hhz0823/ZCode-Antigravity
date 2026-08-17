@@ -23,9 +23,10 @@ ANTIGRAVITY_OAUTH_CLIENT_SECRET='<your-client-secret>' \
 ```
 
 The macOS build compiles a native SwiftUI front end plus Universal Go Core/backend binaries and
-ships as an ad-hoc-signed `.app`. Public
-source does not contain an OAuth desktop client identity; release maintainers may inject one at
-link time, while development builds can read it from the environment.
+ships as an ad-hoc-signed `.app`. Public source does not contain an OAuth desktop client identity;
+release packaging refuses to continue without an injected or verified configuration. A local-only
+development build that intentionally supplies credentials at runtime must explicitly set
+`ALLOW_RUNTIME_OAUTH_CONFIG=1`.
 
 Build the manager:
 
@@ -59,7 +60,7 @@ Build the single-BAT installer from a verified expanded package:
 ```powershell
 .\packaging\windows\Build-Single-Bat.ps1 `
   -PackageDir C:\path\to\expanded-package `
-  -OutputFile C:\path\to\ZCode-Antigravity-OneClick-v0.5.2-test.bat
+  -OutputFile C:\path\to\ZCode-Antigravity-OneClick-v0.5.3-test.bat
 ```
 
 Build the native no-console EXE installer from the same verified package:
@@ -67,5 +68,5 @@ Build the native no-console EXE installer from the same verified package:
 ```powershell
 .\packaging\windows\Build-Exe-Installer.ps1 `
   -PackageDir C:\path\to\expanded-package `
-  -OutputFile C:\path\to\ZCode-Antigravity-Setup-v0.5.2-test.exe
+  -OutputFile C:\path\to\ZCode-Antigravity-Setup-v0.5.3-test.exe
 ```

@@ -27,7 +27,7 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-const VERSION: &str = "0.5.2-test";
+const VERSION: &str = "0.5.3-test";
 const SS_LEFT: u32 = 0;
 const CF_UNICODETEXT_VALUE: u32 = 13;
 const WM_REFRESH_READY: u32 = WM_APP + 1;

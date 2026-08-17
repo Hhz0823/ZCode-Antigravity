@@ -1,7 +1,7 @@
 ZCode Antigravity Bridge - macOS Universal test build
 ====================================================
 
-版本：0.5.2-test
+版本：0.5.3-test
 架构：Apple Silicon (arm64) + Intel (x86_64)
 最低系统：macOS 12
 
@@ -68,7 +68,9 @@ proxyURL。支持 http、https 和 socks5，且应只指向可信的本机代理
 自己有权使用的桌面 OAuth 客户端配置。SwiftUI App 会读取完整解压目录根部的 .env；
 也可通过 Run.command 启动终端工具。发布维护者可在
 运行 Build-Universal.sh 时通过同名环境变量把配置注入二进制；脚本不会把它写入
-源码树或打包成明文配置文件。
+源码树或打包成明文配置文件。为避免再次发布无法登录的包，构建脚本默认拒绝缺少
+OAuth 配置的产物；仅本地开发且明确从运行时环境提供配置时，才可设置
+ALLOW_RUNTIME_OAUTH_CONFIG=1 跳过该发布门禁。
 
 终端诊断脚本
 ------------

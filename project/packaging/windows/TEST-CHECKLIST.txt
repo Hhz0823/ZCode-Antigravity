@@ -1,9 +1,10 @@
 Windows acceptance checklist
 ============================
 
-[ ] ZCode-Antigravity-Setup-v0.5.2-test.exe opens a native confirmation dialog without a terminal.
+[ ] ZCode-Antigravity-Setup-v0.5.3-test.exe opens a native confirmation dialog without a terminal.
 [ ] Control-center refresh, login, sync, stop, port inspection, and ZCode launch never flash a console window.
 [ ] The native EXE writes install.ps1 with exactly one EF BB BF UTF-8 BOM before Windows PowerShell 5.1 parses it.
+[ ] A release build without injected or verified Antigravity OAuth desktop configuration fails before producing artifacts.
 [ ] The EXE installer --extract-only workflow reproduces every package file and hash exactly.
 [ ] The EXE refuses installation while ZCode or the target control center is still running.
 [ ] Successful EXE installation creates current-user Desktop/Start Menu shortcuts, opens the GUI, and automatically begins one-click setup.
@@ -51,6 +52,7 @@ Windows acceptance checklist
 [ ] Test-Grok-Build.bat returns ZCODE_SMOKE_OK and response model grok-build-0.1.
 [ ] Antigravity auth JSON contains dpapi:v1 markers and no plaintext token value.
 [ ] Status.bat reports the final port and model list.
+[ ] Force-exit the recorded backend once; while the control center remains open, it starts a new current-version PID and ZCode reconnects. A normal Stop must remain stopped.
 [ ] Stop-ZCode-Antigravity.bat stops only the recorded backend PID.
 [ ] Remove-ZCode-Provider.bat preserves every unrelated ZCode Provider/setting.
 

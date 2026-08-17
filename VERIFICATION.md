@@ -2,6 +2,14 @@
 
 最新验证日期：2026-08-17（Asia/Shanghai）
 
+## v0.5.3-test Windows 登录与 ZCode 重连修复
+
+- 实机确认 `v0.5.2-test` 发布后端未携带 Antigravity OAuth 桌面配置；新登录会在授权流程前失败。构建脚本现默认拒绝生成此类发布包，只有注入完整配置或提供已验证后端才允许继续；纯开发构建必须显式选择运行时配置模式。
+- `v0.5.3-test` Windows 候选包已确认同时含 OAuth client ID / client secret 配置。使用不会打开真实浏览器的 OAuth 预检启动登录流程并等待回调，结果 `OAUTH_LOGIN_FLOW_STARTED=True`、`OAUTH_CONFIG_ERROR=False`。
+- 实机旧状态最初记录已退出的 `0.5.0-test` 临时网关 PID 和路径，`18080` 未监听，ZCode 因此持续重连。启动新控制中心后，自动恢复为当前 `0.5.3-test` 后端并重写状态，ZCode 随即建立连接。
+- 为验证不是一次性巧合，测试中强制结束当前网关 PID；控制中心在 22 秒检查窗口内换新 PID 恢复同一端口，随后观测到 32 条 ZCode 到网关的已建立连接。用户主动“停止”会把 PID 清零，不触发自动恢复。
+- 真实账号状态检查返回 1 个 Antigravity 账号、2 个可选模型，Provider 为 `http://127.0.0.1:18080`；真实 `gemini-3.7-flash` 冒烟请求精确返回 `ZCODE_SMOKE_OK`。
+
 ## v0.5.2-test 原生液态高斯背景与状态栏唤醒修复
 
 - macOS 主窗口使用透明 `NSWindow`、`NSVisualEffectView`、`.behindWindow` 与
