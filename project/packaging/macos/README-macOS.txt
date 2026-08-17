@@ -71,6 +71,7 @@ proxyURL。支持 http、https 和 socks5，且应只指向可信的本机代理
 - Status.command：查看状态
 - Doctor.command：本机静态检查
 - Test-Gemini-3.7-Flash.command：发送一次小型真实请求
+- Test-Grok-Build.command：使用 grok-build-0.1 发送一次小型真实请求
 - Stop-ZCode-Antigravity.command：只停止本程序记录且路径匹配的网关
 - Remove-ZCode-Provider.command：只删除本程序管理的 Provider
 

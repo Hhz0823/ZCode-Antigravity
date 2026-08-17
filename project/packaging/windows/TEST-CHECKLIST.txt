@@ -38,6 +38,7 @@ Windows acceptance checklist
 [ ] Test-Gemini-3.6-Flash.bat returns ZCODE_SMOKE_OK and writes last-smoke-test.json.
 [ ] In ZCode, one small gemini-3.6-flash prompt returns a real model response.
 [ ] Test-Gemini-3.7-Flash.bat returns ZCODE_SMOKE_OK and response model gemini-3.7-flash.
+[ ] Test-Grok-Build.bat returns ZCODE_SMOKE_OK and response model grok-build-0.1.
 [ ] Antigravity auth JSON contains dpapi:v1 markers and no plaintext token value.
 [ ] Status.bat reports the final port and model list.
 [ ] Stop-ZCode-Antigravity.bat stops only the recorded backend PID.

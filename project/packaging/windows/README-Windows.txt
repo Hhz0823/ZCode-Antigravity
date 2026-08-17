@@ -128,6 +128,7 @@ Available scripts
 - Status.bat                    Health, port, account-file count, and model list
 - Test-Gemini-3.6-Flash.bat     Verified 3.6 regression/fallback inference
 - Test-Gemini-3.7-Flash.bat     Current verified 3.7 High inference and audit artifact
+- Test-Grok-Build.bat           Small grok-build-0.1 inference and audit artifact
 - Doctor.bat                    Static local checks
 - Stop-ZCode-Antigravity.bat    Stop only the process PID/path started by this bridge
 - Remove-ZCode-Provider.bat     Remove only the managed Provider from ZCode
