@@ -25,6 +25,7 @@ state.json
 /dist/
 /release/
 /output/
+**/target/
 /.playwright-cli/
 
 # Editor and OS noise

@@ -1,14 +1,15 @@
 ZCode Antigravity Bridge - macOS Universal test build
 ====================================================
 
-版本：0.3.0-test
+版本：0.4.0-test
 架构：Apple Silicon (arm64) + Intel (x86_64)
 最低系统：macOS 12
 
 用途
 ----
-本程序让 macOS 版 ZCode 和其他 Agent 通过只监听本机的兼容 Provider
-调用 Antigravity Gemini 与 xAI Grok 文本模型，并在菜单栏显示所选账号额度。
+本程序使用原生 SwiftUI + AppKit 控制中心，让 macOS 版 ZCode 和其他 Agent
+通过只监听本机的兼容 Provider 调用 Antigravity Gemini 与 xAI Grok 文本模型。
+App 会在程序坞显示图标，并在菜单栏持续显示所选账号额度。
 
 这是非官方测试版，会使用未公开的 Antigravity 接口。Google 可能限流、暂停
 API 权限或封禁账号。请只使用专门的测试账号，不要使用主 Gmail、Workspace
@@ -21,12 +22,12 @@ API 权限或封禁账号。请只使用专门的测试账号，不要使用主 
 3. 完全退出 ZCode；仅关闭窗口不一定会退出应用。
 4. 首次打开时，按住 Control 点击“ZCode Antigravity.app”，选择“打开”。
    当前 App 使用临时签名，没有 Apple Developer ID，也没有公证。
-5. 双击“ZCode Antigravity.app”，在控制面板选择 Antigravity 或 Grok / xAI。
+5. 双击“ZCode Antigravity.app”，在原生控制中心选择 Antigravity 或 Grok / xAI。
 6. 按需完成 Google OAuth 或 xAI 设备授权，再点击“一键接入 ZCode”。
 7. 在 ZCode 中选择 Antigravity + Grok (Local Bridge) 下的目标模型，先发送一条短消息验收。
-8. 关闭网页面板后菜单栏额度组件继续运行；点击图标可重开面板，菜单中可切换账号或退出。
+8. 关闭原生窗口后菜单栏额度组件继续运行；程序坞或菜单栏均可重开窗口。
 
-普通使用只需打开 App，不会弹出 Terminal。“Terminal Tools”中的 .command 是
+普通使用只需打开 App，不会启动 Chrome，也不会弹出 Terminal。“Terminal Tools”中的 .command 是
 维护和诊断入口，双击它们时 macOS 会按设计显示终端窗口。如果已把 App 拖入
 /Applications，这些脚本仍会自动找到它。
 
@@ -40,7 +41,7 @@ proxyURL。支持 http、https 和 socks5，且应只指向可信的本机代理
 ----
 - 本地 API：127.0.0.1:18080，冲突时扫描到 18180
 - OAuth callback：127.0.0.1:51121，冲突时扫描到 51221
-- 控制中心：127.0.0.1:18200-18250
+- 原生客户端会话：127.0.0.1:18200-18250（只允许随机会话密钥访问）
 
 数据与安全
 ----------
@@ -56,7 +57,8 @@ proxyURL。支持 http、https 和 socks5，且应只指向可信的本机代理
 源码构建
 --------
 公开源码不包含 OAuth 客户端身份。源码构建需复制 .env.example 为 .env，填入
-自己有权使用的桌面 OAuth 客户端配置，再通过 Run.command 启动。发布维护者也可在
+自己有权使用的桌面 OAuth 客户端配置。SwiftUI App 会读取完整解压目录根部的 .env；
+也可通过 Run.command 启动终端工具。发布维护者可在
 运行 Build-Universal.sh 时通过同名环境变量把配置注入二进制；脚本不会把它写入
 源码树或打包成明文配置文件。
 
@@ -77,8 +79,10 @@ proxyURL。支持 http、https 和 socks5，且应只指向可信的本机代理
 
 已验证与未验证边界
 ------------------
-- 已在 Apple Silicon Mac 上完成单元测试、Universal 双架构构建、Mach-O 架构、
-  App 结构、临时签名、包内哈希、隔离数据目录和 ZCode 运行检测检查。
+- 已在 Apple Silicon Mac 上完成单元测试、SwiftUI 原生窗口与菜单栏启动、Universal
+  双架构构建、Mach-O 架构、Dock 图标、App 结构、临时签名和包内哈希检查。
+- SwiftUI 主程序、Go Core 与 CLIProxyAPI 后端均为 arm64 + x86_64 Universal；
+  普通启动不会打开 Chrome 或 Terminal。
 - Intel 切片通过交叉编译和结构验证，但没有 Intel 实机启动测试。
 - 当前没有 Apple Developer ID 签名或 Apple 公证；Gatekeeper 可能提示开发者未知。
 - 账号资格、上游模型目录、额度和风控以用户第一次真实请求为准。

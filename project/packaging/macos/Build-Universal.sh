@@ -5,9 +5,9 @@ script_dir=${0:A:h}
 project_dir=${script_dir:h:h}
 repo_root=${project_dir:h}
 backend_dir="$repo_root/third_party/CLIProxyAPI-7.2.132-patched"
-release_version=${VERSION:-0.3.0-test}
-short_version=${SHORT_VERSION:-0.3.0}
-bundle_version=${BUNDLE_VERSION:-30}
+release_version=${VERSION:-0.4.0-test}
+short_version=${SHORT_VERSION:-0.4.0}
+bundle_version=${BUNDLE_VERSION:-40}
 output_dir=${OUTPUT_DIR:-$repo_root/dist/macos}
 package_name="ZCode-Antigravity-macOS-Universal-v${release_version}"
 package_root="$output_dir/$package_name"
@@ -20,7 +20,8 @@ if ! /usr/bin/grep -Fq "const version = \"$release_version\"" "$project_dir/cmd/
   exit 1
 fi
 
-for tool in /usr/bin/lipo /usr/bin/codesign /usr/bin/ditto /usr/bin/plutil /usr/bin/shasum go; do
+for tool in /usr/bin/lipo /usr/bin/codesign /usr/bin/ditto /usr/bin/iconutil /usr/bin/plutil \
+  /usr/bin/shasum /usr/bin/sips go swift swiftc; do
   command -v "$tool" >/dev/null
 done
 
@@ -42,33 +43,78 @@ build_date=${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
   "$package_root/ZCode Antigravity.app/Contents/Resources" "$package_root/Terminal Tools" \
   "$build_root/arm64" "$build_root/amd64"
 
+app_root="$package_root/ZCode Antigravity.app"
+native_source="$repo_root/project/native/macos/ZCodeAntigravityApp.swift"
+icon_source="$repo_root/project/native/macos/GenerateAppIcon.swift"
+iconset="$build_root/AppIcon.iconset"
+/bin/mkdir -p "$iconset"
+swift "$icon_source" "$build_root/AppIcon-master.png"
+for icon_size in 16 32 128 256 512; do
+  /usr/bin/sips -z $icon_size $icon_size "$build_root/AppIcon-master.png" \
+    --out "$iconset/icon_${icon_size}x${icon_size}.png" >/dev/null
+  retina_size=$((icon_size * 2))
+  /usr/bin/sips -z $retina_size $retina_size "$build_root/AppIcon-master.png" \
+    --out "$iconset/icon_${icon_size}x${icon_size}@2x.png" >/dev/null
+done
+/usr/bin/iconutil -c icns "$iconset" -o "$app_root/Contents/Resources/AppIcon.icns"
+
 for target_arch in arm64 amd64; do
   (
     cd "$project_dir"
     CGO_ENABLED=0 GOOS=darwin GOARCH=$target_arch go build \
-      -trimpath -ldflags='-s -w -X main.defaultCommand=gui' \
-      -o "$build_root/$target_arch/ZCode-Antigravity" ./cmd/zcode-antigravity
+      -trimpath -ldflags='-s -w' \
+      -o "$build_root/$target_arch/ZCode-Antigravity-Core" ./cmd/zcode-antigravity
   )
+
+  swift_arch=$target_arch
+  [[ $target_arch == amd64 ]] && swift_arch=x86_64
+  swiftc -O -whole-module-optimization -swift-version 5 \
+    -target "${swift_arch}-apple-macos12.0" \
+    -runtime-compatibility-version none -disable-autolinking-runtime-compatibility \
+    -framework SwiftUI -framework AppKit -parse-as-library \
+    -o "$build_root/$target_arch/ZCode-Antigravity" "$native_source"
 
   backend_ldflags="-s -w -X main.Version=7.2.132-zcode.12 -X main.Commit=$commit -X main.BuildDate=$build_date"
   if [[ $embedded_oauth == true ]]; then
     backend_ldflags+=" -X github.com/router-for-me/CLIProxyAPI/v7/internal/auth/antigravitycredentials.embeddedClientID=$ANTIGRAVITY_OAUTH_CLIENT_ID"
     backend_ldflags+=" -X github.com/router-for-me/CLIProxyAPI/v7/internal/auth/antigravitycredentials.embeddedClientSecret=$ANTIGRAVITY_OAUTH_CLIENT_SECRET"
   fi
-  (
-    cd "$backend_dir"
-    CGO_ENABLED=0 GOOS=darwin GOARCH=$target_arch go build \
-      -trimpath -ldflags="$backend_ldflags" \
-      -o "$build_root/$target_arch/cli-proxy-api" ./cmd/server
-  )
+  if [[ -z ${PREBUILT_BACKEND_UNIVERSAL:-} ]]; then
+    (
+      cd "$backend_dir"
+      CGO_ENABLED=0 GOOS=darwin GOARCH=$target_arch go build \
+        -trimpath -ldflags="$backend_ldflags" \
+        -o "$build_root/$target_arch/cli-proxy-api" ./cmd/server
+    )
+  fi
 done
 
-app_root="$package_root/ZCode Antigravity.app"
+if [[ -n ${PREBUILT_BACKEND_UNIVERSAL:-} ]]; then
+  if [[ ! -f $PREBUILT_BACKEND_UNIVERSAL ]]; then
+    print -u2 "找不到 PREBUILT_BACKEND_UNIVERSAL=$PREBUILT_BACKEND_UNIVERSAL"
+    exit 1
+  fi
+  if [[ $(/usr/bin/lipo -archs "$PREBUILT_BACKEND_UNIVERSAL") != *arm64* || \
+        $(/usr/bin/lipo -archs "$PREBUILT_BACKEND_UNIVERSAL") != *x86_64* ]]; then
+    print -u2 "预构建后端不是 arm64 + x86_64 Universal Mach-O"
+    exit 1
+  fi
+  /bin/cp "$PREBUILT_BACKEND_UNIVERSAL" "$build_root/arm64/cli-proxy-api"
+  /bin/cp "$PREBUILT_BACKEND_UNIVERSAL" "$build_root/amd64/cli-proxy-api"
+fi
+
 /usr/bin/lipo -create "$build_root/arm64/ZCode-Antigravity" "$build_root/amd64/ZCode-Antigravity" \
   -output "$app_root/Contents/MacOS/ZCode-Antigravity"
-/usr/bin/lipo -create "$build_root/arm64/cli-proxy-api" "$build_root/amd64/cli-proxy-api" \
-  -output "$app_root/Contents/MacOS/backend/cli-proxy-api"
-/bin/chmod 755 "$app_root/Contents/MacOS/ZCode-Antigravity" "$app_root/Contents/MacOS/backend/cli-proxy-api"
+/usr/bin/lipo -create "$build_root/arm64/ZCode-Antigravity-Core" "$build_root/amd64/ZCode-Antigravity-Core" \
+  -output "$app_root/Contents/MacOS/ZCode-Antigravity-Core"
+if [[ -n ${PREBUILT_BACKEND_UNIVERSAL:-} ]]; then
+  /bin/cp "$PREBUILT_BACKEND_UNIVERSAL" "$app_root/Contents/MacOS/backend/cli-proxy-api"
+else
+  /usr/bin/lipo -create "$build_root/arm64/cli-proxy-api" "$build_root/amd64/cli-proxy-api" \
+    -output "$app_root/Contents/MacOS/backend/cli-proxy-api"
+fi
+/bin/chmod 755 "$app_root/Contents/MacOS/ZCode-Antigravity" \
+  "$app_root/Contents/MacOS/ZCode-Antigravity-Core" "$app_root/Contents/MacOS/backend/cli-proxy-api"
 
 /usr/bin/sed -e "s/__SHORT_VERSION__/$short_version/g" -e "s/__BUNDLE_VERSION__/$bundle_version/g" \
   "$script_dir/Info.plist.template" > "$app_root/Contents/Info.plist"
@@ -87,6 +133,7 @@ done
 /bin/cp "$repo_root/project/packaging/windows/LICENSE-TRAY-DEPENDENCIES.txt" "$package_root/LICENSE-TRAY-DEPENDENCIES.txt"
 
 /usr/bin/codesign --force --sign - "$app_root/Contents/MacOS/backend/cli-proxy-api"
+/usr/bin/codesign --force --sign - "$app_root/Contents/MacOS/ZCode-Antigravity-Core"
 /usr/bin/codesign --force --sign - "$app_root/Contents/MacOS/ZCode-Antigravity"
 /usr/bin/codesign --force --deep --sign - "$app_root"
 /usr/bin/codesign --verify --deep --strict "$app_root"

@@ -1,6 +1,26 @@
 # 修复与验证记录
 
-验证日期：2026-08-15（Asia/Shanghai）
+最新验证日期：2026-08-17（Asia/Shanghai）
+
+## v0.4.0-test 原生客户端验证
+
+- macOS 用户界面已改为 SwiftUI + AppKit；`LSUIElement=false`、App Icon、Dock 注册和
+  菜单栏额度组件通过本机启动检查，普通启动未新建 Chrome 或 Terminal 进程。
+- SwiftUI 主程序、Go Core 与 CLIProxyAPI 后端均为 arm64 + x86_64 Universal Mach-O；
+  `codesign --verify --deep --strict`、ZIP CRC 和包内逐文件 SHA-256 通过。
+- SwiftUI App 启动后成功拉起 `ZCode-Antigravity-Core native-host`，只监听
+  `127.0.0.1:18200-18250`；App 退出后子进程和端口均释放。
+- Windows 用户界面已改为 Rust 2024 + Win32；rustfmt、Clippy `-D warnings`、Windows target
+  no-run test 和 x86_64 GNU Release 交叉编译通过。
+- Rust 控制中心为 PE32+ Windows GUI 子系统并包含图标资源、comctl32、shell32 和 user32；
+  启用 Per-Monitor DPI V2、ClearType 与 DPI 变化重排。
+- Windows EXE 安装器与单 BAT 共用同一 SHA-256 载荷；内嵌 ZIP、三个 EXE 哈希、逐文件清单、
+  CRLF 和 PowerShell 5.1 UTF-8 BOM 均通过反向提取验证。
+- Go Core `go test ./...`、`go test -race ./...` 和 `go vet ./...` 通过；CLIProxyAPI
+  `go mod verify` 与完整测试通过。CLIProxyAPI 上游树仍有 3 处既有 `go vet` 命名/取消函数告警，
+  不属于本次原生客户端改动。
+- 尚未在 Windows 10/11 实机完成混合 DPI、安装/重装和 OAuth 双击回归；Intel Mac 仍只有
+  交叉编译与结构验证，不宣称实机通过。
 
 ## macOS v0.2.7-test 新增验证
 
@@ -64,7 +84,7 @@
   解出 23 个文件且逐文件哈希与展开包完全一致；隔离安装根目录首次安装及同版本二次安装均通过，
   三份 EXE 哈希和 `http://127.0.0.1:10808` 设置读回一致。
 
-管理器 `go test -race` 未执行：本机没有 race 构建所需的 GCC。普通测试和 Windows 构建均通过。
+历史 `v0.2.6-test` 验证时未执行管理器 Race；`v0.4.0-test` 已在当前构建机通过 `go test -race ./...`。
 
 ## Gemini 3.7 当前结论
 

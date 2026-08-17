@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const version = "0.3.0-test"
+const version = "0.4.0-test"
 
 var defaultCommand = "menu"
 
@@ -50,6 +50,13 @@ func run(args []string) int {
 	if command == "gui" || command == "dashboard" {
 		if errGUI := app.runGUI(autoSetup); errGUI != nil {
 			fmt.Fprintf(os.Stderr, "图形控制中心失败: %v\n", errGUI)
+			return 1
+		}
+		return 0
+	}
+	if command == "native-host" {
+		if errHost := app.runNativeHost(autoSetup); errHost != nil {
+			fmt.Fprintf(os.Stderr, "原生客户端后台失败: %v\n", errHost)
 			return 1
 		}
 		return 0
@@ -116,6 +123,7 @@ func printHelp() {
   ZCode-Antigravity status           查看端口、账号和模型状态
   ZCode-Antigravity quota            读取 Antigravity 模型额度
   ZCode-Antigravity gui              打开图形控制中心
+  ZCode-Antigravity native-host      为 Swift/Rust 原生客户端启动本地 API
   ZCode-Antigravity doctor           运行本机检查
   ZCode-Antigravity smoke [model]    发送一次真实的小型模型请求
   ZCode-Antigravity stop             停止本程序启动的网关

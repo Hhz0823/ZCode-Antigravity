@@ -22,9 +22,16 @@ The API service is configured with host 127.0.0.1, plugins disabled, remote mana
 its control panel disabled, and detailed request logging disabled. A random per-user key protects
 the loopback-only management calls used by the local quota dashboard.
 
+Native Windows control center
+=============================
+
+The v0.4 native control center is written in Rust and uses Microsoft windows-sys,
+ureq, serde, and their transitive dependencies. The exact dependency list is in
+RUST-DEPENDENCIES.txt; unmodified upstream license files are under rust-licenses/.
+
 System tray
 ===========
 
-The Windows taskbar and macOS menu-bar widget uses github.com/gogpu/systray v0.2.8.
+The compatibility Go manager includes github.com/gogpu/systray v0.2.8.
 Platform builds also link golang.org/x/sys (Windows) or github.com/go-webgpu/goffi
 (macOS). Their required license texts are in LICENSE-TRAY-DEPENDENCIES.txt.

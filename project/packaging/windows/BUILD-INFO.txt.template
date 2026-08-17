@@ -1,23 +1,26 @@
 ZCode Antigravity Bridge build information
 ===========================================
 
-Package: ZCode-Antigravity-Windows-x64-0.3.0-test
+Package: ZCode-Antigravity-Windows-x64-0.4.0-test
 Build date (UTC): 2026-08-17
-Target: Windows x64 (PE32+ console manager and GUI control center)
+Target: Windows x64 (PE32+ Go console Core and Rust/Win32 GUI control center)
 
 Manager
 -------
-Version: 0.3.0-test
+Version: 0.4.0-test
 Go: 1.26.4
 CGO: disabled
 SHA-256: __MANAGER_SHA256__
 
 Control center
 --------------
-Version: 0.3.0-test
+Version: 0.4.0-test
+Language: Rust 2024 Edition
+Bindings: windows-sys 0.61.2
 Subsystem: Windows GUI (no console window)
-Quota view: protected loopback management route, redacted local cache, animated wave meters
-Theme: blue-white telemetry console with reduced-motion accessibility fallback
+Process DPI: Per-Monitor DPI V2
+Quota view: protected loopback management route, redacted local cache, native progress controls
+Theme: native Segoe UI Variable, ClearType, responsive Win32 layout and bundled icon
 SHA-256: __CONTROL_CENTER_SHA256__
 
 Backend
@@ -42,29 +45,30 @@ Local backend patches
 9. Expose clean Gemini 3.7/3.6 Flash client IDs while routing to the exact upstream High entries.
 10. Provide a SHA-256 verified single-BAT installer with v2rayN TUN/proxy preflight.
 11. Stage and verify the payload, safely stop the recorded gateway, then deploy so same-version reruns cannot overwrite a running backend.
-12. Add a no-console control center that injects the Provider, manages the local bridge, and renders Antigravity quota as wave meters.
-13. Apply a blue-white visual system and purposeful status, action, counter, card, and two-layer wave motion.
+12. Add a no-console native control center that injects the Provider, manages the local bridge, and renders provider quota.
+13. Apply native system typography, responsive Win32 controls, progress feedback, and crisp mixed-DPI rendering.
 14. Encode the native installer's embedded Chinese PowerShell script with a UTF-8 BOM at build time and runtime for Windows PowerShell 5.1.
-15. Start PowerShell, tasklist, netstat, taskkill, OAuth, browser, and ZCode child processes without console windows from GUI mode.
-16. Use native Windows/macOS font stacks, 4x-DPR Canvas rendering, responsive breakpoints, and decoration-only motion in the control center.
-17. Add a persistent native Windows taskbar/macOS menu-bar quota widget with provider switching and click-to-open behavior.
+15. Start the Go Core and all PowerShell, tasklist, netstat, taskkill, OAuth, browser, and ZCode child processes without console windows.
+16. Use a Rust/Win32 main window with Segoe UI Variable, ClearType, Per-Monitor DPI V2 and DPI-change relayout.
+17. Add a persistent native Windows taskbar quota widget with provider switching and click-to-open behavior.
 18. Add official xAI device OAuth, Grok text-model selection, Grok Build billing display, and encrypted-token-safe management proxying.
 19. Generate copyable Grok Build, Codex, Claude Code, OpenCode, and generic Agent connector configurations.
 
 Verification evidence
 ---------------------
-Current v0.3.0-test build-host checks:
+Current v0.4.0-test build-host checks:
 - Manager go test ./... and Windows x64 build: passed
 - Manager go test -race: passed on the macOS build host
 - CLIProxyAPI go mod verify, go test ./..., and Windows x64 build: passed
+- Rust control center cargo check and Clippy -D warnings: passed
+- Rust x86_64-pc-windows-gnu release build, PE32+ GUI subsystem, icon resource, and imports: passed
 - Windows PowerShell code page 936 reproduction: 5 parser errors; first error UnexpectedToken
 - Correct UTF-8 parse, BOM writer unit tests, and generated EXE single-BOM byte check: passed
 - EXE/BAT/ZIP payload integrity, three executable hashes, PE32+ x64, and GUI subsystem checks: passed
 - Windows child-process CREATE_NO_WINDOW test and Windows x64 test-binary cross-compile: passed
-- Provider/model selection, Grok billing proxy, tray icon, and five Agent connector tests: passed
-- Playwright desktop and 420px layout/provider-switch/full-page checks: passed
-- Native macOS menu-bar launch, persistence, process exit, and port release: passed
-- v0.3.0-test target Windows 10/11 double-click and mixed-DPI regression: pending after distribution
+- Provider/model selection, Grok billing proxy, tray state, and five Agent connector tests: passed
+- Native SwiftUI macOS main executable and native Rust Windows main executable build checks: passed
+- v0.4.0-test target Windows 10/11 double-click and mixed-DPI regression: pending after distribution
 
 Historical v0.2.6-test Windows/runtime checks retained as the regression baseline:
 - Local end-to-end smoke with fake non-network credentials: passed

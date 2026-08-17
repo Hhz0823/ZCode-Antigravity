@@ -3,7 +3,7 @@
 > 在 Windows 与 macOS 上统一接入 Antigravity Gemini 和 xAI Grok，
 > 并把本机安全网关提供给 ZCode、Grok Build、Codex、Claude Code 与 OpenCode。
 
-**当前版本：** macOS / Windows `v0.3.0-test`
+**当前版本：** macOS / Windows `v0.4.0-test`
 **适用系统：** macOS 12+（Apple Silicon / Intel）、Windows 10 / 11 x64
 **项目状态：** 测试版
 
@@ -14,13 +14,13 @@
 - Antigravity 精确写入 `gemini-3.7-flash` / `gemini-3.6-flash`；Grok 只同步 xAI 返回的文本模型，自动排除 Imagine 图片和视频模型。
 - 支持 Low / Medium / High 思考等级，并转换为 Gemini `thinkingLevel`。
 - 支持文本、图片、音频和视频输入转换；当前 Gemini 3.7 Flash 声明输出仅为文本。
-- Windows 任务栏与 macOS 菜单栏提供常驻额度小组件；点击打开面板，右键可切换账号、刷新额度或退出。
+- Windows 任务栏与 macOS 菜单栏提供常驻额度小组件；可切换 Antigravity / Grok、刷新额度、打开面板或退出。
 - Antigravity 显示每周 / 5 小时余量；Grok 显示官方 Grok Build billing 返回的共享周/月余量、重置时间和 Extra Usage Credits。
 - 内置 Grok Build、OpenAI Codex、Claude Code、OpenCode、通用 OpenAI / Anthropic 客户端配置卡，可一键复制，不会擅自覆盖外部 Agent 配置文件。
-- 提供无终端 Windows GUI 安装器与全链路隐藏子进程，按当前用户安装，无需管理员权限。
-- 提供无终端 macOS Universal `.app`，同一下载包兼容 Apple Silicon 与 Intel；诊断脚本单独放在 `Terminal Tools`。
+- Windows 控制中心使用 **Rust + Win32** 原生开发，子进程全部隐藏；支持 Per-Monitor DPI V2、ClearType、系统托盘与原生任务栏图标。
+- macOS 控制中心使用 **SwiftUI + AppKit** 原生开发，具有真正的 Dock 图标、原生菜单栏额度组件；Universal `.app` 同时兼容 Apple Silicon 与 Intel。
 - 蓝白控制中心统一显示代理、桥接、ZCode、双提供商账号、AI Credits 与额度状态。
-- 控制中心使用 Win/mac 原生字体、最高 4× DPR Canvas、宽屏/低分辨率/高缩放响应式布局和可降级动效。
+- 控制中心使用系统字体、原生控件、响应式布局和轻量状态动效；不再依赖 Chrome 渲染，也不会因打开面板弹出终端窗口。
 - 提供 v2rayN TUN / 代理预检、ZCode 配置备份、安全停止与同版本重装保护。
 - 本地密钥随机生成；Windows 使用 DPAPI、macOS 使用登录钥匙串主密钥保护凭据；API 与 OAuth 回调仅监听 loopback。
 
@@ -30,11 +30,11 @@
 
 | 文件 | 用途 | 建议 |
 | --- | --- | --- |
-| `ZCode-Antigravity-macOS-Universal-v0.3.0-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
-| `ZCode-Antigravity-Setup-v0.3.0-test.exe` | Windows 图形化安装器 | **普通用户首选** |
-| `ZCode-Antigravity-OneClick-v0.3.0-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
-| `ZCode-Antigravity-Windows-x64-0.3.0-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
-| `ZCode-Antigravity-Source-v0.3.0-test.zip` | 当前版本的干净源码快照 | 审计 / 构建 |
+| `ZCode-Antigravity-macOS-Universal-v0.4.0-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
+| `ZCode-Antigravity-Setup-v0.4.0-test.exe` | Windows 图形化安装器 | **普通用户首选** |
+| `ZCode-Antigravity-OneClick-v0.4.0-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
+| `ZCode-Antigravity-Windows-x64-0.4.0-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
+| `ZCode-Antigravity-Source-v0.4.0-test.zip` | 当前版本的干净源码快照 | 审计 / 构建 |
 
 ## macOS 快速安装
 
@@ -49,7 +49,7 @@
 1. 完整解压 macOS Universal ZIP；如需校验，打开 `Terminal Tools` 后双击 `Verify-Package.command`。
 2. 完全退出 ZCode。当前 App 使用临时签名且尚未公证；首次运行请按住 Control 点击 `ZCode Antigravity.app`，选择“打开”。
 3. 双击 `ZCode Antigravity.app`，选择 Antigravity 或 Grok；按需完成 Google OAuth 或 xAI 设备授权，再点击“一键接入 ZCode”。
-4. 重新打开 ZCode，选择 `Antigravity + Grok (Local Bridge)` 下的目标模型，发送一条短消息验收。关闭网页面板后菜单栏额度组件仍会保留。
+4. 重新打开 ZCode，选择 `Antigravity + Grok (Local Bridge)` 下的目标模型，发送一条短消息验收。关闭原生窗口后菜单栏额度组件仍会保留。
 
 Mac 运行数据位于 `~/Library/Application Support/ZCodeAntigravity`。Google token 使用
 AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切片已完成交叉编译和
@@ -69,7 +69,7 @@ AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切�
 
 1. 从 Windows 系统托盘完全退出 ZCode。仅关闭窗口可能仍会留下 `ZCode.exe` 进程。
 2. 确认 v2rayN 已开启 TUN，且本地代理端口与配置一致。
-3. 下载 `ZCode-Antigravity-Setup-v0.3.0-test.exe`，并先校验 SHA-256。请勿继续使用会在中文 Windows 上触发脚本解析错误的 `v0.2.6-test` EXE。
+3. 下载 `ZCode-Antigravity-Setup-v0.4.0-test.exe`，并先校验 SHA-256。请勿继续使用会在中文 Windows 上触发脚本解析错误的 `v0.2.6-test` EXE。
 4. 双击安装器。程序会校验内嵌 ZIP 和三个 EXE，然后安装到当前用户目录。
 5. 在控制中心选择 Antigravity 或 Grok，完成对应授权并等待状态检查通过。
 6. 重新打开 ZCode，选择 Provider `Antigravity + Grok (Local Bridge)`；控制中心会作为任务栏额度小组件继续驻留。
@@ -98,7 +98,7 @@ $env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
 
 ## 已验证范围
 
-Windows 基线与 `v0.3.0-test` 新增的构建主机测试记录包括：
+Windows 基线与 `v0.4.0-test` 新增的构建主机测试记录包括：
 
 - 管理器与 CLIProxyAPI 的 Go 测试、Windows x64 构建和静态检查通过。
 - OAuth PKCE / callback、DPAPI 凭据存储、原子替换和 loopback 约束通过。
@@ -109,17 +109,17 @@ Windows 基线与 `v0.3.0-test` 新增的构建主机测试记录包括：
 - EXE 内嵌 PowerShell 脚本现在由构建器和运行时双重保证 UTF-8 BOM，并加入中文脚本编码回归测试，修复 Windows PowerShell 5.1 的 `ParserError: UnexpectedToken`。
 - 已在构建主机复现中文代码页 936 会产生 `UnexpectedToken`，并确认新 EXE 只内嵌一个 `EF BB BF + param(` 脚本头。
 - Windows 全部 GUI 子进程使用 `CREATE_NO_WINDOW`；Windows x64 测试程序交叉编译通过。
-- 任务栏 / 菜单栏组件使用原生系统 API 的纯 Go 实现；macOS 本机启动、驻留、监听与退出清理通过，Windows x64 交叉编译通过。
+- Rust Win32 控制中心通过 `x86_64-pc-windows-gnu` 交叉编译、Clippy `-D warnings`、PE32+ GUI 子系统和资源图标检查。
 - 双提供商切换、Grok billing 解析、文本模型过滤和五类 Agent 配置均有单元测试。
-- 控制面板在桌面与 420px 窄窗口通过 Playwright 切换、全页截图和横向溢出检查。
-- `v0.3.0-test` 仍需在目标 Windows 10/11 的多 DPI 显示器上完成最终双击回归。
+- 旧版网页控制面板仍保留为诊断回退入口；正式客户端已改为原生 SwiftUI / Win32。
+- `v0.4.0-test` 仍需在目标 Windows 10/11 的多 DPI 显示器上完成最终双击回归。
 
-`v0.3.0-test` 的 macOS 验证包括：
+`v0.4.0-test` 的 macOS 验证包括：
 
 - 管理器、Keychain 凭据加密与后端相关测试通过。
-- 管理器和后端均为真正的 `x86_64 + arm64` Universal Mach-O。
+- SwiftUI 主程序、Go Core 和后端均为真正的 `x86_64 + arm64` Universal Mach-O。
 - App 临时签名、包内逐文件哈希、ZIP 完整性和隔离 `doctor` 检查通过。
-- macOS 菜单栏组件本机运行通过；关闭面板不退出组件，退出后进程与端口均被释放。
+- Info.plist 已启用普通 App 激活策略（`LSUIElement=false`），Dock 图标、原生菜单栏组件、关闭窗口驻留和退出清理通过。
 - 本机已识别 `/Applications/ZCode.app` 及运行中的 `ZCode` 进程；未修改用户现有配置。
 
 注意：上游模型目录、账号资格、风控和额度都可能随时变化。列表中看到模型并不代表当前账号一定可用。
@@ -139,7 +139,7 @@ Windows 基线与 `v0.3.0-test` 新增的构建主机测试记录包括：
 
 ### Windows 提示未知发布者
 
-当前 EXE 为未签名的自定义 Go 二进制。先对照本页或 `SHA256SUMS.txt`
+当前安装器、Rust 控制中心和 Go Core 均未使用商业代码签名证书。先对照本页或 `SHA256SUMS.txt`
 校验哈希；仅在哈希完全一致时选择继续运行。
 
 ### macOS 提示无法验证开发者
@@ -183,8 +183,8 @@ Grok Build、Codex、Claude Code 或 OpenCode 配置即可。实现依据为
 
 ## 从源码构建
 
-源码包含管理器、Windows/macOS 脚本、测试、文档、固定的 CLIProxyAPI v7.2.132
-源码和可重放补丁。已验证 Windows x64 与 macOS Universal 的 `CGO_ENABLED=0` 构建。
+源码包含 SwiftUI macOS 客户端、Rust Win32 客户端、Go 本地 Core、测试、打包脚本、
+固定的 CLIProxyAPI v7.2.132 源码和可重放补丁。已验证 Windows x64 交叉编译与 macOS Universal 构建。
 提交修改前请另见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
 
 GitHub 源码不内置 Google OAuth 客户端凭据。开发者需使用自己有权使用的
@@ -210,17 +210,17 @@ ANTIGRAVITY_OAUTH_CLIENT_SECRET='<your-client-secret>' \
 公开源码的默认构建从进程环境读取这两个值，不应提交到 Git。发布维护者可在链接时注入；
 两种方式都未配置时，OAuth 登录和 token 刷新会返回明确错误。
 
-```powershell
-cd project
-$env:CGO_ENABLED = '0'
-$env:GOOS = 'windows'
-$env:GOARCH = 'amd64'
-go test ./...
-go build -trimpath -ldflags='-s -w' `
-  -o ZCode-Antigravity.exe ./cmd/zcode-antigravity
-go build -trimpath -ldflags='-s -w -H windowsgui -X main.defaultCommand=gui' `
-  -o ZCode-Antigravity-ControlCenter.exe ./cmd/zcode-antigravity
+Windows 原生客户端使用 Rust 2024 Edition 和 Microsoft `windows-sys` 绑定。交叉编译示例：
+
+```bash
+rustup target add x86_64-pc-windows-gnu
+cd project/native/windows
+cargo clippy --target x86_64-pc-windows-gnu -- -D warnings
+cargo build --release --target x86_64-pc-windows-gnu
 ```
+
+同一发布包中的 `ZCode-Antigravity.exe` 是隐藏运行的 Go Core，Rust 客户端通过一次性
+loopback 会话与它通信；OAuth、token 加密和模型路由仍由经过测试的 Core/后端负责。
 
 后端固定为 `router-for-me/CLIProxyAPI v7.2.132`，本地修改位于：
 
@@ -233,7 +233,8 @@ project/docs/CLIProxyAPI-v7.2.132-zcode.patch
 ## 第三方说明与许可
 
 - 上游项目：[`router-for-me/CLIProxyAPI`](https://github.com/router-for-me/CLIProxyAPI)
-- 任务栏组件：[`gogpu/systray`](https://github.com/gogpu/systray) `v0.2.8`
+- 原生 Windows 客户端：Rust、[`windows-sys`](https://github.com/microsoft/windows-rs)、`ureq`、`serde`
+- 兼容回退任务栏组件：[`gogpu/systray`](https://github.com/gogpu/systray) `v0.2.8`
 - 固定版本：`v7.2.132`
 - 固定提交：`78f0c4079e3e6273d65d03b5549cffc898703264`
 - CLIProxyAPI 与 systray 上游许可：MIT License；平台依赖许可见发布包第三方说明。

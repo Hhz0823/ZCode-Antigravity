@@ -26,12 +26,12 @@ Requirements
 First test
 ----------
 Recommended: fully exit ZCode from the tray, enable v2rayN TUN, and double-click
-ZCode-Antigravity-Setup-v0.3.0-test.exe. This is a native Windows GUI installer: it shows no
+ZCode-Antigravity-Setup-v0.4.0-test.exe. This is a native Windows GUI installer: it shows no
 terminal, verifies the embedded ZIP plus all three executables, installs only for the current
 user, creates Desktop/Start Menu shortcuts, and opens the control center after completion.
 
 For the single-BAT fallback, fully exit ZCode from the tray, enable v2rayN TUN, and double-click
-ZCode-Antigravity-OneClick-v0.3.0-test.bat. It verifies and extracts its embedded package,
+ZCode-Antigravity-OneClick-v0.4.0-test.bat. It verifies and extracts its embedded package,
 then opens the graphical control center without leaving a terminal window. The control center
 opens OAuth when needed, writes the verified ZCode Provider directly, and starts ZCode after
 successful readback.
@@ -41,7 +41,8 @@ For the expanded package:
 2. Double-click Verify-Package.bat and confirm all three checks say [OK].
 3. In the Windows system tray, right-click ZCode and choose Exit. Closing the ZCode window
    normally leaves ZCode.exe running in the tray; the bridge refuses to edit while it runs.
-4. Double-click Setup-and-Start.bat. The graphical control center opens without a terminal window.
+4. Double-click Setup-and-Start.bat. The native Rust/Win32 control center opens without Chrome
+   or a terminal window.
 5. Select Antigravity or Grok / xAI and complete the corresponding browser authorization.
 6. The first model-directory load can take up to about 35 seconds on a poor connection.
 7. Reopen ZCode. Select Provider "Antigravity + Grok (Local Bridge)" and choose the desired
@@ -99,18 +100,21 @@ Files and privacy
 Graphical control center and quota
 ----------------------------------
 - Desktop/Start Menu shortcut: ZCode Antigravity 控制中心
-- The window is a Windows GUI executable and does not create a terminal window.
+- The control center is a native Rust + Win32 Windows GUI executable. It starts the audited Go
+  manager as a CREATE_NO_WINDOW child and never needs Chrome to render the panel.
+- It uses Segoe UI Variable, ClearType, Per-Monitor DPI V2, native controls, a bundled icon, and
+  responsive layout for mixed DPI and different desktop resolutions.
 - It shows v2rayN TUN, proxy, bridge, ZCode, provider accounts, models, quota, and Agent connectors.
-- Closing the browser panel leaves a native system-tray widget running. Click to reopen; use its
+- Closing the native window leaves a system-tray widget running. Click to reopen; use its
   menu to switch Antigravity/Grok, refresh quota, or exit the widget.
-- Gemini weekly and five-hour remaining quota use exact percentages, reset times, and animated
-  two-layer wave meters. AI credit balance is shown separately so it is not confused with model quota.
+- Gemini weekly and five-hour remaining quota use exact percentages, reset times, and a native
+  progress display. AI credit balance is shown separately so it is not confused with model quota.
 - Grok uses the official Grok Build billing response for shared weekly/monthly usage, reset time,
   pay-as-you-go limits, and Extra Usage Credits. It never estimates account quota from local tokens.
 - Connector cards generate copyable Grok Build, Codex, Claude Code, OpenCode, and generic client
   settings. The control center does not overwrite those agents' existing config files.
-- The blue-white telemetry theme adds entrance, status, counter, button, and operation feedback
-  animations. Windows/browser reduced-motion preference disables nonessential motion.
+- Native hover, focus, progress, refresh, and operation feedback replace browser Canvas effects;
+  no fractional CSS font weights are used, so text remains crisp at Windows scaling levels.
 - Quota is read through the already authenticated local bridge. Only a random-key-protected
   loopback management route is enabled; remote management and the web control panel stay disabled.
 - If Antigravity temporarily cannot refresh, the last redacted result is shown with a stale badge
@@ -118,7 +122,7 @@ Graphical control center and quota
 
 Available scripts
 -----------------
-- ZCode-Antigravity-ControlCenter.exe  No-console setup, status, actions, and quota dashboard
+- ZCode-Antigravity-ControlCenter.exe  Native Rust/Win32 setup, status, actions, quota, and tray UI
 - Run-Menu.bat                  Interactive menu
 - Setup-and-Start.bat           Open the GUI and start first-time setup
 - Login-Antigravity.bat         Add or refresh an Antigravity account
@@ -135,9 +139,9 @@ Available scripts
 
 Installer formats
 -----------------
-- ZCode-Antigravity-Setup-v0.3.0-test.exe: recommended no-terminal current-user installer.
-- ZCode-Antigravity-OneClick-v0.3.0-test.bat: fallback single-file installer.
-- ZCode-Antigravity-Windows-x64-0.3.0-test.zip: manually verifiable expanded package.
+- ZCode-Antigravity-Setup-v0.4.0-test.exe: recommended no-terminal current-user installer.
+- ZCode-Antigravity-OneClick-v0.4.0-test.bat: fallback single-file installer.
+- ZCode-Antigravity-Windows-x64-0.4.0-test.zip: manually verifiable expanded package.
 - The EXE installer is custom-built and unsigned. It does not require administrator rights or
   7-Zip on the target computer; Windows SmartScreen may still require manual confirmation.
 
@@ -174,7 +178,7 @@ Troubleshooting
   bridge so its client-version refresh runs, then check the live account catalog and entitlement.
 - "project id unavailable": onboarding did not yield a usable project. The account may be
   ineligible or restricted; use another dedicated test account instead of bypassing controls.
-- Windows SmartScreen: these custom Go binaries are not code-signed. Verify checksums first,
+- Windows SmartScreen: these custom Rust/Go binaries are not code-signed. Verify checksums first,
   then use More info -> Run anyway only if the hashes pass.
 - Stopping does not delete or revoke Google tokens. Removing the Provider also does not revoke
   Google authorization. Revoke access from your Google account separately if required.
@@ -210,8 +214,10 @@ cause a clear setup error instead of silently substituting another model.
 
 Build versions
 --------------
-- ZCode Antigravity Bridge: 0.3.0-test
+- ZCode Antigravity Bridge: 0.4.0-test
+- Native control center: Rust 1.96, windows-sys 0.61.2, ureq 3.4.0
 - CLIProxyAPI base: v7.2.132, commit 78f0c4079e3e6273d65d03b5549cffc898703264
 - Local build: 7.2.132-zcode.12
 
-Read THIRD-PARTY-NOTICES.txt and LICENSE-CLIProxyAPI.txt for upstream details.
+Read THIRD-PARTY-NOTICES.txt, RUST-DEPENDENCIES.txt, rust-licenses/, and
+LICENSE-CLIProxyAPI.txt for upstream details.

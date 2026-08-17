@@ -86,7 +86,7 @@ func main() {
 	}
 
 	showMessage(
-		"安装完成。\n\n已创建桌面和开始菜单快捷方式，接下来将打开蓝白控制中心并开始接入 ZCode。",
+		"安装完成。\n\n已创建桌面和开始菜单快捷方式，接下来将打开原生控制中心并开始接入 ZCode。",
 		messageOK|messageIconInfo,
 	)
 	if err := launchControlCenter(controlCenter); err != nil {

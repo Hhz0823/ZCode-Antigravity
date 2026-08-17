@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -24,17 +25,18 @@ import (
 var dashboardHTML string
 
 type guiRuntime struct {
-	app          *app
-	token        string
-	autoSetup    bool
-	operationMu  sync.Mutex
-	operation    guiOperation
-	quotaMu      sync.Mutex
-	providerMu   sync.RWMutex
-	provider     string
-	trayRefresh  chan struct{}
-	lastActivity atomic.Int64
-	shutdown     func()
+	app            *app
+	token          string
+	autoSetup      bool
+	operationMu    sync.Mutex
+	operation      guiOperation
+	quotaMu        sync.Mutex
+	providerMu     sync.RWMutex
+	provider       string
+	trayRefresh    chan struct{}
+	persistentTray bool
+	lastActivity   atomic.Int64
+	shutdown       func()
 }
 
 type guiOperation struct {
@@ -76,6 +78,14 @@ type guiProviderRequest struct {
 }
 
 func (a *app) runGUI(autoSetup bool) error {
+	return a.runUIHost(autoSetup, true)
+}
+
+func (a *app) runNativeHost(autoSetup bool) error {
+	return a.runUIHost(autoSetup, false)
+}
+
+func (a *app) runUIHost(autoSetup, launchBrowser bool) error {
 	a.guiMode = true
 	tokenBytes := make([]byte, 32)
 	if _, errRand := rand.Read(tokenBytes); errRand != nil {
@@ -87,11 +97,12 @@ func (a *app) runGUI(autoSetup bool) error {
 	}
 
 	runtime := &guiRuntime{
-		app:         a,
-		token:       base64.RawURLEncoding.EncodeToString(tokenBytes),
-		autoSetup:   autoSetup,
-		provider:    preferredInitialProvider(a.paths.AuthDir),
-		trayRefresh: make(chan struct{}, 1),
+		app:            a,
+		token:          base64.RawURLEncoding.EncodeToString(tokenBytes),
+		autoSetup:      autoSetup,
+		provider:       preferredInitialProvider(a.paths.AuthDir),
+		trayRefresh:    make(chan struct{}, 1),
+		persistentTray: launchBrowser && platformTraySupported(),
 	}
 	runtime.lastActivity.Store(time.Now().UnixNano())
 	mux := http.NewServeMux()
@@ -124,7 +135,7 @@ func (a *app) runGUI(autoSetup bool) error {
 	go func() {
 		serveErrCh <- server.Serve(listener)
 	}()
-	if !platformTraySupported() {
+	if launchBrowser && !platformTraySupported() {
 		go runtime.stopWhenInactive(shutdownCh)
 	}
 
@@ -133,11 +144,28 @@ func (a *app) runGUI(autoSetup bool) error {
 	if autoSetup {
 		dashboardURL += "&auto=1"
 	}
-	if errOpen := launchDashboardWindow(dashboardURL); errOpen != nil {
-		runtime.shutdown()
-		return fmt.Errorf("打开控制中心窗口: %w", errOpen)
+	if !launchBrowser {
+		connection := map[string]string{
+			"baseURL":      fmt.Sprintf("http://127.0.0.1:%d", address.Port),
+			"session":      runtime.token,
+			"dashboardURL": dashboardURL,
+		}
+		if errEncode := json.NewEncoder(os.Stdout).Encode(connection); errEncode != nil {
+			runtime.shutdown()
+			return fmt.Errorf("输出原生客户端连接信息: %w", errEncode)
+		}
+		_ = os.Stdout.Sync()
+		go func() {
+			_, _ = io.Copy(io.Discard, os.Stdin)
+			runtime.shutdown()
+		}()
+	} else {
+		if errOpen := launchDashboardWindow(dashboardURL); errOpen != nil {
+			runtime.shutdown()
+			return fmt.Errorf("打开控制中心窗口: %w", errOpen)
+		}
 	}
-	if platformTraySupported() {
+	if launchBrowser && platformTraySupported() {
 		go func() {
 			errServe := <-serveErrCh
 			if errServe != nil && !errors.Is(errServe, http.ErrServerClosed) {
@@ -537,7 +565,7 @@ func (g *guiRuntime) serveClose(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-	if !platformTraySupported() {
+	if !g.persistentTray {
 		go g.shutdown()
 	}
 }
