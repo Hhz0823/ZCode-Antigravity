@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "0.4.6-test"
+private let appVersion = "0.4.7-test"
 private let quotaRefreshInterval: TimeInterval = 5 * 60
 
 private extension Notification.Name {
@@ -454,16 +454,139 @@ final class NavigationModel: ObservableObject {
     @Published var section = "usage"
 }
 
+@MainActor
+final class StatusWidgetModel: ObservableObject {
+    @Published var provider = "antigravity"
+    @Published var providerName = "Antigravity"
+    @Published var accountCount = 0
+    @Published var fiveHourPercent: Double?
+    @Published var fiveHourReset = "等待同步"
+    @Published var weeklyPercent: Double?
+    @Published var weeklyReset = "等待同步"
+    @Published var outputText = "—"
+    @Published var speedText = "等待首次响应"
+}
+
+private struct StatusPopoverView: View {
+    @ObservedObject var model: StatusWidgetModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 11)
+                        .fill(LinearGradient(colors: [CodexUPalette.accentLight, CodexUPalette.accent], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    Text("ZA").font(.caption.bold()).foregroundStyle(.white)
+                }
+                .frame(width: 38, height: 38)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("ZCode Antigravity").font(.headline)
+                    Text("额度与 Token 小组件").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button {
+                    NotificationCenter.default.post(name: .refreshBridgeData, object: nil)
+                } label: {
+                    Image(systemName: "arrow.clockwise").frame(width: 30, height: 30)
+                }
+                .buttonStyle(.plain)
+                .background(.thinMaterial, in: Circle())
+            }
+
+            HStack(spacing: 7) {
+                widgetProviderButton("Antigravity", provider: "antigravity")
+                widgetProviderButton("Grok / xAI", provider: "xai")
+            }
+            .padding(4)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(CodexUPalette.border))
+
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(model.providerName).font(.title3.weight(.semibold))
+                        Text("\(model.accountCount) 个账号 · 本机数据").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text(model.accountCount > 0 ? "可用" : "待登录")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(model.accountCount > 0 ? .green : .orange)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background((model.accountCount > 0 ? Color.green : Color.orange).opacity(0.1), in: Capsule())
+                }
+                HStack(spacing: 16) {
+                    WidgetQuotaColumn(title: "5 小时剩余", percent: model.fiveHourPercent, reset: model.fiveHourReset, tint: CodexUPalette.accent)
+                    WidgetQuotaColumn(title: "本周剩余", percent: model.weeklyPercent, reset: model.weeklyReset, tint: CodexUPalette.secondary)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("最近输出").font(.caption).foregroundStyle(.secondary)
+                        Text(model.outputText).font(.title3.monospacedDigit().weight(.semibold))
+                        Text(model.speedText).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(16)
+            .background(CodexUPalette.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(CodexUPalette.accent.opacity(0.35)))
+
+            HStack(spacing: 8) {
+                widgetAction("打开主界面", icon: "macwindow") { StatusBarController.shared.openWindow() }
+                widgetAction("刷新", icon: "arrow.clockwise") { NotificationCenter.default.post(name: .refreshBridgeData, object: nil) }
+                widgetAction("退出", icon: "power") { NSApp.terminate(nil) }
+            }
+        }
+        .padding(18)
+        .frame(width: 430)
+        .background(.ultraThinMaterial)
+    }
+
+    private func widgetProviderButton(_ title: String, provider: String) -> some View {
+        Button {
+            NotificationCenter.default.post(name: .selectBridgeProvider, object: provider)
+        } label: {
+            Text(title).font(.callout.weight(.medium)).frame(maxWidth: .infinity).padding(.vertical, 8)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(model.provider == provider ? Color.white : Color.secondary)
+        .background(model.provider == provider ? CodexUPalette.accent : Color.clear, in: RoundedRectangle(cornerRadius: 11))
+    }
+
+    private func widgetAction(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon).frame(maxWidth: .infinity).padding(.vertical, 9)
+        }
+        .buttonStyle(.plain)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 11))
+        .overlay(RoundedRectangle(cornerRadius: 11).stroke(CodexUPalette.border))
+    }
+}
+
+private struct WidgetQuotaColumn: View {
+    let title: String
+    let percent: Double?
+    let reset: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text(percent.map { String(format: "%.0f%%", $0) } ?? "—")
+                .font(.title3.monospacedDigit().weight(.semibold))
+            ProgressView(value: max(0, min(100, percent ?? 0)), total: 100).tint(tint)
+            Text(reset).font(.caption2.monospacedDigit()).foregroundStyle(.secondary).lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+@MainActor
 final class StatusBarController: NSObject {
     static let shared = StatusBarController()
 
     private var statusItem: NSStatusItem?
-    private let summaryItem = NSMenuItem(title: "额度：正在读取…", action: nil, keyEquivalent: "")
-    private let fiveHourItem = NSMenuItem(title: "5 小时剩余：正在读取…", action: nil, keyEquivalent: "")
-    private let weeklyItem = NSMenuItem(title: "本周剩余：正在读取…", action: nil, keyEquivalent: "")
-    private let tokenItem = NSMenuItem(title: "Token 统计：等待首次响应", action: nil, keyEquivalent: "")
-    private let antigravityItem = NSMenuItem(title: "使用 Antigravity", action: #selector(selectAntigravity), keyEquivalent: "")
-    private let grokItem = NSMenuItem(title: "使用 Grok", action: #selector(selectGrok), keyEquivalent: "")
+    private let popover = NSPopover()
+    private let widgetModel = StatusWidgetModel()
 
     func install() {
         guard statusItem == nil else { return }
@@ -471,54 +594,52 @@ final class StatusBarController: NSObject {
         item.button?.image = NSImage(systemSymbolName: "gauge.with.dots.needle.67percent", accessibilityDescription: "ZCode 额度")
         item.button?.image?.isTemplate = true
         item.button?.toolTip = "ZCode Antigravity 额度"
-
-        let menu = NSMenu()
-        for infoItem in [summaryItem, fiveHourItem, weeklyItem, tokenItem] {
-            infoItem.isEnabled = false
-            menu.addItem(infoItem)
-        }
-        menu.addItem(.separator())
-        antigravityItem.target = self
-        grokItem.target = self
-        menu.addItem(antigravityItem)
-        menu.addItem(grokItem)
-        menu.addItem(.separator())
-        let openItem = NSMenuItem(title: "打开控制中心", action: #selector(openWindow), keyEquivalent: "o")
-        openItem.target = self
-        menu.addItem(openItem)
-        let refreshItem = NSMenuItem(title: "刷新额度", action: #selector(refresh), keyEquivalent: "r")
-        refreshItem.target = self
-        menu.addItem(refreshItem)
-        menu.addItem(.separator())
-        let quitItem = NSMenuItem(title: "退出", action: #selector(quit), keyEquivalent: "q")
-        quitItem.target = self
-        menu.addItem(quitItem)
-        item.menu = menu
+        item.button?.target = self
+        item.button?.action = #selector(togglePopover)
+        item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        popover.behavior = .transient
+        popover.animates = true
+        popover.contentSize = NSSize(width: 430, height: 330)
+        popover.contentViewController = NSHostingController(rootView: StatusPopoverView(model: widgetModel))
         statusItem = item
-        setProviderChecks("antigravity")
     }
 
     func update(provider: String, quota: QuotaReport?, usage: UsageReport?, status: DashboardStatus?) {
         DispatchQueue.main.async {
-            self.setProviderChecks(provider)
             let name = provider == "xai" ? "Grok / xAI" : "Antigravity"
             let count = provider == "xai" ? status?.providerAccounts.xai ?? 0 : status?.providerAccounts.antigravity ?? 0
-            self.summaryItem.title = "\(name) · \(count) 个账号"
             let five = self.quotaWindow(quota, kind: "five")
             let week = self.quotaWindow(quota, kind: "week")
-            self.fiveHourItem.title = self.quotaMenuTitle("5 小时", bucket: five)
-            self.weeklyItem.title = self.quotaMenuTitle("本周", bucket: week)
+            self.widgetModel.provider = provider
+            self.widgetModel.providerName = name
+            self.widgetModel.accountCount = count
+            self.widgetModel.fiveHourPercent = five?.remainingPercent
+            self.widgetModel.fiveHourReset = self.quotaResetText(five)
+            self.widgetModel.weeklyPercent = week?.remainingPercent
+            self.widgetModel.weeklyReset = self.quotaResetText(week)
             if let latest = usage?.latest {
                 let speedLabel = latest.speedBasis == "generation" ? "生成速度" : "有效吞吐"
-                self.tokenItem.title = String(format: "最近输出：%@ token · %@ %.1f token/s", self.formatInteger(latest.outputTokens), speedLabel, latest.outputTokensPerSecond)
+                self.widgetModel.outputText = "\(self.formatInteger(latest.outputTokens)) tok"
+                self.widgetModel.speedText = String(format: "%@ %.1f tok/s", speedLabel, latest.outputTokensPerSecond)
             } else {
-                self.tokenItem.title = "Token 统计：等待首次成功的模型响应"
+                self.widgetModel.outputText = "—"
+                self.widgetModel.speedText = "等待首次响应"
             }
             var buttonParts: [String] = []
             if let remaining = five?.remainingPercent { buttonParts.append(String(format: "5h %.0f%%", remaining)) }
             if let remaining = week?.remainingPercent { buttonParts.append(String(format: "周 %.0f%%", remaining)) }
             self.statusItem?.button?.title = buttonParts.isEmpty ? "" : " " + buttonParts.joined(separator: " · ")
-            self.statusItem?.button?.toolTip = [self.summaryItem.title, self.fiveHourItem.title, self.weeklyItem.title, self.tokenItem.title].joined(separator: "\n")
+            self.statusItem?.button?.toolTip = "\(name) · \(count) 个账号\n\(self.quotaMenuTitle("5 小时", bucket: five))\n\(self.quotaMenuTitle("本周", bucket: week))"
+        }
+    }
+
+    @objc private func togglePopover() {
+        guard let button = statusItem?.button else { return }
+        if popover.isShown {
+            popover.performClose(nil)
+        } else {
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 
@@ -544,6 +665,11 @@ final class StatusBarController: NSObject {
         return String(format: "%@剩余：%.0f%%%@", label, remaining, reset)
     }
 
+    private func quotaResetText(_ bucket: QuotaBucket?) -> String {
+        guard let raw = bucket?.resetTime else { return "等待同步" }
+        return String(raw.prefix(16)).replacingOccurrences(of: "T", with: " ")
+    }
+
     private func formatInteger(_ value: Int64) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
@@ -551,30 +677,10 @@ final class StatusBarController: NSObject {
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 
-    private func setProviderChecks(_ provider: String) {
-        antigravityItem.state = provider == "xai" ? .off : .on
-        grokItem.state = provider == "xai" ? .on : .off
-    }
-
-    @objc private func selectAntigravity() {
-        NotificationCenter.default.post(name: .selectBridgeProvider, object: "antigravity")
-    }
-
-    @objc private func selectGrok() {
-        NotificationCenter.default.post(name: .selectBridgeProvider, object: "xai")
-    }
-
-    @objc private func refresh() {
-        NotificationCenter.default.post(name: .refreshBridgeData, object: nil)
-    }
-
-    @objc private func openWindow() {
+    func openWindow() {
+        popover.performClose(nil)
         NSApp.activate(ignoringOtherApps: true)
         NSApp.windows.first(where: { $0.canBecomeKey })?.makeKeyAndOrderFront(nil)
-    }
-
-    @objc private func quit() {
-        NSApp.terminate(nil)
     }
 }
 
@@ -608,7 +714,7 @@ struct ZCodeAntigravityApp: App {
         WindowGroup("ZCode · Antigravity 控制中心") {
             DashboardView()
                 .environmentObject(model)
-                .frame(minWidth: 980, minHeight: 680)
+                .frame(minWidth: 1020, minHeight: 720)
                 .onAppear { model.start() }
         }
         .windowStyle(.titleBar)
@@ -621,107 +727,180 @@ struct ZCodeAntigravityApp: App {
     }
 }
 
+private enum CodexUPalette {
+    static let accent = Color(red: 40 / 255, green: 102 / 255, blue: 247 / 255)
+    static let accentLight = Color(red: 123 / 255, green: 160 / 255, blue: 255 / 255)
+    static let secondary = Color(red: 139 / 255, green: 109 / 255, blue: 255 / 255)
+    static let tertiary = Color(red: 255 / 255, green: 159 / 255, blue: 10 / 255)
+    static let border = Color(red: 148 / 255, green: 163 / 255, blue: 184 / 255).opacity(0.32)
+    static let pageBackground = Color(nsColor: .windowBackgroundColor)
+}
+
+private struct ThemeModeButton: View {
+    let icon: String
+    let value: String
+    @Binding var selection: String
+
+    var body: some View {
+        Button { selection = value } label: {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .medium))
+                .frame(width: 30, height: 30)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(selection == value ? Color.white : Color.secondary)
+        .background(selection == value ? CodexUPalette.accent : Color.clear, in: Circle())
+    }
+}
+
 struct DashboardView: View {
     @EnvironmentObject private var model: BridgeModel
     @ObservedObject private var navigation = NavigationModel.shared
+    @AppStorage("zcode.theme") private var theme = "system"
 
     var body: some View {
-        HSplitView {
-            sidebar
-                .frame(minWidth: 210, idealWidth: 230, maxWidth: 250)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    header
-                    statusStrip
-                    if navigation.section == "connectors" { connectorPanel } else { usageAndActions }
-                }
-                .padding(28)
-                .frame(maxWidth: 1180, alignment: .leading)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                topToolbar
+                contextRow
+                providerTabs
+                statusStrip
+                if navigation.section == "connectors" { connectorPanel } else { usageAndActions }
             }
-            .background(Color(nsColor: .windowBackgroundColor))
+            .padding(22)
+            .frame(maxWidth: 1280, alignment: .leading)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(CodexUPalette.pageBackground.ignoresSafeArea())
+        .preferredColorScheme(theme == "light" ? .light : (theme == "dark" ? .dark : nil))
+        .animation(.easeInOut(duration: 0.18), value: model.provider)
+        .animation(.easeInOut(duration: 0.18), value: navigation.section)
     }
 
-    private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 16) {
+    private var topToolbar: some View {
+        HStack(spacing: 14) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 10).fill(
-                        LinearGradient(colors: [Color(red: 0.03, green: 0.25, blue: 0.68), Color.accentColor], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    RoundedRectangle(cornerRadius: 14).fill(
+                        LinearGradient(colors: [CodexUPalette.accentLight, CodexUPalette.accent], startPoint: .topLeading, endPoint: .bottomTrailing)
                     )
-                    Text("ZA").font(.system(size: 17, weight: .bold, design: .rounded)).foregroundColor(.white)
-                }.frame(width: 42, height: 42)
+                    Text("ZA").font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                }
+                .frame(width: 48, height: 48)
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(.white.opacity(0.7), lineWidth: 1))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("ZCode Bridge").font(.headline)
-                    Text("Native Control").font(.caption).foregroundStyle(.secondary)
+                    Text("ZCode Antigravity").font(.system(size: 20, weight: .semibold, design: .rounded))
+                    Text("Updated " + lastUpdateText).font(.caption).foregroundStyle(.secondary)
                 }
             }
-            .padding(.bottom, 10)
-
-            SidebarButton(title: "模型与额度", icon: "gauge.with.dots.needle.67percent", selected: navigation.section == "usage") { navigation.section = "usage" }
-            SidebarButton(title: "Agent 接入", icon: "point.3.connected.trianglepath.dotted", selected: navigation.section == "connectors") { navigation.section = "connectors" }
             Spacer()
-            Divider()
-            Label("127.0.0.1 · 当前用户密钥", systemImage: "lock.shield")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("SwiftUI · v\(appVersion)").font(.caption2).foregroundStyle(.tertiary)
+            HStack(spacing: 4) {
+                ThemeModeButton(icon: "sun.max", value: "light", selection: $theme)
+                ThemeModeButton(icon: "moon", value: "dark", selection: $theme)
+                ThemeModeButton(icon: "display", value: "system", selection: $theme)
+            }
+            .padding(3)
+            .background(.thinMaterial, in: Capsule())
+            .overlay(Capsule().stroke(CodexUPalette.border))
+            Button { Task { await model.refreshAll() } } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 38, height: 38)
+            }
+            .buttonStyle(.plain)
+            .background(.thinMaterial, in: Circle())
+            .overlay(Circle().stroke(CodexUPalette.border))
+            .rotationEffect(.degrees(model.loading ? 360 : 0))
+            .animation(model.loading ? .linear(duration: 0.8).repeatForever(autoreverses: false) : .default, value: model.loading)
         }
-        .padding(20)
-        .background(.regularMaterial)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(CodexUPalette.border))
+        .shadow(color: .black.opacity(0.07), radius: 18, y: 8)
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(navigation.section == "connectors" ? "接入更多 Agent" : "模型与额度")
-                        .font(.system(size: 28, weight: .semibold, design: .rounded))
-                    Text("当前查看 \(model.provider == "xai" ? "Grok / xAI" : "Antigravity") 的账号、模型与额度。")
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                if model.loading { ProgressView().controlSize(.small) }
-                Label("每 5 分钟自动刷新", systemImage: "clock.arrow.circlepath")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color(nsColor: .controlBackgroundColor), in: Capsule())
-                Button { Task { await model.refreshAll() } } label: {
-                    Label("刷新", systemImage: "arrow.clockwise")
-                }
+    private var contextRow: some View {
+        HStack(spacing: 12) {
+            Label("Local only", systemImage: "waveform.path.ecg")
+                .foregroundStyle(.orange)
+                .font(.caption.weight(.medium))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(.thinMaterial, in: Capsule())
+                .overlay(Capsule().stroke(CodexUPalette.border))
+            Text("\(model.provider == "xai" ? "Grok / xAI" : "Antigravity") · \(selectedProviderCount) 个账号")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Label("额度每 5 分钟 · Token 每 5 秒", systemImage: "clock.arrow.circlepath")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(.thinMaterial, in: Capsule())
+                .overlay(Capsule().stroke(CodexUPalette.border))
+        }
+        .padding(.horizontal, 6)
+    }
+
+    private var providerTabs: some View {
+        HStack(spacing: 7) {
+            ProviderChoiceButton(
+                title: "Antigravity",
+                subtitle: "Google · Gemini",
+                count: model.status?.providerAccounts.antigravity ?? 0,
+                selected: model.provider != "xai" && navigation.section == "usage",
+                switching: model.providerSwitching && model.provider != "xai"
+            ) {
+                navigation.section = "usage"
+                Task { await model.selectProvider("antigravity") }
             }
-            HStack(spacing: 10) {
-                ProviderChoiceButton(
-                    title: "Antigravity",
-                    subtitle: "Google · Gemini",
-                    count: model.status?.providerAccounts.antigravity ?? 0,
-                    selected: model.provider != "xai",
-                    switching: model.providerSwitching && model.provider != "xai"
-                ) { Task { await model.selectProvider("antigravity") } }
-                ProviderChoiceButton(
-                    title: "Grok / xAI",
-                    subtitle: "Grok Build",
-                    count: model.status?.providerAccounts.xai ?? 0,
-                    selected: model.provider == "xai",
-                    switching: model.providerSwitching && model.provider == "xai"
-                ) { Task { await model.selectProvider("xai") } }
+            ProviderChoiceButton(
+                title: "Grok / xAI",
+                subtitle: "Grok Build",
+                count: model.status?.providerAccounts.xai ?? 0,
+                selected: model.provider == "xai" && navigation.section == "usage",
+                switching: model.providerSwitching && model.provider == "xai"
+            ) {
+                navigation.section = "usage"
+                Task { await model.selectProvider("xai") }
             }
-            .frame(maxWidth: 560)
-            .disabled(model.providerSwitching)
+            Button {
+                navigation.section = "connectors"
+            } label: {
+                Label("Agent 接入", systemImage: "point.3.connected.trianglepath.dotted")
+                    .font(.callout.weight(.medium))
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 42)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(navigation.section == "connectors" ? Color.white : Color.secondary)
+            .background(navigation.section == "connectors" ? CodexUPalette.accent : Color.clear, in: RoundedRectangle(cornerRadius: 13))
+            Spacer()
             if let error = model.errorMessage {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout)
+                Label(error, systemImage: "exclamationmark.triangle.fill").font(.caption)
                     .foregroundStyle(.red)
-                    .textSelection(.enabled)
             } else {
-                Label(model.message, systemImage: "checkmark.circle")
-                    .font(.callout)
+                Label(model.message, systemImage: "checkmark.circle").font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
+        .padding(5)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(CodexUPalette.border))
+        .disabled(model.providerSwitching)
+    }
+
+    private var selectedProviderCount: Int {
+        model.provider == "xai" ? model.status?.providerAccounts.xai ?? 0 : model.status?.providerAccounts.antigravity ?? 0
+    }
+
+    private var lastUpdateText: String {
+        guard let date = model.lastQuotaRefresh else { return "等待首次刷新" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: date)
     }
 
     private var statusStrip: some View {
@@ -948,32 +1127,37 @@ struct ProviderChoiceButton: View {
             HStack(spacing: 10) {
                 ZStack {
                     Circle()
-                        .fill(selected ? Color.accentColor : Color.secondary.opacity(0.22))
-                        .frame(width: 25, height: 25)
+                        .fill(selected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.14))
+                        .frame(width: 24, height: 24)
                     if switching {
                         ProgressView().controlSize(.mini).tint(.white)
                     } else if selected {
                         Image(systemName: "checkmark").font(.caption.bold()).foregroundStyle(.white)
                     } else {
-                        Circle().fill(Color(nsColor: .controlBackgroundColor)).frame(width: 9, height: 9)
+                        Circle().fill(Color.secondary.opacity(0.7)).frame(width: 7, height: 7)
                     }
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.callout.weight(.semibold))
-                    Text(subtitle).font(.caption2).foregroundStyle(.secondary)
+                    Text(subtitle).font(.caption2).opacity(0.72)
                 }
                 Spacer(minLength: 8)
-                Text("\(count) 个账号")
+                Text("\(count)")
                     .font(.caption.monospacedDigit().weight(.medium))
-                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background((selected ? Color.white : CodexUPalette.accent).opacity(0.12), in: Capsule())
             }
             .padding(.horizontal, 13)
-            .padding(.vertical, 10)
+            .padding(.vertical, 7)
+            .frame(minWidth: 190, minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(selected ? Color.accentColor.opacity(0.12) : Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 11))
-        .overlay(RoundedRectangle(cornerRadius: 11).stroke(selected ? Color.accentColor.opacity(0.75) : Color.primary.opacity(0.08), lineWidth: selected ? 1.5 : 1))
+        .foregroundStyle(selected ? Color.white : Color.primary)
+        .background(selected ? CodexUPalette.accent : Color.clear, in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(selected ? CodexUPalette.accent : Color.clear))
+        .shadow(color: selected ? CodexUPalette.accent.opacity(0.24) : .clear, radius: 10, y: 5)
         .animation(.easeInOut(duration: 0.18), value: selected)
     }
 }
@@ -1009,17 +1193,20 @@ struct StatusTile: View {
         }
         .padding(13)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.06)))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(CodexUPalette.border))
+        .shadow(color: .black.opacity(0.045), radius: 12, y: 5)
     }
 }
 
 struct NativeCard<Content: View>: View {
     @ViewBuilder let content: () -> Content
     var body: some View {
-        content().padding(20).background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.primary.opacity(0.08)))
-            .shadow(color: .black.opacity(0.04), radius: 14, y: 5)
+        content()
+            .padding(20)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(CodexUPalette.border))
+            .shadow(color: .black.opacity(0.06), radius: 18, y: 8)
     }
 }
 
@@ -1030,11 +1217,15 @@ struct CardTitle: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(kicker).font(.caption2.weight(.bold)).tracking(1.4).foregroundStyle(Color.accentColor)
+                Text(kicker).font(.caption2.weight(.bold)).tracking(1.4).foregroundStyle(CodexUPalette.accent)
                 Text(title).font(.title2.weight(.semibold))
             }
             Spacer()
-            Image(systemName: icon).font(.title2).foregroundStyle(Color.accentColor)
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(CodexUPalette.accent)
+                .frame(width: 34, height: 34)
+                .background(CodexUPalette.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
         }
     }
 }
@@ -1060,8 +1251,8 @@ struct QuotaSummaryTile: View {
         }
         .padding(11)
         .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.06)))
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(CodexUPalette.border))
     }
 }
 
@@ -1133,8 +1324,9 @@ struct ActionButton: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(primary ? Color.white : (destructive ? Color.red : Color.primary))
-        .background(primary ? Color.accentColor : Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(primary ? Color.clear : Color.primary.opacity(0.08)))
+        .background(primary ? CodexUPalette.accent : Color.clear, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(primary ? Color.clear : CodexUPalette.border))
+        .shadow(color: primary ? CodexUPalette.accent.opacity(0.2) : .clear, radius: 10, y: 5)
     }
 }
 

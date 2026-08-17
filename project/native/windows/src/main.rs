@@ -22,11 +22,11 @@ use windows_sys::Win32::System::Memory::*;
 use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::HiDpi::*;
-use windows_sys::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-const VERSION: &str = "0.4.6-test";
+const VERSION: &str = "0.4.7-test";
 const SS_LEFT: u32 = 0;
 const CF_UNICODETEXT_VALUE: u32 = 13;
 const WM_REFRESH_READY: u32 = WM_APP + 1;
@@ -38,22 +38,23 @@ const TIMER_OPERATION_POLL: usize = 2;
 const STATUS_REFRESH_MS: u32 = 5_000;
 const QUOTA_REFRESH_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
-const COLOR_SIDEBAR: COLORREF = 0x00442308;
-const COLOR_SIDEBAR_ACTIVE: COLORREF = 0x008C4A16;
-const COLOR_BACKGROUND: COLORREF = 0x00FFF9F4;
+// codexU-inspired native palette. COLORREF stores bytes as 0x00BBGGRR.
+const COLOR_BACKGROUND: COLORREF = 0x00FCFAF8;
 const COLOR_CARD: COLORREF = 0x00FFFFFF;
-const COLOR_BORDER: COLORREF = 0x00F0E3D3;
-const COLOR_GRID: COLORREF = 0x00F8F0E7;
-const COLOR_PRIMARY: COLORREF = 0x00F56B16;
-const COLOR_PRIMARY_DARK: COLORREF = 0x00CF5710;
-const COLOR_PRIMARY_SOFT: COLORREF = 0x00FFF2E9;
-const COLOR_TEXT: COLORREF = 0x00422A16;
-const COLOR_MUTED: COLORREF = 0x00907762;
-const COLOR_LIGHT_TEXT: COLORREF = 0x00F8E9DC;
-const COLOR_SUCCESS: COLORREF = 0x0062A024;
-const COLOR_WARNING: COLORREF = 0x001E91DC;
-const COLOR_DANGER: COLORREF = 0x005A41DA;
-const COLOR_TRACK: COLORREF = 0x00F4EDE6;
+const COLOR_BORDER: COLORREF = 0x00F0E8E2;
+const COLOR_SURFACE_INSET: COLORREF = 0x00F9F5F1;
+const COLOR_PRIMARY: COLORREF = 0x00F76628;
+const COLOR_PRIMARY_DARK: COLORREF = 0x00ED591F;
+const COLOR_PRIMARY_SOFT: COLORREF = 0x00FFF3ED;
+const COLOR_SECONDARY: COLORREF = 0x00FF6D8B;
+const COLOR_TEXT: COLORREF = 0x00271811;
+const COLOR_MUTED: COLORREF = 0x0063554B;
+const COLOR_TERTIARY: COLORREF = 0x0080726B;
+const COLOR_LIGHT_TEXT: COLORREF = 0x00FFFFFF;
+const COLOR_SUCCESS: COLORREF = 0x004AA316;
+const COLOR_WARNING: COLORREF = 0x000677D9;
+const COLOR_DANGER: COLORREF = 0x002626DC;
+const COLOR_TRACK: COLORREF = 0x00F3EFEA;
 
 const ID_PROVIDER_ANTIGRAVITY: i32 = 100;
 const ID_PROVIDER_GROK: i32 = 101;
@@ -65,11 +66,6 @@ const ID_SYNC: i32 = 203;
 const ID_OPEN_ZCODE: i32 = 204;
 const ID_STOP: i32 = 205;
 const ID_COPY_CONNECTORS: i32 = 206;
-const ID_TRAY_OPEN: usize = 300;
-const ID_TRAY_REFRESH: usize = 301;
-const ID_TRAY_ANTIGRAVITY: usize = 302;
-const ID_TRAY_GROK: usize = 303;
-const ID_TRAY_QUIT: usize = 304;
 
 static STATE: OnceLock<Mutex<AppState>> = OnceLock::new();
 
@@ -395,7 +391,7 @@ unsafe fn create_control(
 }
 
 unsafe fn create_font(point_size: i32, weight: i32, dpi: u32) -> isize {
-    let face = wide("Microsoft YaHei UI");
+    let face = wide("Segoe UI Variable Text");
     let pixel_height = -((point_size * dpi as i32 + 36) / 72).max(1);
     unsafe {
         CreateFontW(
@@ -605,7 +601,6 @@ struct LayoutMetrics {
     width: i32,
     height: i32,
     dpi: u32,
-    sidebar_w: i32,
     main_x: i32,
     main_w: i32,
     gap: i32,
@@ -630,28 +625,26 @@ unsafe fn layout_metrics(hwnd: HWND, dpi: u32) -> LayoutMetrics {
     unsafe { GetClientRect(hwnd, &mut rect) };
     let width = rect.right.max(1);
     let height = rect.bottom.max(1);
-    let compact = height < scale(680, dpi) || width < scale(1000, dpi);
-    let sidebar_w = scale(if compact { 190 } else { 210 }, dpi).min(width / 3);
-    let margin = scale(if compact { 16 } else { 26 }, dpi);
-    let gap = scale(12, dpi);
-    let main_x = sidebar_w + margin;
-    let main_w = (width - sidebar_w - margin * 2).max(1);
-    let provider_y = scale(if compact { 64 } else { 76 }, dpi);
-    let provider_w = scale(if compact { 138 } else { 150 }, dpi);
-    let provider_h = scale(if compact { 32 } else { 38 }, dpi);
-    let status_y = scale(if compact { 106 } else { 126 }, dpi);
-    let status_h = scale(if compact { 62 } else { 76 }, dpi);
+    let compact = height < scale(760, dpi) || width < scale(1080, dpi);
+    let margin = scale(if compact { 16 } else { 24 }, dpi);
+    let gap = scale(if compact { 9 } else { 12 }, dpi);
+    let main_x = margin;
+    let main_w = (width - margin * 2).max(1);
+    let provider_y = scale(if compact { 162 } else { 184 }, dpi);
+    let provider_w = scale(if compact { 158 } else { 182 }, dpi);
+    let provider_h = scale(if compact { 36 } else { 42 }, dpi);
+    let status_y = scale(if compact { 210 } else { 240 }, dpi);
+    let status_h = scale(if compact { 64 } else { 74 }, dpi);
     let status_w = (main_w - gap * 3) / 4;
-    let content_top = scale(if compact { 180 } else { 222 }, dpi);
-    let content_bottom = height - scale(if compact { 14 } else { 24 }, dpi);
-    let action_w = scale(284, dpi).min(main_w * 36 / 100);
+    let content_top = scale(if compact { 286 } else { 330 }, dpi);
+    let content_bottom = height - scale(if compact { 16 } else { 24 }, dpi);
+    let action_w = scale(if compact { 278 } else { 318 }, dpi).min(main_w * 34 / 100);
     let action_x = main_x + main_w - action_w;
     let left_w = action_x - gap - main_x;
     LayoutMetrics {
         width,
         height,
         dpi,
-        sidebar_w,
         main_x,
         main_w,
         gap,
@@ -667,7 +660,7 @@ unsafe fn layout_metrics(hwnd: HWND, dpi: u32) -> LayoutMetrics {
         action_x,
         action_w,
         button_h: scale(if compact { 30 } else { 40 }, dpi),
-        button_gap: scale(if compact { 4 } else { 9 }, dpi),
+        button_gap: scale(if compact { 4 } else { 8 }, dpi),
         compact,
     }
 }
@@ -681,7 +674,7 @@ unsafe fn layout(hwnd: HWND) {
         (state.dpi, state.controls)
     };
     let m = unsafe { layout_metrics(hwnd, dpi) };
-    let inset = scale(20, m.dpi);
+    let inset = scale(if m.compact { 16 } else { 20 }, m.dpi);
     let models_h = scale(76, m.dpi);
     let models_y = m.content_bottom - inset - models_h;
 
@@ -695,8 +688,8 @@ unsafe fn layout(hwnd: HWND) {
     move_control(
         controls.subtitle,
         m.main_x,
-        scale(48, m.dpi),
-        m.main_w,
+        scale(if m.compact { 130 } else { 150 }, m.dpi),
+        m.main_w - scale(220, m.dpi),
         scale(22, m.dpi),
     );
     move_control(
@@ -715,9 +708,9 @@ unsafe fn layout(hwnd: HWND) {
     );
     move_control(
         controls.refresh,
-        m.main_x + m.main_w - scale(92, m.dpi),
+        m.main_x + m.main_w - scale(if m.compact { 74 } else { 84 }, m.dpi),
         m.provider_y,
-        scale(92, m.dpi),
+        scale(if m.compact { 74 } else { 84 }, m.dpi),
         m.provider_h,
     );
     for (index, handle) in [
@@ -740,7 +733,7 @@ unsafe fn layout(hwnd: HWND) {
     move_control(
         controls.quota_title,
         m.main_x + inset,
-        m.content_top + scale(18, m.dpi),
+        m.content_top + scale(33, m.dpi),
         m.left_w - inset * 2,
         scale(34, m.dpi),
     );
@@ -760,7 +753,7 @@ unsafe fn layout(hwnd: HWND) {
     move_control(
         controls.action_header,
         m.action_x + inset,
-        m.content_top + scale(18, m.dpi),
+        m.content_top + scale(33, m.dpi),
         m.action_w - inset * 2,
         scale(34, m.dpi),
     );
@@ -780,7 +773,7 @@ unsafe fn layout(hwnd: HWND) {
             *handle,
             m.action_x + inset,
             m.content_top
-                + scale(if m.compact { 54 } else { 62 }, m.dpi)
+                + scale(if m.compact { 72 } else { 78 }, m.dpi)
                 + index as i32 * (m.button_h + m.button_gap),
             m.action_w - inset * 2,
             m.button_h,
@@ -788,11 +781,12 @@ unsafe fn layout(hwnd: HWND) {
     }
     move_control(
         controls.footer,
-        scale(20, m.dpi),
-        m.height - scale(55, m.dpi),
-        m.sidebar_w - scale(40, m.dpi),
-        scale(36, m.dpi),
+        m.main_x + m.main_w - scale(if m.compact { 258 } else { 286 }, m.dpi),
+        scale(if m.compact { 48 } else { 54 }, m.dpi),
+        scale(if m.compact { 176 } else { 192 }, m.dpi),
+        scale(24, m.dpi),
     );
+    unsafe { ShowWindow(controls.footer as HWND, SW_HIDE) };
 }
 
 unsafe fn recreate_fonts(hwnd: HWND, dpi: u32) {
@@ -892,6 +886,52 @@ unsafe fn rounded_box(hdc: HDC, rect: &RECT, fill: COLORREF, border: COLORREF, r
     }
 }
 
+unsafe fn elevated_box(hdc: HDC, rect: &RECT, dpi: u32) {
+    let shadow = RECT {
+        left: rect.left + scale(2, dpi),
+        top: rect.top + scale(5, dpi),
+        right: rect.right + scale(2, dpi),
+        bottom: rect.bottom + scale(5, dpi),
+    };
+    unsafe {
+        rounded_box(
+            hdc,
+            &shadow,
+            0x00F4F1ED,
+            0x00F4F1ED,
+            scale(18, dpi),
+        );
+        rounded_box(
+            hdc,
+            rect,
+            COLOR_CARD,
+            COLOR_BORDER,
+            scale(18, dpi),
+        );
+    }
+}
+
+unsafe fn draw_status_dot(hdc: HDC, center_x: i32, center_y: i32, color: COLORREF, dpi: u32) {
+    let radius = scale(4, dpi).max(2);
+    let brush = unsafe { CreateSolidBrush(color) };
+    let pen = unsafe { CreatePen(PS_SOLID, 1, color) };
+    let old_brush = unsafe { SelectObject(hdc, brush as HGDIOBJ) };
+    let old_pen = unsafe { SelectObject(hdc, pen as HGDIOBJ) };
+    unsafe {
+        Ellipse(
+            hdc,
+            center_x - radius,
+            center_y - radius,
+            center_x + radius,
+            center_y + radius,
+        );
+        SelectObject(hdc, old_brush);
+        SelectObject(hdc, old_pen);
+        DeleteObject(brush as HGDIOBJ);
+        DeleteObject(pen as HGDIOBJ);
+    }
+}
+
 unsafe fn draw_label(
     hdc: HDC,
     text: &str,
@@ -958,7 +998,7 @@ unsafe fn paint_quota_dashboard(hdc: HDC, state: &AppState, m: &LayoutMetrics) {
     let inset = scale(20, m.dpi);
     let content_left = m.main_x + inset;
     let content_right = m.main_x + m.left_w - inset;
-    let summary_top = m.content_top + scale(60, m.dpi);
+    let summary_top = m.content_top + scale(80, m.dpi);
     let summary_height = scale(if m.compact { 48 } else { 58 }, m.dpi);
     let summary_gap = scale(8, m.dpi);
     let summary_width = (content_right - content_left - summary_gap * 4) / 5;
@@ -1017,7 +1057,13 @@ unsafe fn paint_quota_dashboard(hdc: HDC, state: &AppState, m: &LayoutMetrics) {
             bottom: summary_top + summary_height,
         };
         unsafe {
-            rounded_box(hdc, &card, COLOR_BACKGROUND, COLOR_BORDER, scale(5, m.dpi));
+            rounded_box(
+                hdc,
+                &card,
+                COLOR_SURFACE_INSET,
+                COLOR_BORDER,
+                scale(12, m.dpi),
+            );
             draw_label(
                 hdc,
                 label,
@@ -1044,7 +1090,7 @@ unsafe fn paint_quota_dashboard(hdc: HDC, state: &AppState, m: &LayoutMetrics) {
                 if index == 1 {
                     lowest.map(quota_percent_color).unwrap_or(COLOR_TEXT)
                 } else if index == 3 {
-                    COLOR_PRIMARY
+                    COLOR_SECONDARY
                 } else {
                     COLOR_TEXT
                 },
@@ -1300,7 +1346,7 @@ unsafe fn paint_quota_dashboard(hdc: HDC, state: &AppState, m: &LayoutMetrics) {
                 },
                 COLOR_BACKGROUND,
                 COLOR_BORDER,
-                scale(6, m.dpi),
+                scale(12, m.dpi),
             );
             draw_label(
                 hdc,
@@ -1337,9 +1383,21 @@ unsafe fn paint_dashboard(hwnd: HWND) {
         return;
     };
     let mut paint = PAINTSTRUCT::default();
-    let hdc = unsafe { BeginPaint(hwnd, &mut paint) };
+    let target_hdc = unsafe { BeginPaint(hwnd, &mut paint) };
     let state = state_lock.lock().unwrap();
     let m = unsafe { layout_metrics(hwnd, state.dpi) };
+    let memory_hdc = unsafe { CreateCompatibleDC(target_hdc) };
+    let bitmap = unsafe { CreateCompatibleBitmap(target_hdc, m.width, m.height) };
+    let old_bitmap = if !memory_hdc.is_null() && !bitmap.is_null() {
+        unsafe { SelectObject(memory_hdc, bitmap as HGDIOBJ) }
+    } else {
+        null_mut()
+    };
+    let hdc = if !memory_hdc.is_null() && !bitmap.is_null() {
+        memory_hdc
+    } else {
+        target_hdc
+    };
     let client = RECT {
         left: 0,
         top: 0,
@@ -1347,45 +1405,24 @@ unsafe fn paint_dashboard(hwnd: HWND) {
         bottom: m.height,
     };
     unsafe { fill_color(hdc, &client, COLOR_BACKGROUND) };
-    let sidebar = RECT {
-        left: 0,
-        top: 0,
-        right: m.sidebar_w,
-        bottom: m.height,
+
+    let toolbar_top = scale(if m.compact { 14 } else { 18 }, m.dpi);
+    let toolbar_bottom = scale(if m.compact { 92 } else { 108 }, m.dpi);
+    let toolbar = RECT {
+        left: m.main_x,
+        top: toolbar_top,
+        right: m.main_x + m.main_w,
+        bottom: toolbar_bottom,
     };
-    unsafe { fill_color(hdc, &sidebar, COLOR_SIDEBAR) };
-
-    let grid_pen = unsafe { CreatePen(PS_SOLID, 1, COLOR_GRID) };
-    let old_pen = unsafe { SelectObject(hdc, grid_pen as HGDIOBJ) };
-    let grid = scale(48, m.dpi).max(1);
-    let mut x = m.sidebar_w;
-    while x < m.width {
-        unsafe {
-            MoveToEx(hdc, x, 0, null_mut());
-            LineTo(hdc, x, m.height);
-        }
-        x += grid;
-    }
-    let mut y = 0;
-    while y < m.height {
-        unsafe {
-            MoveToEx(hdc, m.sidebar_w, y, null_mut());
-            LineTo(hdc, m.width, y);
-        }
-        y += grid;
-    }
-    unsafe {
-        SelectObject(hdc, old_pen);
-        DeleteObject(grid_pen as HGDIOBJ);
-    }
-
+    unsafe { elevated_box(hdc, &toolbar, m.dpi) };
+    let logo_size = scale(if m.compact { 46 } else { 52 }, m.dpi);
     let logo = RECT {
-        left: scale(20, m.dpi),
-        top: scale(26, m.dpi),
-        right: scale(60, m.dpi),
-        bottom: scale(66, m.dpi),
+        left: m.main_x + scale(18, m.dpi),
+        top: toolbar_top + (toolbar_bottom - toolbar_top - logo_size) / 2,
+        right: m.main_x + scale(18, m.dpi) + logo_size,
+        bottom: toolbar_top + (toolbar_bottom - toolbar_top + logo_size) / 2,
     };
-    unsafe { rounded_box(hdc, &logo, COLOR_SIDEBAR, COLOR_PRIMARY, scale(4, m.dpi)) };
+    unsafe { rounded_box(hdc, &logo, COLOR_PRIMARY, COLOR_PRIMARY_DARK, scale(16, m.dpi)) };
     unsafe {
         draw_label(
             hdc,
@@ -1397,102 +1434,60 @@ unsafe fn paint_dashboard(hwnd: HWND) {
         );
         draw_label(
             hdc,
-            "ZCode Bridge",
+            "ZCode Antigravity",
             RECT {
-                left: scale(72, m.dpi),
-                top: scale(25, m.dpi),
-                right: m.sidebar_w - scale(12, m.dpi),
-                bottom: scale(49, m.dpi),
+                left: logo.right + scale(14, m.dpi),
+                top: toolbar_top + scale(if m.compact { 14 } else { 18 }, m.dpi),
+                right: m.main_x + m.main_w / 2,
+                bottom: toolbar_top + scale(if m.compact { 39 } else { 45 }, m.dpi),
             },
-            state.font_bold,
-            COLOR_CARD,
+            state.font_title,
+            COLOR_TEXT,
             DT_LEFT | DT_VCENTER | DT_SINGLELINE,
         );
         draw_label(
             hdc,
-            "Antigravity Control",
+            "Native bridge · Local only · 127.0.0.1",
             RECT {
-                left: scale(72, m.dpi),
-                top: scale(48, m.dpi),
-                right: m.sidebar_w - scale(10, m.dpi),
-                bottom: scale(70, m.dpi),
+                left: logo.right + scale(14, m.dpi),
+                top: toolbar_top + scale(if m.compact { 39 } else { 47 }, m.dpi),
+                right: m.main_x + m.main_w / 2 + scale(120, m.dpi),
+                bottom: toolbar_bottom - scale(10, m.dpi),
             },
             state.font,
-            COLOR_MUTED,
-            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
-        );
-        draw_label(
-            hdc,
-            "控制中心",
-            RECT {
-                left: scale(24, m.dpi),
-                top: scale(112, m.dpi),
-                right: m.sidebar_w,
-                bottom: scale(138, m.dpi),
-            },
-            state.font,
-            COLOR_MUTED,
+            COLOR_TERTIARY,
             DT_LEFT | DT_VCENTER | DT_SINGLELINE,
         );
     }
-    let active_nav = RECT {
-        left: scale(16, m.dpi),
-        top: scale(146, m.dpi),
-        right: m.sidebar_w - scale(12, m.dpi),
-        bottom: scale(190, m.dpi),
+    let local_pill = RECT {
+        left: m.main_x + m.main_w - scale(if m.compact { 174 } else { 200 }, m.dpi),
+        top: toolbar_top + (toolbar_bottom - toolbar_top - scale(32, m.dpi)) / 2,
+        right: m.main_x + m.main_w - scale(18, m.dpi),
+        bottom: toolbar_top + (toolbar_bottom - toolbar_top + scale(32, m.dpi)) / 2,
     };
     unsafe {
         rounded_box(
             hdc,
-            &active_nav,
-            COLOR_SIDEBAR_ACTIVE,
-            COLOR_SIDEBAR_ACTIVE,
-            scale(4, m.dpi),
-        )
-    };
-    unsafe {
-        draw_label(
+            &local_pill,
+            COLOR_PRIMARY_SOFT,
+            COLOR_BORDER,
+            scale(16, m.dpi),
+        );
+        draw_status_dot(
             hdc,
-            "●   模型与额度",
-            active_nav,
-            state.font_bold,
-            COLOR_CARD,
-            DT_CENTER | DT_VCENTER | DT_SINGLELINE,
+            local_pill.left + scale(17, m.dpi),
+            (local_pill.top + local_pill.bottom) / 2,
+            COLOR_SUCCESS,
+            m.dpi,
         );
         draw_label(
             hdc,
-            "●   连接状态",
+            "本机安全连接",
             RECT {
-                left: scale(28, m.dpi),
-                top: scale(199, m.dpi),
-                right: m.sidebar_w,
-                bottom: scale(235, m.dpi),
-            },
-            state.font,
-            COLOR_MUTED,
-            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
-        );
-        draw_label(
-            hdc,
-            "●   本机操作",
-            RECT {
-                left: scale(28, m.dpi),
-                top: scale(239, m.dpi),
-                right: m.sidebar_w,
-                bottom: scale(275, m.dpi),
-            },
-            state.font,
-            COLOR_MUTED,
-            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
-        );
-        draw_label(
-            hdc,
-            "本地安全边界",
-            RECT {
-                left: scale(20, m.dpi),
-                top: m.height - scale(86, m.dpi),
-                right: m.sidebar_w - scale(16, m.dpi),
-                bottom: m.height - scale(60, m.dpi),
+                left: local_pill.left + scale(30, m.dpi),
+                top: local_pill.top,
+                right: local_pill.right - scale(10, m.dpi),
+                bottom: local_pill.bottom,
             },
             state.font,
             COLOR_MUTED,
@@ -1503,15 +1498,31 @@ unsafe fn paint_dashboard(hwnd: HWND) {
             "模型与额度",
             RECT {
                 left: m.main_x,
-                top: scale(14, m.dpi),
+                top: scale(if m.compact { 100 } else { 116 }, m.dpi),
                 right: m.main_x + m.main_w,
-                bottom: scale(48, m.dpi),
+                bottom: scale(if m.compact { 132 } else { 150 }, m.dpi),
             },
             state.font_title,
             COLOR_TEXT,
             DT_LEFT | DT_VCENTER | DT_SINGLELINE,
         );
     }
+
+    let provider_rail = RECT {
+        left: m.main_x - scale(5, m.dpi),
+        top: m.provider_y - scale(5, m.dpi),
+        right: m.main_x + m.main_w + scale(5, m.dpi),
+        bottom: m.provider_y + m.provider_h + scale(5, m.dpi),
+    };
+    unsafe {
+        rounded_box(
+            hdc,
+            &provider_rail,
+            COLOR_SURFACE_INSET,
+            COLOR_BORDER,
+            scale(18, m.dpi),
+        )
+    };
 
     for index in 0..4 {
         let left = m.main_x + index * (m.status_w + m.gap);
@@ -1521,7 +1532,7 @@ unsafe fn paint_dashboard(hwnd: HWND) {
             right: left + m.status_w,
             bottom: m.status_y + m.status_h,
         };
-        unsafe { rounded_box(hdc, &card, COLOR_CARD, COLOR_BORDER, scale(5, m.dpi)) };
+        unsafe { elevated_box(hdc, &card, m.dpi) };
     }
     let quota_card = RECT {
         left: m.main_x,
@@ -1536,11 +1547,58 @@ unsafe fn paint_dashboard(hwnd: HWND) {
         bottom: m.content_bottom,
     };
     unsafe {
-        rounded_box(hdc, &quota_card, COLOR_CARD, COLOR_BORDER, scale(7, m.dpi));
-        rounded_box(hdc, &action_card, COLOR_CARD, COLOR_BORDER, scale(7, m.dpi));
+        elevated_box(hdc, &quota_card, m.dpi);
+        elevated_box(hdc, &action_card, m.dpi);
+        draw_label(
+            hdc,
+            if state.provider == "xai" {
+                "GROK / XAI USAGE"
+            } else {
+                "ANTIGRAVITY USAGE"
+            },
+            RECT {
+                left: m.main_x + scale(if m.compact { 16 } else { 20 }, m.dpi),
+                top: m.content_top + scale(12, m.dpi),
+                right: m.main_x + m.left_w - scale(20, m.dpi),
+                bottom: m.content_top + scale(35, m.dpi),
+            },
+            state.font_bold,
+            COLOR_PRIMARY,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+        );
+        draw_label(
+            hdc,
+            "LOCAL ACTIONS",
+            RECT {
+                left: m.action_x + scale(if m.compact { 16 } else { 20 }, m.dpi),
+                top: m.content_top + scale(12, m.dpi),
+                right: m.action_x + m.action_w - scale(20, m.dpi),
+                bottom: m.content_top + scale(35, m.dpi),
+            },
+            state.font_bold,
+            COLOR_PRIMARY,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+        );
         paint_quota_dashboard(hdc, &state, &m);
     }
     drop(state);
+    if hdc == memory_hdc {
+        unsafe {
+            BitBlt(target_hdc, 0, 0, m.width, m.height, memory_hdc, 0, 0, SRCCOPY);
+            SelectObject(memory_hdc, old_bitmap);
+            DeleteObject(bitmap as HGDIOBJ);
+            DeleteDC(memory_hdc);
+        }
+    } else {
+        unsafe {
+            if !bitmap.is_null() {
+                DeleteObject(bitmap as HGDIOBJ);
+            }
+            if !memory_hdc.is_null() {
+                DeleteDC(memory_hdc);
+            }
+        }
+    }
     unsafe { EndPaint(hwnd, &paint) };
 }
 
@@ -1557,6 +1615,7 @@ unsafe fn draw_owner_button(draw: &DRAWITEMSTRUCT) {
         })
         .unwrap_or(false);
     let primary = id == ID_SETUP;
+    let destructive = id == ID_STOP;
     let (fill, border, text_color) = if disabled {
         (COLOR_BACKGROUND, COLOR_BORDER, COLOR_MUTED)
     } else if primary {
@@ -1582,15 +1641,15 @@ unsafe fn draw_owner_button(draw: &DRAWITEMSTRUCT) {
     } else {
         (
             if pressed {
-                COLOR_PRIMARY_SOFT
+            COLOR_PRIMARY_SOFT
             } else {
-                COLOR_CARD
+                COLOR_SURFACE_INSET
             },
             COLOR_BORDER,
-            COLOR_TEXT,
+            if destructive { COLOR_DANGER } else { COLOR_TEXT },
         )
     };
-    unsafe { rounded_box(draw.hDC, &draw.rcItem, fill, border, 5) };
+    unsafe { rounded_box(draw.hDC, &draw.rcItem, fill, border, 16) };
     let mut label = [0u16; 256];
     let length = unsafe { GetWindowTextW(draw.hwndItem, label.as_mut_ptr(), label.len() as i32) };
     let text = String::from_utf16_lossy(&label[..length.max(0) as usize]);
@@ -2219,21 +2278,6 @@ fn quota_window_summary(report: &QuotaReport, kind: &str) -> Option<QuotaWindowS
     selected
 }
 
-fn quota_window_menu_text(label: &str, value: Option<&QuotaWindowSummary>) -> String {
-    match value {
-        Some(value) => {
-            let reset = value
-                .reset_time
-                .as_deref()
-                .map(short_iso_time)
-                .map(|time| format!(" · 重置 {time}"))
-                .unwrap_or_default();
-            format!("{label}剩余：{:.0}%{reset}", value.remaining)
-        }
-        None => format!("{label}剩余：当前提供商未提供"),
-    }
-}
-
 fn update_tray(
     hwnd: HWND,
     provider: &str,
@@ -2278,7 +2322,84 @@ unsafe fn remove_tray_icon(hwnd: HWND) {
 }
 
 unsafe fn show_tray_menu(hwnd: HWND) {
-    let menu = unsafe { CreatePopupMenu() };
+    let class_name = wide("ZCodeAntigravityTrayWidget");
+    static REGISTERED: OnceLock<()> = OnceLock::new();
+    REGISTERED.get_or_init(|| {
+        let mut class: WNDCLASSEXW = unsafe { std::mem::zeroed() };
+        class.cbSize = std::mem::size_of::<WNDCLASSEXW>() as u32;
+        class.style = CS_HREDRAW | CS_VREDRAW;
+        class.lpfnWndProc = Some(tray_widget_proc);
+        class.hInstance = unsafe { GetModuleHandleW(null()) };
+        class.hCursor = unsafe { LoadCursorW(null_mut(), IDC_ARROW) };
+        class.hbrBackground = (COLOR_WINDOW + 1) as HBRUSH;
+        class.lpszClassName = class_name.as_ptr();
+        unsafe { RegisterClassExW(&class) };
+    });
+    let existing = unsafe { FindWindowW(class_name.as_ptr(), null()) };
+    if !existing.is_null() {
+        unsafe { DestroyWindow(existing) };
+    }
+    let dpi = unsafe { GetDpiForWindow(hwnd) }.max(96);
+    let width = scale(430, dpi);
+    let height = scale(352, dpi);
+    let mut point = POINT::default();
+    unsafe { GetCursorPos(&mut point) };
+    let monitor = unsafe { MonitorFromPoint(point, MONITOR_DEFAULTTONEAREST) };
+    let mut monitor_info: MONITORINFO = unsafe { std::mem::zeroed() };
+    monitor_info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+    unsafe { GetMonitorInfoW(monitor, &mut monitor_info) };
+    let work = monitor_info.rcWork;
+    let x = (point.x - width / 2).clamp(work.left, work.right - width);
+    let y_above = point.y - height - scale(10, dpi);
+    let y = if y_above >= work.top {
+        y_above
+    } else {
+        (point.y + scale(10, dpi)).min(work.bottom - height)
+    };
+    let widget = unsafe {
+        CreateWindowExW(
+            WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
+            class_name.as_ptr(),
+            wide("ZCode 额度").as_ptr(),
+            WS_POPUP,
+            x,
+            y,
+            width,
+            height,
+            hwnd,
+            null_mut(),
+            GetModuleHandleW(null()),
+            null_mut(),
+        )
+    };
+    if widget.is_null() {
+        return;
+    }
+    let region = unsafe {
+        CreateRoundRectRgn(
+            0,
+            0,
+            width + 1,
+            height + 1,
+            scale(24, dpi),
+            scale(24, dpi),
+        )
+    };
+    unsafe {
+        SetWindowRgn(widget, region, 1);
+        ShowWindow(widget, SW_SHOW);
+        SetForegroundWindow(widget);
+        SetFocus(widget);
+        InvalidateRect(widget, null(), 1);
+    }
+}
+
+unsafe fn paint_tray_widget(hwnd: HWND) {
+    let mut paint = PAINTSTRUCT::default();
+    let hdc = unsafe { BeginPaint(hwnd, &mut paint) };
+    let dpi = unsafe { GetDpiForWindow(hwnd) }.max(96);
+    let mut client = RECT::default();
+    unsafe { GetClientRect(hwnd, &mut client) };
     let (provider, quota, usage, accounts) = STATE
         .get()
         .map(|state| {
@@ -2295,91 +2416,170 @@ unsafe fn show_tray_menu(hwnd: HWND) {
     let account_count = if provider == "xai" { accounts.xai } else { accounts.antigravity };
     let five = quota.as_ref().and_then(|report| quota_window_summary(report, "five"));
     let week = quota.as_ref().and_then(|report| quota_window_summary(report, "week"));
+    let (font, bold, title) = STATE
+        .get()
+        .map(|state| {
+            let state = state.lock().unwrap();
+            (state.font, state.font_bold, state.font_title)
+        })
+        .unwrap_or_default();
     unsafe {
-        AppendMenuW(
-            menu,
-            MF_STRING | MF_GRAYED,
-            0,
-            wide(&format!("{provider_name} · {account_count} 个账号")).as_ptr(),
+        fill_color(hdc, &client, COLOR_BACKGROUND);
+        rounded_box(hdc, &client, COLOR_CARD, COLOR_BORDER, scale(22, dpi));
+        let logo = RECT {
+            left: scale(18, dpi),
+            top: scale(16, dpi),
+            right: scale(56, dpi),
+            bottom: scale(54, dpi),
+        };
+        rounded_box(hdc, &logo, COLOR_PRIMARY, COLOR_PRIMARY_DARK, scale(12, dpi));
+        draw_label(hdc, "ZA", logo, bold, COLOR_CARD, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        draw_label(
+            hdc,
+            "ZCode Antigravity",
+            RECT { left: scale(68, dpi), top: scale(13, dpi), right: client.right - scale(18, dpi), bottom: scale(39, dpi) },
+            title,
+            COLOR_TEXT,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
         );
-        AppendMenuW(
-            menu,
-            MF_STRING | MF_GRAYED,
-            0,
-            wide(&quota_window_menu_text("5 小时", five.as_ref())).as_ptr(),
+        draw_label(
+            hdc,
+            "额度与 Token 小组件",
+            RECT { left: scale(68, dpi), top: scale(38, dpi), right: client.right - scale(18, dpi), bottom: scale(59, dpi) },
+            font,
+            COLOR_TERTIARY,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
         );
-        AppendMenuW(
-            menu,
-            MF_STRING | MF_GRAYED,
-            0,
-            wide(&quota_window_menu_text("本周", week.as_ref())).as_ptr(),
-        );
-        if let Some(latest) = usage.as_ref().and_then(|report| report.latest.as_ref()) {
-            AppendMenuW(
-                menu,
-                MF_STRING | MF_GRAYED,
-                0,
-                wide(&format!(
-                    "最近输出：{} token · {:.1} token/s",
-                    format_integer(latest.output_tokens),
-                    latest.output_tokens_per_second
-                ))
-                .as_ptr(),
-            );
+        let rail = RECT { left: scale(18, dpi), top: scale(70, dpi), right: client.right - scale(18, dpi), bottom: scale(116, dpi) };
+        rounded_box(hdc, &rail, COLOR_SURFACE_INSET, COLOR_BORDER, scale(14, dpi));
+        let mid = (rail.left + rail.right) / 2;
+        let anti = RECT { right: mid - scale(3, dpi), ..rail };
+        let grok = RECT { left: mid + scale(3, dpi), ..rail };
+        if provider == "xai" {
+            rounded_box(hdc, &grok, COLOR_PRIMARY, COLOR_PRIMARY, scale(12, dpi));
         } else {
-            AppendMenuW(
-                menu,
-                MF_STRING | MF_GRAYED,
-                0,
-                wide("Token 统计：等待首次模型响应").as_ptr(),
-            );
+            rounded_box(hdc, &anti, COLOR_PRIMARY, COLOR_PRIMARY, scale(12, dpi));
         }
-        AppendMenuW(menu, MF_SEPARATOR, 0, null());
-        AppendMenuW(
-            menu,
-            MF_STRING | if provider == "xai" { 0 } else { MF_CHECKED },
-            ID_TRAY_ANTIGRAVITY,
-            wide("使用 Antigravity").as_ptr(),
+        draw_label(hdc, "Antigravity", anti, bold, if provider == "xai" { COLOR_MUTED } else { COLOR_CARD }, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        draw_label(hdc, "Grok / xAI", grok, bold, if provider == "xai" { COLOR_CARD } else { COLOR_MUTED }, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+        let quota_card = RECT { left: scale(18, dpi), top: scale(130, dpi), right: client.right - scale(18, dpi), bottom: scale(276, dpi) };
+        rounded_box(hdc, &quota_card, COLOR_PRIMARY_SOFT, COLOR_PRIMARY, scale(16, dpi));
+        draw_label(
+            hdc,
+            &format!("{provider_name}  ·  {account_count} 个账号"),
+            RECT { left: scale(34, dpi), top: scale(139, dpi), right: quota_card.right - scale(70, dpi), bottom: scale(169, dpi) },
+            title,
+            COLOR_TEXT,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
         );
-        AppendMenuW(
-            menu,
-            MF_STRING | if provider == "xai" { MF_CHECKED } else { 0 },
-            ID_TRAY_GROK,
-            wide("使用 Grok").as_ptr(),
-        );
-        AppendMenuW(menu, MF_STRING, ID_TRAY_REFRESH, wide("刷新额度").as_ptr());
-        AppendMenuW(menu, MF_SEPARATOR, 0, null());
-        AppendMenuW(menu, MF_STRING, ID_TRAY_OPEN, wide("打开控制中心").as_ptr());
-        AppendMenuW(menu, MF_STRING, ID_TRAY_QUIT, wide("退出").as_ptr());
-        let mut point = POINT::default();
-        GetCursorPos(&mut point);
-        SetForegroundWindow(hwnd);
-        let selected = TrackPopupMenu(
-            menu,
-            TPM_RETURNCMD | TPM_RIGHTBUTTON,
-            point.x,
-            point.y,
-            0,
-            hwnd,
-            null(),
-        ) as usize;
-        DestroyMenu(menu);
-        match selected {
-            ID_TRAY_OPEN => {
-                ShowWindow(hwnd, SW_RESTORE);
-                SetForegroundWindow(hwnd);
-            }
-            ID_TRAY_REFRESH => request_refresh(hwnd, true),
-            ID_TRAY_ANTIGRAVITY => select_provider(hwnd, "antigravity"),
-            ID_TRAY_GROK => select_provider(hwnd, "xai"),
-            ID_TRAY_QUIT => {
-                if let Some(state) = STATE.get() {
-                    state.lock().unwrap().quitting = true;
+        let badge = RECT { left: quota_card.right - scale(70, dpi), top: scale(141, dpi), right: quota_card.right - scale(14, dpi), bottom: scale(167, dpi) };
+        rounded_box(hdc, &badge, if account_count > 0 { 0x00E8F7EA } else { 0x00E6F3FF }, COLOR_BORDER, scale(13, dpi));
+        draw_label(hdc, if account_count > 0 { "可用" } else { "待登录" }, badge, bold, if account_count > 0 { COLOR_SUCCESS } else { COLOR_WARNING }, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+        let column_width = (quota_card.right - quota_card.left - scale(32, dpi)) / 3;
+        for (index, (label, summary, tint)) in [
+            ("5 小时剩余", five.as_ref(), COLOR_PRIMARY),
+            ("本周剩余", week.as_ref(), COLOR_SECONDARY),
+        ].iter().enumerate() {
+            let left = quota_card.left + scale(16, dpi) + index as i32 * column_width;
+            draw_label(hdc, label, RECT { left, top: scale(177, dpi), right: left + column_width - scale(12, dpi), bottom: scale(197, dpi) }, font, COLOR_MUTED, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            draw_label(hdc, &summary.map(|value| format!("{:.0}%", value.remaining)).unwrap_or_else(|| "—".to_string()), RECT { left, top: scale(198, dpi), right: left + column_width - scale(12, dpi), bottom: scale(225, dpi) }, title, COLOR_TEXT, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            let track = RECT { left, top: scale(230, dpi), right: left + column_width - scale(14, dpi), bottom: scale(237, dpi) };
+            rounded_box(hdc, &track, COLOR_TRACK, COLOR_TRACK, scale(5, dpi));
+            if let Some(value) = summary {
+                let fill_width = ((track.right - track.left) as f64 * value.remaining.clamp(0.0, 100.0) / 100.0) as i32;
+                if fill_width > 0 {
+                    let fill = RECT { right: track.left + fill_width.max(scale(5, dpi)), ..track };
+                    rounded_box(hdc, &fill, *tint, *tint, scale(5, dpi));
                 }
-                DestroyWindow(hwnd);
+                let reset = value.reset_time.as_deref().map(short_iso_time).unwrap_or_else(|| "等待同步".to_string());
+                draw_label(hdc, &reset, RECT { left, top: scale(241, dpi), right: left + column_width - scale(12, dpi), bottom: scale(261, dpi) }, font, COLOR_TERTIARY, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
             }
-            _ => {}
         }
+        let token_left = quota_card.left + scale(16, dpi) + 2 * column_width;
+        draw_label(hdc, "最近输出", RECT { left: token_left, top: scale(177, dpi), right: quota_card.right - scale(14, dpi), bottom: scale(197, dpi) }, font, COLOR_MUTED, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        let (output, speed) = usage.as_ref().and_then(|report| report.latest.as_ref()).map(|latest| (
+            format!("{} tok", format_integer(latest.output_tokens)),
+            format!("{:.1} tok/s", latest.output_tokens_per_second),
+        )).unwrap_or_else(|| ("—".to_string(), "等待首次响应".to_string()));
+        draw_label(hdc, &output, RECT { left: token_left, top: scale(198, dpi), right: quota_card.right - scale(14, dpi), bottom: scale(225, dpi) }, title, COLOR_TEXT, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+        draw_label(hdc, &speed, RECT { left: token_left, top: scale(231, dpi), right: quota_card.right - scale(14, dpi), bottom: scale(257, dpi) }, font, COLOR_TERTIARY, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+        let button_top = scale(292, dpi);
+        let button_bottom = scale(336, dpi);
+        let button_gap = scale(8, dpi);
+        let button_width = (client.right - scale(36, dpi) - button_gap * 2) / 3;
+        for (index, label) in ["打开主界面", "刷新", "退出"].iter().enumerate() {
+            let left = scale(18, dpi) + index as i32 * (button_width + button_gap);
+            let button = RECT { left, top: button_top, right: left + button_width, bottom: button_bottom };
+            rounded_box(hdc, &button, COLOR_SURFACE_INSET, COLOR_BORDER, scale(12, dpi));
+            draw_label(hdc, label, button, font, if index == 2 { COLOR_DANGER } else { COLOR_TEXT }, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        }
+    }
+    unsafe { EndPaint(hwnd, &paint) };
+}
+
+unsafe extern "system" fn tray_widget_proc(
+    hwnd: HWND,
+    message: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match message {
+        WM_ERASEBKGND => 1,
+        WM_PAINT => {
+            unsafe { paint_tray_widget(hwnd) };
+            0
+        }
+        WM_KILLFOCUS => {
+            unsafe { SetTimer(hwnd, 99, 1_500, None) };
+            0
+        }
+        WM_TIMER if wparam == 99 => {
+            unsafe {
+                KillTimer(hwnd, 99);
+                if GetForegroundWindow() != hwnd {
+                    DestroyWindow(hwnd);
+                }
+            }
+            0
+        }
+        WM_KEYDOWN if wparam as u32 == VK_ESCAPE as u32 => {
+            unsafe { DestroyWindow(hwnd) };
+            0
+        }
+        WM_LBUTTONUP => {
+            let dpi = unsafe { GetDpiForWindow(hwnd) }.max(96);
+            let x = loword(lparam as usize);
+            let y = ((lparam as usize >> 16) & 0xffff) as i32;
+            let main_hwnd = STATE.get().map(|state| state.lock().unwrap().hwnd as HWND).unwrap_or(null_mut());
+            if y >= scale(70, dpi) && y <= scale(116, dpi) {
+                if x < scale(215, dpi) {
+                    select_provider(main_hwnd, "antigravity");
+                } else {
+                    select_provider(main_hwnd, "xai");
+                }
+                unsafe { DestroyWindow(hwnd) };
+            } else if y >= scale(292, dpi) && y <= scale(336, dpi) {
+                if x < scale(151, dpi) {
+                    unsafe {
+                        ShowWindow(main_hwnd, SW_RESTORE);
+                        SetForegroundWindow(main_hwnd);
+                    }
+                } else if x < scale(287, dpi) {
+                    request_refresh(main_hwnd, true);
+                } else {
+                    if let Some(state) = STATE.get() {
+                        state.lock().unwrap().quitting = true;
+                    }
+                    unsafe { DestroyWindow(main_hwnd) };
+                }
+                unsafe { DestroyWindow(hwnd) };
+            }
+            0
+        }
+        _ => unsafe { DefWindowProcW(hwnd, message, wparam, lparam) },
     }
 }
 
