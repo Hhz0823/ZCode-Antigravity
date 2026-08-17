@@ -225,10 +225,33 @@ func (a *app) fetchQuotaReport() (quotaReport, error) {
 		return a.cachedQuotaReport(errors.New("没有可查询的 Antigravity 账号"))
 	}
 	sort.Slice(report.Accounts, func(i, j int) bool { return report.Accounts[i].Account < report.Accounts[j].Account })
+	if !quotaReportHasBuckets(report) {
+		cause := errors.New("实时额度接口没有返回可用额度")
+		for _, account := range report.Accounts {
+			if strings.TrimSpace(account.Error) != "" {
+				cause = errors.New(account.Error)
+				break
+			}
+		}
+		if cached, errCached := a.cachedQuotaReport(cause); errCached == nil && quotaReportHasBuckets(cached) {
+			return cached, nil
+		}
+	}
 	if errSave := a.saveQuotaCache(report); errSave != nil {
 		report.Warning = "额度读取成功，但本地缓存保存失败"
 	}
 	return report, nil
+}
+
+func quotaReportHasBuckets(report quotaReport) bool {
+	for _, account := range report.Accounts {
+		for _, group := range account.Groups {
+			if len(group.Buckets) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (a *app) retrieveQuotaSummary(port int, authIndex, projectID string) (upstreamQuotaSummary, string, error) {
@@ -432,6 +455,12 @@ func (a *app) managementJSON(port int, method, path string, payload any, target 
 		return errRead
 	}
 	if resp.StatusCode != http.StatusOK {
+		var problem struct {
+			Error string `json:"error"`
+		}
+		if json.Unmarshal(raw, &problem) == nil && strings.TrimSpace(problem.Error) != "" {
+			return fmt.Errorf("本机额度代理返回 HTTP %d: %s", resp.StatusCode, strings.TrimSpace(problem.Error))
+		}
 		return fmt.Errorf("本机额度代理返回 HTTP %d", resp.StatusCode)
 	}
 	if target == nil {

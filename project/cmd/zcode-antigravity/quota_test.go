@@ -252,7 +252,11 @@ func testServerPort(t *testing.T, serverURL string) int {
 
 func TestCachedQuotaReportMarksDataStale(t *testing.T) {
 	a := testApp(t)
-	report := quotaReport{FetchedAt: time.Now().UTC(), Source: "test", Accounts: []quotaAccount{{Account: "q***@example.com"}}}
+	remaining := 88.0
+	report := quotaReport{FetchedAt: time.Now().UTC(), Source: "test", Accounts: []quotaAccount{{
+		Account: "q***@example.com",
+		Groups:  []quotaGroup{{Buckets: []quotaBucket{{Name: "每周剩余额度", RemainingPercent: &remaining}}}},
+	}}}
 	if err := a.saveQuotaCache(report); err != nil {
 		t.Fatal(err)
 	}
@@ -262,6 +266,30 @@ func TestCachedQuotaReportMarksDataStale(t *testing.T) {
 	}
 	if !cached.Stale || !strings.Contains(cached.Warning, "network down") {
 		t.Fatalf("cached report = %+v", cached)
+	}
+}
+
+func TestManagementJSONIncludesSafeProxyErrorDetail(t *testing.T) {
+	a := testApp(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"auth token refresh failed"}`))
+	}))
+	defer server.Close()
+
+	err := a.managementJSON(testServerPort(t, server.URL), http.MethodPost, "/v0/management/api-call", map[string]string{"action": "quota"}, nil)
+	if err == nil || !strings.Contains(err.Error(), "HTTP 400: auth token refresh failed") {
+		t.Fatalf("managementJSON error = %v", err)
+	}
+}
+
+func TestQuotaReportHasBucketsRejectsErrorOnlyReport(t *testing.T) {
+	if quotaReportHasBuckets(quotaReport{Accounts: []quotaAccount{{Error: "refresh failed"}}}) {
+		t.Fatal("error-only report must not replace a successful quota cache")
+	}
+	remaining := 75.0
+	if !quotaReportHasBuckets(quotaReport{Accounts: []quotaAccount{{Groups: []quotaGroup{{Buckets: []quotaBucket{{RemainingPercent: &remaining}}}}}}}) {
+		t.Fatal("report with a quota bucket should be cacheable")
 	}
 }
 

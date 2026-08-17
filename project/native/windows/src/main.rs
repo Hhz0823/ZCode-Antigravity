@@ -21,15 +21,18 @@ use windows_sys::Win32::System::Memory::*;
 use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 use windows_sys::Win32::UI::Controls::*;
 use windows_sys::Win32::UI::HiDpi::*;
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-const VERSION: &str = "0.4.3-test";
+const VERSION: &str = "0.4.4-test";
 const SS_LEFT: u32 = 0;
 const CF_UNICODETEXT_VALUE: u32 = 13;
 const WM_REFRESH_READY: u32 = WM_APP + 1;
+const WM_OPERATION_POSTED: u32 = WM_APP + 2;
 const WM_TRAY: u32 = WM_APP + 20;
 const TIMER_REFRESH: usize = 1;
+const TIMER_OPERATION_POLL: usize = 2;
 
 const COLOR_SIDEBAR: COLORREF = 0x00442308;
 const COLOR_SIDEBAR_ACTIVE: COLORREF = 0x008C4A16;
@@ -204,6 +207,10 @@ struct RefreshResult {
     connectors: Result<ConnectorResponse, String>,
 }
 
+struct OperationPostResult {
+    error: Option<String>,
+}
+
 #[derive(Clone, Copy, Default)]
 struct Controls {
     subtitle: isize,
@@ -238,6 +245,7 @@ struct AppState {
     font_title: isize,
     dpi: u32,
     refreshing: bool,
+    operation_pending: bool,
     quitting: bool,
     provider: String,
     connectors_text: String,
@@ -254,6 +262,7 @@ impl AppState {
             font_title: 0,
             dpi: 96,
             refreshing: false,
+            operation_pending: false,
             quitting: false,
             provider: "antigravity".to_string(),
             connectors_text: String::new(),
@@ -1042,6 +1051,7 @@ unsafe fn paint_dashboard(hwnd: HWND) {
 unsafe fn draw_owner_button(draw: &DRAWITEMSTRUCT) {
     let id = draw.CtlID as i32;
     let pressed = draw.itemState & ODS_SELECTED != 0;
+    let disabled = draw.itemState & ODS_DISABLED != 0;
     let provider_selected = STATE
         .get()
         .map(|state| {
@@ -1051,7 +1061,9 @@ unsafe fn draw_owner_button(draw: &DRAWITEMSTRUCT) {
         })
         .unwrap_or(false);
     let primary = id == ID_SETUP;
-    let (fill, border, text_color) = if primary {
+    let (fill, border, text_color) = if disabled {
+        (COLOR_BACKGROUND, COLOR_BORDER, COLOR_MUTED)
+    } else if primary {
         (
             if pressed {
                 COLOR_PRIMARY_DARK
@@ -1161,13 +1173,17 @@ fn request_refresh(hwnd: HWND) {
     let Some(state_lock) = STATE.get() else {
         return;
     };
-    let (connection, hwnd_value) = {
+    let (connection, hwnd_value, skip_quota) = {
         let mut state = state_lock.lock().unwrap();
         if state.refreshing {
             return;
         }
         state.refreshing = true;
-        (state.host.connection.clone(), hwnd as isize)
+        (
+            state.host.connection.clone(),
+            hwnd as isize,
+            state.operation_pending,
+        )
     };
     thread::spawn(move || {
         let status = api_get::<DashboardStatus>(&connection, "/api/status");
@@ -1175,7 +1191,11 @@ fn request_refresh(hwnd: HWND) {
             .as_ref()
             .map(|value| value.selected_provider.as_str())
             .unwrap_or("antigravity");
-        let quota = api_get::<QuotaReport>(&connection, &format!("/api/quota?provider={provider}"));
+        let quota = if skip_quota {
+            Err("本地操作完成后自动刷新额度".to_string())
+        } else {
+            api_get::<QuotaReport>(&connection, &format!("/api/quota?provider={provider}"))
+        };
         let connectors = api_get::<ConnectorResponse>(&connection, "/api/connectors");
         let update = Box::new(RefreshResult {
             status,
@@ -1282,17 +1302,33 @@ unsafe fn apply_refresh(update: RefreshResult) {
         quota,
         connectors,
     } = update;
-    let (controls, hwnd, provider) = {
+    let (controls, hwnd, provider, operation_running, operation_finished) = {
         let mut state = state_lock.lock().unwrap();
         state.refreshing = false;
+        let was_pending = state.operation_pending;
         if let Ok(status) = &status {
             state.provider = status.selected_provider.clone();
+            state.operation_pending = status.operation.running;
         }
         if let Ok(connectors) = &connectors {
             state.connectors_text = connectors_text(connectors);
         }
-        (state.controls, state.hwnd as HWND, state.provider.clone())
+        (
+            state.controls,
+            state.hwnd as HWND,
+            state.provider.clone(),
+            state.operation_pending,
+            was_pending && !state.operation_pending,
+        )
     };
+    unsafe {
+        set_action_controls(controls, !operation_running);
+        if operation_running {
+            SetTimer(hwnd, TIMER_OPERATION_POLL, 800, None);
+        } else {
+            KillTimer(hwnd, TIMER_OPERATION_POLL);
+        }
+    }
     match status {
         Ok(status) => unsafe {
             let operation_message = status
@@ -1394,21 +1430,82 @@ unsafe fn apply_refresh(update: RefreshResult) {
         InvalidateRect(controls.provider_antigravity as HWND, null(), 1);
         InvalidateRect(controls.provider_grok as HWND, null(), 1);
     }
+    if operation_finished {
+        request_refresh(hwnd);
+    }
 }
 
 fn run_operation(hwnd: HWND, action: &'static str) {
     let Some(state_lock) = STATE.get() else {
         return;
     };
-    let connection = state_lock.lock().unwrap().host.connection.clone();
+    let (connection, controls) = {
+        let mut state = state_lock.lock().unwrap();
+        if state.operation_pending {
+            return;
+        }
+        state.operation_pending = true;
+        (state.host.connection.clone(), state.controls)
+    };
+    unsafe {
+        set_text(controls.subtitle, operation_start_message(action));
+        set_action_controls(controls, false);
+        SetTimer(hwnd, TIMER_OPERATION_POLL, 800, None);
+        InvalidateRect(hwnd, null(), 0);
+    }
     let hwnd_value = hwnd as isize;
     thread::spawn(move || {
-        let _ = api_post(&connection, "/api/action", json!({"action": action}));
-        thread::sleep(Duration::from_millis(450));
+        let update = Box::new(OperationPostResult {
+            error: api_post(&connection, "/api/action", json!({"action": action})).err(),
+        });
         unsafe {
-            let _ = PostMessageW(hwnd_value as HWND, WM_TIMER, TIMER_REFRESH, 0);
+            let _ = PostMessageW(
+                hwnd_value as HWND,
+                WM_OPERATION_POSTED,
+                0,
+                Box::into_raw(update) as LPARAM,
+            );
         }
     });
+}
+
+fn operation_start_message(action: &str) -> &'static str {
+    match action {
+        "setup" => "正在启动网关并接入 ZCode…",
+        "login" => "正在打开 Antigravity 登录…",
+        "login-grok" => "正在打开 Grok / xAI 登录…",
+        "sync" => "正在修复并重新同步…",
+        "open-zcode" => "正在打开 ZCode…",
+        "stop" => "正在停止本地网关…",
+        _ => "正在处理…",
+    }
+}
+
+unsafe fn set_action_controls(controls: Controls, enabled: bool) {
+    for handle in [
+        controls.setup,
+        controls.login_antigravity,
+        controls.login_grok,
+        controls.sync,
+        controls.open_zcode,
+        controls.stop,
+        controls.copy_connectors,
+    ] {
+        unsafe {
+            EnableWindow(handle as HWND, i32::from(enabled));
+            InvalidateRect(handle as HWND, null(), 1);
+        }
+    }
+    unsafe {
+        set_text(
+            controls.setup,
+            if enabled {
+                "一键接入 ZCode"
+            } else {
+                "处理中，请稍候…"
+            },
+        );
+    }
 }
 
 fn select_provider(hwnd: HWND, provider: &'static str) {
@@ -1709,6 +1806,34 @@ unsafe extern "system" fn window_proc(
             request_refresh(hwnd);
             0
         }
+        WM_OPERATION_POSTED => {
+            if lparam != 0 {
+                let result = unsafe { Box::from_raw(lparam as *mut OperationPostResult) };
+                if let Some(error) = result.error {
+                    let controls = STATE.get().map(|state| {
+                        let mut state = state.lock().unwrap();
+                        state.operation_pending = false;
+                        state.controls
+                    });
+                    unsafe {
+                        KillTimer(hwnd, TIMER_OPERATION_POLL);
+                        if let Some(controls) = controls {
+                            set_action_controls(controls, true);
+                            set_text(controls.subtitle, &format!("操作请求失败：{error}"));
+                        }
+                        MessageBoxW(
+                            hwnd,
+                            wide(&format!("操作请求失败：{error}")).as_ptr(),
+                            wide("ZCode Antigravity").as_ptr(),
+                            MB_OK | MB_ICONERROR,
+                        );
+                    }
+                } else {
+                    request_refresh(hwnd);
+                }
+            }
+            0
+        }
         WM_REFRESH_READY => {
             if lparam != 0 {
                 let update = unsafe { Box::from_raw(lparam as *mut RefreshResult) };
@@ -1746,6 +1871,7 @@ unsafe extern "system" fn window_proc(
         WM_DESTROY => {
             unsafe {
                 KillTimer(hwnd, TIMER_REFRESH);
+                KillTimer(hwnd, TIMER_OPERATION_POLL);
                 remove_tray_icon(hwnd)
             };
             if let Some(state) = STATE.get() {

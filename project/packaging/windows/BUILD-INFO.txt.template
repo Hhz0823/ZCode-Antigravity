@@ -1,20 +1,20 @@
 ZCode Antigravity Bridge build information
 ===========================================
 
-Package: ZCode-Antigravity-Windows-x64-0.4.3-test
+Package: ZCode-Antigravity-Windows-x64-0.4.4-test
 Build date (UTC): 2026-08-17
 Target: Windows x64 (PE32+ Go console Core and Rust/Win32 GUI control center)
 
 Manager
 -------
-Version: 0.4.3-test
+Version: 0.4.4-test
 Go: 1.26.4
 CGO: disabled
 SHA-256: __MANAGER_SHA256__
 
 Control center
 --------------
-Version: 0.4.3-test
+Version: 0.4.4-test
 Language: Rust 2024 Edition
 Bindings: windows-sys 0.61.2
 Subsystem: Windows GUI (no console window)
@@ -57,7 +57,7 @@ Local backend patches
 
 Verification evidence
 ---------------------
-Current v0.4.3-test build-host checks:
+Current v0.4.4-test build-host checks:
 - Manager go test ./... and Windows x64 build: passed
 - Manager go test -race: passed on the macOS build host
 - CLIProxyAPI go mod verify, go test ./..., and Windows x64 build: passed
@@ -71,7 +71,7 @@ Current v0.4.3-test build-host checks:
 - Windows child-process CREATE_NO_WINDOW test and Windows x64 test-binary cross-compile: passed
 - Provider/model selection, Grok billing proxy, tray state, and five Agent connector tests: passed
 - Native SwiftUI macOS main executable and native Rust Windows main executable build checks: passed
-- v0.4.3-test target Windows 11 real-account quota refresh and 144-DPI dashboard capture: passed
+- v0.4.4-test target Windows 11 one-click feedback, OAuth refresh, real-account quota and 144-DPI dashboard: passed
 
 Historical v0.2.6-test Windows/runtime checks retained as the regression baseline:
 - Local end-to-end smoke with fake non-network credentials: passed
