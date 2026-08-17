@@ -55,7 +55,7 @@ Verification evidence
 ---------------------
 Current v0.3.0-test build-host checks:
 - Manager go test ./... and Windows x64 build: passed
-- Manager go test -race: not run (GCC unavailable on build host)
+- Manager go test -race: passed on the macOS build host
 - CLIProxyAPI go mod verify, go test ./..., and Windows x64 build: passed
 - Windows PowerShell code page 936 reproduction: 5 parser errors; first error UnexpectedToken
 - Correct UTF-8 parse, BOM writer unit tests, and generated EXE single-BOM byte check: passed
