@@ -20,6 +20,7 @@ const antigravityQuotaUserAgent = "antigravity/hub/2.8.1 darwin/arm64"
 
 type quotaReport struct {
 	FetchedAt time.Time      `json:"fetchedAt"`
+	Provider  string         `json:"provider"`
 	Source    string         `json:"source"`
 	Stale     bool           `json:"stale"`
 	Accounts  []quotaAccount `json:"accounts"`
@@ -141,6 +142,7 @@ func (a *app) fetchQuotaReport() (quotaReport, error) {
 
 	report := quotaReport{
 		FetchedAt: a.now().UTC(),
+		Provider:  "antigravity",
 		Source:    "Antigravity retrieveUserQuotaSummary",
 		Accounts:  make([]quotaAccount, 0, len(authFiles.Files)),
 	}
@@ -261,17 +263,21 @@ func (a *app) retrievePlanAndCredits(port int, authIndex string) (string, *credi
 }
 
 func (a *app) managementAPICall(port int, authIndex, endpoint, data string) ([]byte, error) {
+	return a.managementAPICallRequest(port, authIndex, http.MethodPost, endpoint, data, map[string]string{
+		"Authorization": "Bearer $TOKEN$",
+		"Accept":        "*/*",
+		"Content-Type":  "application/json",
+		"User-Agent":    antigravityQuotaUserAgent,
+	})
+}
+
+func (a *app) managementAPICallRequest(port int, authIndex, method, endpoint, data string, headers map[string]string) ([]byte, error) {
 	payload := map[string]any{
 		"auth_index": authIndex,
-		"method":     http.MethodPost,
+		"method":     method,
 		"url":        endpoint,
-		"header": map[string]string{
-			"Authorization": "Bearer $TOKEN$",
-			"Accept":        "*/*",
-			"Content-Type":  "application/json",
-			"User-Agent":    antigravityQuotaUserAgent,
-		},
-		"data": data,
+		"header":     headers,
+		"data":       data,
 	}
 	var result managementAPICallResponse
 	if err := a.managementJSON(port, http.MethodPost, "/v0/management/api-call", payload, &result); err != nil {

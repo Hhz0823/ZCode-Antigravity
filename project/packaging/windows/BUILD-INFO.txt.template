@@ -1,20 +1,20 @@
 ZCode Antigravity Bridge build information
 ===========================================
 
-Package: ZCode-Antigravity-Windows-x64-0.2.9-test
+Package: ZCode-Antigravity-Windows-x64-0.3.0-test
 Build date (UTC): 2026-08-17
 Target: Windows x64 (PE32+ console manager and GUI control center)
 
 Manager
 -------
-Version: 0.2.9-test
+Version: 0.3.0-test
 Go: 1.26.4
 CGO: disabled
 SHA-256: __MANAGER_SHA256__
 
 Control center
 --------------
-Version: 0.2.9-test
+Version: 0.3.0-test
 Subsystem: Windows GUI (no console window)
 Quota view: protected loopback management route, redacted local cache, animated wave meters
 Theme: blue-white telemetry console with reduced-motion accessibility fallback
@@ -24,7 +24,7 @@ Backend
 -------
 Upstream: router-for-me/CLIProxyAPI v7.2.132
 Upstream commit: 78f0c4079e3e6273d65d03b5549cffc898703264
-Local build version: 7.2.132-zcode.11
+Local build version: 7.2.132-zcode.12
 Go: 1.26.4
 CGO: disabled (dynamic plugins unavailable and disabled)
 SHA-256: __BACKEND_SHA256__
@@ -47,10 +47,13 @@ Local backend patches
 14. Encode the native installer's embedded Chinese PowerShell script with a UTF-8 BOM at build time and runtime for Windows PowerShell 5.1.
 15. Start PowerShell, tasklist, netstat, taskkill, OAuth, browser, and ZCode child processes without console windows from GUI mode.
 16. Use native Windows/macOS font stacks, 4x-DPR Canvas rendering, responsive breakpoints, and decoration-only motion in the control center.
+17. Add a persistent native Windows taskbar/macOS menu-bar quota widget with provider switching and click-to-open behavior.
+18. Add official xAI device OAuth, Grok text-model selection, Grok Build billing display, and encrypted-token-safe management proxying.
+19. Generate copyable Grok Build, Codex, Claude Code, OpenCode, and generic Agent connector configurations.
 
 Verification evidence
 ---------------------
-Current v0.2.9-test build-host checks:
+Current v0.3.0-test build-host checks:
 - Manager go test ./... and Windows x64 build: passed
 - Manager go test -race: not run (GCC unavailable on build host)
 - CLIProxyAPI go mod verify, go test ./..., and Windows x64 build: passed
@@ -58,8 +61,10 @@ Current v0.2.9-test build-host checks:
 - Correct UTF-8 parse, BOM writer unit tests, and generated EXE single-BOM byte check: passed
 - EXE/BAT/ZIP payload integrity, three executable hashes, PE32+ x64, and GUI subsystem checks: passed
 - Windows child-process CREATE_NO_WINDOW test and Windows x64 test-binary cross-compile: passed
-- Playwright 1920x1080, 1366x768, 1024x768, and 520x900 layout/overflow checks: passed
-- v0.2.9-test target Windows 10/11 double-click and mixed-DPI regression: pending after distribution
+- Provider/model selection, Grok billing proxy, tray icon, and five Agent connector tests: passed
+- Playwright desktop and 420px layout/provider-switch/full-page checks: passed
+- Native macOS menu-bar launch, persistence, process exit, and port release: passed
+- v0.3.0-test target Windows 10/11 double-click and mixed-DPI regression: pending after distribution
 
 Historical v0.2.6-test Windows/runtime checks retained as the regression baseline:
 - Local end-to-end smoke with fake non-network credentials: passed

@@ -12,5 +12,11 @@ The packaged backend includes local compatibility, loopback, model-routing,
 macOS Keychain credential-protection, and ZCode integration changes. See the
 repository source tree and project/docs/CLIProxyAPI-v7.2.132-zcode.patch.
 
-ZCode, Google, Gemini, Antigravity, macOS, and Apple are names or marks of their
+System tray
+-----------
+The menu-bar widget uses github.com/gogpu/systray v0.2.8 and
+github.com/go-webgpu/goffi v0.6.3. Required license texts are shipped in
+LICENSE-TRAY-DEPENDENCIES.txt.
+
+ZCode, Google, Gemini, Antigravity, Grok, xAI, macOS, and Apple are names or marks of their
 respective owners. This project is unofficial and is not endorsed by them.

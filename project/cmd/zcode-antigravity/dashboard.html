@@ -70,6 +70,12 @@
     .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 30px; animation: fadeReveal .5s .06s var(--ease) backwards; }
     h1 { margin: 0; font-family: var(--display-font); font-size: clamp(30px, calc(24px + 1.4vw), 44px); line-height: 1.12; letter-spacing: 0; font-weight: 700; }
     .subtitle { margin: 9px 0 0; color: var(--muted); font-size: 14px; }
+    .provider-switch { display: inline-flex; margin-top: 16px; padding: 3px; border: 1px solid var(--line-strong); background: #edf3fb; box-shadow: inset 0 1px 2px rgba(24,62,115,.05); }
+    .provider-tab { position: relative; min-width: 130px; border: 0; background: transparent; color: #58708f; padding: 9px 14px; cursor: pointer; font: 600 12px var(--ui-font); transition: color .2s ease, background .2s ease, box-shadow .2s ease, transform .2s var(--ease); }
+    .provider-tab:hover { color: var(--accent); }
+    .provider-tab.active { background: #fff; color: var(--accent-deep); box-shadow: 0 5px 14px rgba(29,75,142,.12); transform: translateY(-1px); }
+    .provider-count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 6px; border-radius: 9px; background: #dce9fa; color: #42618a; font-size: 10px; }
+    .provider-tab.active .provider-count { background: #dceaff; color: #0759d7; }
     .refresh { position: relative; isolation: isolate; overflow: hidden; display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line-strong); background: #fff; color: var(--ink); padding: 10px 14px; cursor: pointer; box-shadow: 0 6px 18px rgba(29,75,142,.06); transition: border-color .18s ease, color .18s ease, box-shadow .18s ease, background .18s ease; }
     .refresh::before { content: ""; position: absolute; z-index: -1; inset: 0; background: linear-gradient(110deg, transparent 25%, rgba(91,164,255,.18) 50%, transparent 75%); transform: translateX(-120%); }
     .refresh:hover { border-color: var(--accent); color: var(--accent); background: #f8fbff; box-shadow: 0 10px 25px rgba(11,99,246,.12); }
@@ -145,6 +151,20 @@
     .models { margin: 0 20px 22px; border-top: 1px solid var(--line); padding-top: 17px; }
     .models-title { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
     .model-pill { display: inline-block; margin: 9px 6px 0 0; padding: 5px 8px; background: #edf4ff; color: #315a91; border: 1px solid #dbe9fc; font: 11px var(--mono-font); animation: fadeReveal .34s var(--ease) backwards; }
+    .connectors { margin-top: 22px; }
+    .connector-intro { padding: 0 24px 18px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    .connector-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0 24px 24px; }
+    .connector-card { min-width: 0; border: 1px solid var(--line); background: #f8faff; padding: 16px; transition: transform .2s var(--ease), border-color .2s ease, box-shadow .2s ease; }
+    .connector-card:hover { transform: translateY(-2px); border-color: #abcaf4; box-shadow: 0 14px 30px rgba(29,75,142,.10); }
+    .connector-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+    .connector-head strong { font-size: 14px; }
+    .connector-head span { color: var(--muted); font: 10px var(--mono-font); }
+    .connector-card p { min-height: 36px; margin: 6px 0 12px; color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .snippet { position: relative; margin-top: 8px; }
+    .snippet-label { margin-bottom: 5px; color: #52729b; font-size: 10px; }
+    .snippet pre { margin: 0; max-height: 150px; overflow: auto; border: 1px solid #d8e4f3; background: #071a37; color: #d7e8ff; padding: 12px 70px 12px 12px; font: 10px/1.55 var(--mono-font); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .copy-btn { position: absolute; right: 7px; top: 26px; border: 1px solid #365987; background: #112e57; color: #cfe3ff; padding: 5px 8px; cursor: pointer; font: 10px var(--ui-font); transition: background .18s ease, border-color .18s ease; }
+    .copy-btn:hover { background: #174278; border-color: #64a9ff; }
     .credit { margin: 0 24px 24px; padding: 13px 15px; border-left: 3px solid #4c92ed; background: #eef5ff; display: flex; justify-content: space-between; align-items: center; gap: 12px; animation: fadeReveal .44s .06s var(--ease) backwards; }
     .credit span { color: #48688f; font-size: 11px; }
     .credit strong { display: block; margin-top: 3px; font-size: 15px; }
@@ -158,6 +178,7 @@
     }
     @media (max-width: 1100px) and (min-width: 981px) {
       .grid { grid-template-columns: 1fr; }
+      .connector-grid { grid-template-columns: 1fr; }
       .side-panel { width: 100%; }
       .actions { grid-template-columns: 1fr 1fr; }
       .action.primary { grid-column: 1 / -1; }
@@ -176,12 +197,16 @@
       .status-cell:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
       .panel-head, .wave-list { padding-left: 16px; padding-right: 16px; }
       .plan-row, .credit { margin-left: 16px; margin-right: 16px; }
+      .connector-grid { grid-template-columns: 1fr; padding-left: 16px; padding-right: 16px; }
+      .connector-intro { padding-left: 16px; padding-right: 16px; }
     }
     @media (max-width: 520px) {
       html { font-size: 15px; }
       .sidebar { min-height: 68px; padding: 13px 16px; }
       .brand-mark { width: 36px; height: 36px; }
       .topbar { align-items: stretch; flex-direction: column; gap: 16px; }
+      .provider-switch { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+      .provider-tab { min-width: 0; }
       .refresh { justify-content: center; width: 100%; }
       .status-strip { grid-template-columns: 1fr; }
       .status-cell { border-right: 0; border-bottom: 1px solid var(--line); }
@@ -240,7 +265,7 @@
     </aside>
     <main class="main">
       <header class="topbar">
-        <div><h1>模型与额度</h1><p class="subtitle">直接接入 ZCode，并查看 Antigravity 返回的真实模型余量。</p></div>
+        <div><h1>模型与额度</h1><p class="subtitle" id="pageSubtitle">选择账号提供商，查看真实余量并连接本机 Agent。</p><div class="provider-switch" role="tablist" aria-label="账号提供商"><button class="provider-tab active" data-provider="antigravity" role="tab">Antigravity <span class="provider-count" id="antigravityCount">0</span></button><button class="provider-tab" data-provider="xai" role="tab">Grok / xAI <span class="provider-count" id="xaiCount">0</span></button></div></div>
         <button class="refresh" id="refreshBtn"><span class="refresh-icon" aria-hidden="true">↻</span><span id="refreshLabel">刷新数据</span></button>
       </header>
 
@@ -254,7 +279,7 @@
       <div class="grid">
         <section class="panel">
           <div class="panel-head">
-            <div><div class="eyebrow">Antigravity Usage</div><h2>Gemini 模型额度</h2><div class="meta" id="quotaMeta">等待首次刷新</div></div>
+            <div><div class="eyebrow" id="quotaEyebrow">Antigravity Usage</div><h2 id="quotaTitle">Gemini 模型额度</h2><div class="meta" id="quotaMeta">等待首次刷新</div></div>
             <span class="badge" id="sourceBadge">实时接口</span>
           </div>
           <div id="quotaContent"><div class="empty">启动网关后即可读取每周与 5 小时剩余额度。</div></div>
@@ -264,15 +289,22 @@
           <div class="panel-head"><div><div class="eyebrow">Local Actions</div><h2>接入控制</h2><div class="meta">所有操作均在本机完成</div></div></div>
           <div class="operation" id="operation" role="status" aria-live="polite" hidden></div>
           <div class="actions">
-            <button class="action primary" data-action="setup"><strong>一键接入 ZCode</strong><span>登录、启动网关、只注入 3.7 / 3.6 Flash</span></button>
-            <button class="action" data-action="login"><strong>登录 / 添加账号</strong><span>通过浏览器完成 Google OAuth</span></button>
+            <button class="action primary" data-action="setup"><strong>一键接入 ZCode</strong><span>启动网关并同步已登录提供商</span></button>
+            <button class="action" data-action="login"><strong>登录 Antigravity</strong><span>通过浏览器完成 Google OAuth</span></button>
+            <button class="action" data-action="login-grok"><strong>登录 Grok / xAI</strong><span>通过官方 xAI 设备授权接入</span></button>
             <button class="action" data-action="sync"><strong>修复并重新同步</strong><span>重新校验网关与 ZCode Provider</span></button>
             <button class="action" data-action="open-zcode"><strong>打开 ZCode</strong><span>接入完成后直接开始使用</span></button>
             <button class="action" data-action="stop"><strong>停止本地网关</strong><span>不会删除账号和 ZCode 聊天</span></button>
           </div>
-          <div class="models"><div class="models-title">ZCode 允许模型</div><div id="models"><span class="model-pill">gemini-3.7-flash</span><span class="model-pill">gemini-3.6-flash</span></div></div>
+          <div class="models"><div class="models-title" id="modelsTitle">当前提供商模型</div><div id="models"><span class="model-pill">等待网关同步</span></div></div>
         </aside>
       </div>
+
+      <section class="panel connectors" id="connectorsPanel">
+        <div class="panel-head"><div><div class="eyebrow">Agent Connectors</div><h2>接入更多 Agent 程序</h2><div class="meta" id="connectorsMeta">启动网关后生成当前提供商的本地配置</div></div><span class="badge" id="connectorModel">等待模型</span></div>
+        <div class="connector-intro">支持 Grok Build、Codex、Claude Code、OpenCode 以及通用 OpenAI / Anthropic 客户端。配置中包含当前用户的本机密钥，请勿发给他人。</div>
+        <div class="connector-grid" id="connectorGrid"><div class="empty">尚未生成 Agent 接入配置。</div></div>
+      </section>
     </main>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -291,7 +323,7 @@
       if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
       return body;
     };
-    const state = {status: null, quota: null, quotaLoading: false, waveFrames: new Map(), operationWasRunning: false};
+    const state = {status: null, quota: null, provider: 'antigravity', quotaLoading: false, waveFrames: new Map(), operationWasRunning: false};
     const $ = id => document.getElementById(id);
     const setLamp = (id, ok) => $(id).classList.toggle('ok', !!ok);
     const setStatusItem = (prefix, item) => {
@@ -304,15 +336,27 @@
     const toast = (message, bad = false) => { const el = $('toast'); el.textContent = message; el.className = 'toast show' + (bad ? ' bad' : ''); clearTimeout(toast.timer); toast.timer = setTimeout(() => el.className = 'toast', 4200); };
     const escapeHTML = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
 
+    function applyProviderUI() {
+      const grok = state.provider === 'xai';
+      document.querySelectorAll('[data-provider]').forEach(tab => { const active = tab.dataset.provider === state.provider; tab.classList.toggle('active', active); tab.setAttribute('aria-selected', String(active)); });
+      $('quotaEyebrow').textContent = grok ? 'xAI Grok Build Usage' : 'Antigravity Usage';
+      $('quotaTitle').textContent = grok ? 'Grok 共享额度' : 'Gemini 模型额度';
+      $('modelsTitle').textContent = grok ? 'Grok 文本模型' : 'Antigravity Gemini 模型';
+      $('pageSubtitle').textContent = grok ? '当前查看 Grok / xAI 账号、共享额度与 Agent 接入。' : '当前查看 Antigravity 账号、模型余量与 Agent 接入。';
+    }
+
     async function refreshStatus() {
       try {
         state.status = await api('/api/status');
+        state.provider = state.status.selectedProvider || state.provider; applyProviderUI();
+        $('antigravityCount').textContent = state.status.providerAccounts?.antigravity ?? 0;
+        $('xaiCount').textContent = state.status.providerAccounts?.xai ?? 0;
         setStatusItem('tun', state.status.tun); setStatusItem('proxy', state.status.proxy); setStatusItem('gateway', state.status.gateway); setStatusItem('zcode', state.status.zcode);
         const op = state.status.operation || {}; const box = $('operation');
         if (op.running || op.message || op.error) { box.hidden = false; box.classList.toggle('error', !!op.error); box.classList.toggle('complete', !op.running && !op.error && !!op.completedAt); box.textContent = op.error || op.message; } else { box.hidden = true; box.classList.remove('error', 'complete'); }
         document.querySelectorAll('[data-action]').forEach(b => b.disabled = !!op.running);
         if (Array.isArray(state.status.models) && state.status.models.length) $('models').innerHTML = state.status.models.map(m => `<span class="model-pill">${escapeHTML(m)}</span>`).join('');
-        if (state.operationWasRunning && !op.running && !op.error) refreshQuota();
+        if (state.operationWasRunning && !op.running && !op.error) { refreshQuota(); refreshConnectors(); }
         state.operationWasRunning = !!op.running;
         if (op.running) setTimeout(refreshStatus, 1200);
       } catch (error) { toast('状态刷新失败：' + error.message, true); }
@@ -329,15 +373,15 @@
     }
     const bucketRank = b => /周|week/i.test(b.name) ? 0 : /5|五|hour/i.test(b.name) ? 1 : 2;
     function renderQuota(report) {
-      state.quota = report; const account = report.accounts?.[0];
+      state.quota = report; const account = report.accounts?.[0]; const grok = (report.provider || state.provider) === 'xai';
       $('quotaMeta').textContent = report.fetchedAt ? `更新于 ${new Date(report.fetchedAt).toLocaleString('zh-CN')} · ${account?.account || '账号未知'}` : '更新时间未知';
       const badge = $('sourceBadge'); badge.textContent = report.stale ? '缓存数据' : '实时接口'; badge.classList.toggle('stale', !!report.stale);
-      if (!account) { $('quotaContent').innerHTML = '<div class="empty">Antigravity 没有返回可显示的账号额度。</div>'; return; }
+      if (!account) { $('quotaContent').innerHTML = `<div class="empty">${grok ? 'xAI' : 'Antigravity'} 没有返回可显示的账号额度。</div>`; return; }
       const groups = account.groups || [];
-      const gemini = groups.find(g => /gemini/i.test(g.name)) || groups[0];
+      const gemini = groups.find(g => grok ? /grok|xai/i.test(g.name) : /gemini/i.test(g.name)) || groups[0];
       const buckets = [...(gemini?.buckets || [])].sort((a,b) => bucketRank(a)-bucketRank(b));
-      let html = `<div class="plan-row"><div><span>当前套餐</span><strong>${escapeHTML(account.plan || 'Antigravity 未提供套餐名称')}</strong></div><div class="account">${escapeHTML(account.account)} · ${escapeHTML(account.status || 'ready')}</div></div>`;
-      if (account.credits) html += `<div class="credit"><div><span>${escapeHTML(account.credits.upstreamLabel || 'AI Credits')}</span><strong>${Number(account.credits.amount).toLocaleString()}</strong></div><span>${account.credits.available ? '可用' : '低于最小使用额度'} · 此项不是周额度</span></div>`;
+      let html = `<div class="plan-row"><div><span>当前套餐</span><strong>${escapeHTML(account.plan || (grok ? 'xAI 未提供套餐名称' : 'Antigravity 未提供套餐名称'))}</strong></div><div class="account">${escapeHTML(account.account)} · ${escapeHTML(account.status || 'ready')}</div></div>`;
+      if (account.credits) html += `<div class="credit"><div><span>${escapeHTML(account.credits.upstreamLabel || 'AI Credits')}</span><strong>${Number(account.credits.amount).toLocaleString()}</strong></div><span>${escapeHTML(account.statusMessage || (account.credits.available ? '可用' : '当前不可用'))}</span></div>`;
       if (!buckets.length) html += `<div class="empty">${escapeHTML(account.error || '上游暂未提供每周 / 5 小时额度。')}</div>`;
       else html += `<div class="wave-list">${buckets.map((bucket, index) => {
         const known = typeof bucket.remainingPercent === 'number'; const pct = known ? Math.max(0, Math.min(100, bucket.remainingPercent)) : null;
@@ -393,19 +437,46 @@
 
     async function refreshQuota() {
       if (state.quotaLoading) return; state.quotaLoading = true; $('refreshBtn').disabled = true; $('refreshBtn').classList.add('loading'); $('refreshLabel').textContent = '正在读取…';
-      try { renderQuota(await api('/api/quota')); } catch (error) { $('quotaContent').innerHTML = `<div class="empty">${escapeHTML(error.message)}</div>`; toast('额度刷新失败：' + error.message, true); }
+      try { renderQuota(await api('/api/quota?provider=' + encodeURIComponent(state.provider))); } catch (error) { $('quotaContent').innerHTML = `<div class="empty">${escapeHTML(error.message)}</div>`; toast('额度刷新失败：' + error.message, true); }
       finally { state.quotaLoading = false; $('refreshBtn').disabled = false; $('refreshBtn').classList.remove('loading'); $('refreshLabel').textContent = '刷新数据'; }
     }
     async function runAction(action) {
       try { await api('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})}); toast(action==='open-zcode'?'ZCode 已打开':'操作已经开始'); await refreshStatus(); }
       catch(error){ toast('操作失败：'+error.message,true); }
     }
+    async function selectProvider(provider) {
+      if (provider === state.provider) return;
+      try {
+        const result = await api('/api/provider',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider})});
+        state.provider = result.provider; applyProviderUI();
+        $('quotaContent').innerHTML = '<div class="empty">正在切换账号提供商…</div>';
+        $('connectorGrid').innerHTML = '<div class="empty">正在生成对应 Agent 配置…</div>';
+        await Promise.all([refreshStatus(), refreshQuota(), refreshConnectors()]);
+      } catch (error) { toast('切换失败：' + error.message, true); }
+    }
+    function renderConnectors(response) {
+      $('connectorModel').textContent = response.model || '无可用模型';
+      $('connectorsMeta').textContent = `${response.provider === 'xai' ? 'Grok / xAI' : 'Antigravity'} · ${response.baseURL}`;
+      const connectors = response.connectors || [];
+      if (!connectors.length) { $('connectorGrid').innerHTML = '<div class="empty">没有可生成的 Agent 配置。</div>'; return; }
+      $('connectorGrid').innerHTML = connectors.map(connector => `<article class="connector-card"><div class="connector-head"><strong>${escapeHTML(connector.name)}</strong><span>${escapeHTML(connector.model)}</span></div><p>${escapeHTML(connector.description)}</p>${Object.entries(connector.snippets || {}).map(([label,value], index) => `<div class="snippet"><div class="snippet-label">${escapeHTML(label)}</div><pre>${escapeHTML(value)}</pre><button class="copy-btn" data-copy-card="${escapeHTML(connector.id)}" data-copy-index="${index}">复制</button></div>`).join('')}</article>`).join('');
+      document.querySelectorAll('[data-copy-card]').forEach(button => button.addEventListener('click', async () => {
+        const connector = connectors.find(item => item.id === button.dataset.copyCard); const value = Object.values(connector?.snippets || {})[Number(button.dataset.copyIndex)];
+        try { await navigator.clipboard.writeText(value || ''); button.textContent = '已复制'; setTimeout(() => button.textContent = '复制', 1200); }
+        catch { toast('无法写入剪贴板，请手动选择配置文本。', true); }
+      }));
+    }
+    async function refreshConnectors() {
+      try { renderConnectors(await api('/api/connectors')); }
+      catch (error) { $('connectorGrid').innerHTML = `<div class="empty">${escapeHTML(error.message)}</div>`; $('connectorModel').textContent = '等待网关'; }
+    }
     document.querySelectorAll('[data-action]').forEach(button => button.addEventListener('click', () => {
       button.classList.remove('pressed'); void button.offsetWidth; button.classList.add('pressed');
       setTimeout(() => button.classList.remove('pressed'), 720);
       runAction(button.dataset.action);
     }));
-    $('refreshBtn').addEventListener('click', async () => { await refreshStatus(); await refreshQuota(); });
+    document.querySelectorAll('[data-provider]').forEach(tab => tab.addEventListener('click', () => selectProvider(tab.dataset.provider)));
+    $('refreshBtn').addEventListener('click', async () => { await refreshStatus(); await refreshQuota(); await refreshConnectors(); });
     let resizeTimer;
     addEventListener('resize', () => {
       document.documentElement.style.setProperty('--device-scale', String(Math.min(Math.max(devicePixelRatio || 1, 1), 4)));
@@ -419,7 +490,7 @@
       await refreshStatus();
       const params = new URLSearchParams(location.search);
       if (params.get('auto') === '1') runAction('setup');
-      else refreshQuota();
+      else { refreshQuota(); refreshConnectors(); }
     })();
   </script>
 </body>

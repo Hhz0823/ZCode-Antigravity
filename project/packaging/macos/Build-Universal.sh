@@ -5,9 +5,9 @@ script_dir=${0:A:h}
 project_dir=${script_dir:h:h}
 repo_root=${project_dir:h}
 backend_dir="$repo_root/third_party/CLIProxyAPI-7.2.132-patched"
-release_version=${VERSION:-0.2.9-test}
-short_version=${SHORT_VERSION:-0.2.9}
-bundle_version=${BUNDLE_VERSION:-29}
+release_version=${VERSION:-0.3.0-test}
+short_version=${SHORT_VERSION:-0.3.0}
+bundle_version=${BUNDLE_VERSION:-30}
 output_dir=${OUTPUT_DIR:-$repo_root/dist/macos}
 package_name="ZCode-Antigravity-macOS-Universal-v${release_version}"
 package_root="$output_dir/$package_name"
@@ -50,7 +50,7 @@ for target_arch in arm64 amd64; do
       -o "$build_root/$target_arch/ZCode-Antigravity" ./cmd/zcode-antigravity
   )
 
-  backend_ldflags="-s -w -X main.Version=7.2.132-zcode.11 -X main.Commit=$commit -X main.BuildDate=$build_date"
+  backend_ldflags="-s -w -X main.Version=7.2.132-zcode.12 -X main.Commit=$commit -X main.BuildDate=$build_date"
   if [[ $embedded_oauth == true ]]; then
     backend_ldflags+=" -X github.com/router-for-me/CLIProxyAPI/v7/internal/auth/antigravitycredentials.embeddedClientID=$ANTIGRAVITY_OAUTH_CLIENT_ID"
     backend_ldflags+=" -X github.com/router-for-me/CLIProxyAPI/v7/internal/auth/antigravitycredentials.embeddedClientSecret=$ANTIGRAVITY_OAUTH_CLIENT_SECRET"
@@ -84,6 +84,7 @@ done
 /bin/cp "$script_dir/README-macOS.txt" "$package_root/README-macOS.txt"
 /bin/cp "$script_dir/THIRD-PARTY-NOTICES.txt" "$package_root/THIRD-PARTY-NOTICES.txt"
 /bin/cp "$repo_root/project/packaging/windows/LICENSE-CLIProxyAPI.txt" "$package_root/LICENSE-CLIProxyAPI.txt"
+/bin/cp "$repo_root/project/packaging/windows/LICENSE-TRAY-DEPENDENCIES.txt" "$package_root/LICENSE-TRAY-DEPENDENCIES.txt"
 
 /usr/bin/codesign --force --sign - "$app_root/Contents/MacOS/backend/cli-proxy-api"
 /usr/bin/codesign --force --sign - "$app_root/Contents/MacOS/ZCode-Antigravity"

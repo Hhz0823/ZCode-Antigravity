@@ -1,21 +1,25 @@
 # ZCode Antigravity Bridge
 
-> 让 ZCode 通过本机 Anthropic-compatible Provider 调用 Antigravity 中的
-> Gemini 3.7 Flash 与 Gemini 3.6 Flash。
+> 在 Windows 与 macOS 上统一接入 Antigravity Gemini 和 xAI Grok，
+> 并把本机安全网关提供给 ZCode、Grok Build、Codex、Claude Code 与 OpenCode。
 
-**当前版本：** macOS / Windows `v0.2.9-test`
+**当前版本：** macOS / Windows `v0.3.0-test`
 **适用系统：** macOS 12+（Apple Silicon / Intel）、Windows 10 / 11 x64
 **项目状态：** 测试版
 
 
 ## 功能特性
 
-- 只向 ZCode 写入 `gemini-3.7-flash` 和 `gemini-3.6-flash`。
+- 可在控制中心切换 **Antigravity** 与 **Grok / xAI**；账号、模型、额度和 Agent 配置跟随切换。
+- Antigravity 精确写入 `gemini-3.7-flash` / `gemini-3.6-flash`；Grok 只同步 xAI 返回的文本模型，自动排除 Imagine 图片和视频模型。
 - 支持 Low / Medium / High 思考等级，并转换为 Gemini `thinkingLevel`。
 - 支持文本、图片、音频和视频输入转换；当前 Gemini 3.7 Flash 声明输出仅为文本。
+- Windows 任务栏与 macOS 菜单栏提供常驻额度小组件；点击打开面板，右键可切换账号、刷新额度或退出。
+- Antigravity 显示每周 / 5 小时余量；Grok 显示官方 Grok Build billing 返回的共享周/月余量、重置时间和 Extra Usage Credits。
+- 内置 Grok Build、OpenAI Codex、Claude Code、OpenCode、通用 OpenAI / Anthropic 客户端配置卡，可一键复制，不会擅自覆盖外部 Agent 配置文件。
 - 提供无终端 Windows GUI 安装器与全链路隐藏子进程，按当前用户安装，无需管理员权限。
 - 提供无终端 macOS Universal `.app`，同一下载包兼容 Apple Silicon 与 Intel；诊断脚本单独放在 `Terminal Tools`。
-- 蓝白控制中心统一显示代理、桥接、ZCode、账号、AI Credits 与额度状态。
+- 蓝白控制中心统一显示代理、桥接、ZCode、双提供商账号、AI Credits 与额度状态。
 - 控制中心使用 Win/mac 原生字体、最高 4× DPR Canvas、宽屏/低分辨率/高缩放响应式布局和可降级动效。
 - 提供 v2rayN TUN / 代理预检、ZCode 配置备份、安全停止与同版本重装保护。
 - 本地密钥随机生成；Windows 使用 DPAPI、macOS 使用登录钥匙串主密钥保护凭据；API 与 OAuth 回调仅监听 loopback。
@@ -26,11 +30,11 @@
 
 | 文件 | 用途 | 建议 |
 | --- | --- | --- |
-| `ZCode-Antigravity-macOS-Universal-v0.2.9-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
-| `ZCode-Antigravity-Setup-v0.2.9-test.exe` | Windows 图形化安装器 | **普通用户首选** |
-| `ZCode-Antigravity-OneClick-v0.2.9-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
-| `ZCode-Antigravity-Windows-x64-0.2.9-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
-| `ZCode-Antigravity-Source-v0.2.9-test.zip` | 当前版本的干净源码快照 | 审计 / 构建 |
+| `ZCode-Antigravity-macOS-Universal-v0.3.0-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
+| `ZCode-Antigravity-Setup-v0.3.0-test.exe` | Windows 图形化安装器 | **普通用户首选** |
+| `ZCode-Antigravity-OneClick-v0.3.0-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
+| `ZCode-Antigravity-Windows-x64-0.3.0-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
+| `ZCode-Antigravity-Source-v0.3.0-test.zip` | 当前版本的干净源码快照 | 审计 / 构建 |
 
 ## macOS 快速安装
 
@@ -38,14 +42,14 @@
 
 - macOS 12 或更新版本，Apple Silicon 与 Intel 均可。
 - 已安装 macOS 版 ZCode，并至少打开过一次。
-- 能正常访问 Google 登录与 Antigravity；可使用系统 TUN，或自行配置可信的本机 HTTP/SOCKS5 代理。
+- 能正常访问 Google / xAI 登录与相应模型服务；可使用系统 TUN，或自行配置可信的本机 HTTP/SOCKS5 代理。
 
 ### 安装步骤
 
 1. 完整解压 macOS Universal ZIP；如需校验，打开 `Terminal Tools` 后双击 `Verify-Package.command`。
 2. 完全退出 ZCode。当前 App 使用临时签名且尚未公证；首次运行请按住 Control 点击 `ZCode Antigravity.app`，选择“打开”。
-3. 双击 `ZCode Antigravity.app`，在无终端控制面板中点击“一键接入 ZCode”，完成 Google OAuth、启动网关并同步 Provider。
-4. 重新打开 ZCode，选择 `Antigravity (Local Bridge)`，发送一条短消息验收。
+3. 双击 `ZCode Antigravity.app`，选择 Antigravity 或 Grok；按需完成 Google OAuth 或 xAI 设备授权，再点击“一键接入 ZCode”。
+4. 重新打开 ZCode，选择 `Antigravity + Grok (Local Bridge)` 下的目标模型，发送一条短消息验收。关闭网页面板后菜单栏额度组件仍会保留。
 
 Mac 运行数据位于 `~/Library/Application Support/ZCodeAntigravity`。Google token 使用
 AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切片已完成交叉编译和
@@ -59,16 +63,16 @@ AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切�
 - 已安装 ZCode 3.7.x，并至少打开过一次。
 - 已启动 v2rayN 并开启 TUN 模式。
 - v2rayN mixed inbound 默认监听 `127.0.0.1:10808`。
-- 可正常打开 Google 登录与 Antigravity 授权页面的浏览器。
+- 可正常打开 Google / xAI 授权页面的浏览器。
 
 ### 安装步骤
 
 1. 从 Windows 系统托盘完全退出 ZCode。仅关闭窗口可能仍会留下 `ZCode.exe` 进程。
 2. 确认 v2rayN 已开启 TUN，且本地代理端口与配置一致。
-3. 下载 `ZCode-Antigravity-Setup-v0.2.9-test.exe`，并先校验 SHA-256。请勿继续使用会在中文 Windows 上触发脚本解析错误的 `v0.2.6-test` EXE。
+3. 下载 `ZCode-Antigravity-Setup-v0.3.0-test.exe`，并先校验 SHA-256。请勿继续使用会在中文 Windows 上触发脚本解析错误的 `v0.2.6-test` EXE。
 4. 双击安装器。程序会校验内嵌 ZIP 和三个 EXE，然后安装到当前用户目录。
-5. 在控制中心中完成 Google OAuth，等待状态检查通过。
-6. 重新打开 ZCode，选择 Provider `Antigravity (Local Bridge)`。
+5. 在控制中心选择 Antigravity 或 Grok，完成对应授权并等待状态检查通过。
+6. 重新打开 ZCode，选择 Provider `Antigravity + Grok (Local Bridge)`；控制中心会作为任务栏额度小组件继续驻留。
 7. 先发送一条短消息进行小规模验收。账号权限和实时额度以第一次真实请求为准。
 
 ## 本地端口与代理
@@ -94,7 +98,7 @@ $env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
 
 ## 已验证范围
 
-Windows 基线与 `v0.2.9-test` 新增的构建主机测试记录包括：
+Windows 基线与 `v0.3.0-test` 新增的构建主机测试记录包括：
 
 - 管理器与 CLIProxyAPI 的 Go 测试、Windows x64 构建和静态检查通过。
 - OAuth PKCE / callback、DPAPI 凭据存储、原子替换和 loopback 约束通过。
@@ -105,28 +109,31 @@ Windows 基线与 `v0.2.9-test` 新增的构建主机测试记录包括：
 - EXE 内嵌 PowerShell 脚本现在由构建器和运行时双重保证 UTF-8 BOM，并加入中文脚本编码回归测试，修复 Windows PowerShell 5.1 的 `ParserError: UnexpectedToken`。
 - 已在构建主机复现中文代码页 936 会产生 `UnexpectedToken`，并确认新 EXE 只内嵌一个 `EF BB BF + param(` 脚本头。
 - Windows 全部 GUI 子进程使用 `CREATE_NO_WINDOW`；Windows x64 测试程序交叉编译通过。
-- 控制面板在 1920×1080、1366×768、1024×768 与 520×900 视口通过 Playwright 截图和横向溢出检查。
-- `v0.2.9-test` 仍需在目标 Windows 10/11 的多 DPI 显示器上完成最终双击回归。
+- 任务栏 / 菜单栏组件使用原生系统 API 的纯 Go 实现；macOS 本机启动、驻留、监听与退出清理通过，Windows x64 交叉编译通过。
+- 双提供商切换、Grok billing 解析、文本模型过滤和五类 Agent 配置均有单元测试。
+- 控制面板在桌面与 420px 窄窗口通过 Playwright 切换、全页截图和横向溢出检查。
+- `v0.3.0-test` 仍需在目标 Windows 10/11 的多 DPI 显示器上完成最终双击回归。
 
-`v0.2.9-test` 的 macOS 验证包括：
+`v0.3.0-test` 的 macOS 验证包括：
 
 - 管理器、Keychain 凭据加密与后端相关测试通过。
 - 管理器和后端均为真正的 `x86_64 + arm64` Universal Mach-O。
 - App 临时签名、包内逐文件哈希、ZIP 完整性和隔离 `doctor` 检查通过。
+- macOS 菜单栏组件本机运行通过；关闭面板不退出组件，退出后进程与端口均被释放。
 - 本机已识别 `/Applications/ZCode.app` 及运行中的 `ZCode` 进程；未修改用户现有配置。
 
 注意：上游模型目录、账号资格、风控和额度都可能随时变化。列表中看到模型并不代表当前账号一定可用。
 
 ## 隐私与安全边界
 
-- Google access / refresh token 和运行状态保存在 `%LOCALAPPDATA%\ZCodeAntigravity`。
-- Antigravity token 字段在 Windows 下使用当前用户 DPAPI 保护。
-- Antigravity token 字段在 macOS 下用登录钥匙串中的随机主密钥进行 AES-256-GCM 加密。
+- Google / xAI access、refresh token 和运行状态保存在当前用户的 ZCodeAntigravity 数据目录。
+- OAuth token 字段在 Windows 下使用当前用户 DPAPI 保护。
+- OAuth token 字段在 macOS 下用登录钥匙串中的随机主密钥进行 AES-256-GCM 加密。
 - ZCode `config.json` 只写入随机本地网关密钥，不写入 Google token。
 - API、OAuth callback 和管理路由只监听 `127.0.0.1`，远程管理与 Web 控制面板默认关闭。
 - 每次修改 ZCode 配置前会创建有上限的备份。
 - 发布包不包含 OAuth token、账号 JSON、本地 API key、运行日志或本机 ZCode 配置。
-- 停止 Bridge 或移除 Provider 不会自动撤销 Google 授权；如需彻底撤销，请在 Google 账号中单独操作。
+- 停止 Bridge 或移除 Provider 不会自动撤销 Google / xAI 授权；如需彻底撤销，请在对应账号中单独操作。
 
 ## 常见问题
 
@@ -153,8 +160,22 @@ macOS 检查系统 TUN，或 `.env` 中的 `HTTP_PROXY` / `HTTPS_PROXY` 是否�
 
 ### 401 或没有模型
 
-Windows 运行 `Login-Antigravity.bat` 和 `Start-ZCode-Antigravity.bat`；
-macOS 运行同名 `.command` 脚本。
+在控制中心确认当前选择了正确的提供商。Antigravity 可运行 `Login-Antigravity`，
+Grok 可运行 `Login-Grok`，然后重新启动并同步网关。
+
+### Grok 额度为什么只有一条周/月额度
+
+xAI 目前把 Build、Chat、Imagine 等产品计入统一共享用量池。面板按官方 Grok Build
+billing 响应显示当前周期，不把本地 token 数估算成账号余量。若上游暂时不返回
+billing 配置，面板会明确显示错误，不会沿用 Antigravity 的百分比。
+
+### 如何接入其他 Agent
+
+先启动网关，在控制中心切换到目标提供商，再展开“接入更多 Agent 程序”。复制对应的
+Grok Build、Codex、Claude Code 或 OpenCode 配置即可。实现依据为
+[Grok Build 自定义模型端点](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-shell/README.md)、
+[Codex 自定义 Provider](https://github.com/openai/codex/blob/main/codex-rs/core/config.schema.json) 与
+[Claude Code LLM Gateway](https://docs.anthropic.com/en/docs/claude-code/llm-gateway)。
 
 ### 403、429 或模型不可用
 
@@ -212,9 +233,10 @@ project/docs/CLIProxyAPI-v7.2.132-zcode.patch
 ## 第三方说明与许可
 
 - 上游项目：[`router-for-me/CLIProxyAPI`](https://github.com/router-for-me/CLIProxyAPI)
+- 任务栏组件：[`gogpu/systray`](https://github.com/gogpu/systray) `v0.2.8`
 - 固定版本：`v7.2.132`
 - 固定提交：`78f0c4079e3e6273d65d03b5549cffc898703264`
-- CLIProxyAPI 上游许可：MIT License
+- CLIProxyAPI 与 systray 上游许可：MIT License；平台依赖许可见发布包第三方说明。
 
 上游 MIT License 仅适用于对应的 CLIProxyAPI 内容。本项目其余代码尚未在本仓库顶层声明独立许可证，
 请勿自动将整个项目视为 MIT 授权。商标和产品名称归各自权利人所有。

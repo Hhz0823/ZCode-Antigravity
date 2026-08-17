@@ -18,8 +18,17 @@ import (
 
 const (
 	providerID   = "zcode-antigravity-local"
-	providerName = "Antigravity (Local Bridge)"
+	providerName = "Antigravity + Grok (Local Bridge)"
 )
+
+type providerAccountCounts struct {
+	Antigravity int `json:"antigravity"`
+	XAI         int `json:"xai"`
+}
+
+func (c providerAccountCounts) total() int {
+	return c.Antigravity + c.XAI
+}
 
 type settings struct {
 	PreferredPort         int    `json:"preferredPort"`
@@ -374,45 +383,64 @@ func (a *app) setup() error {
 }
 
 func countAntigravityAccounts(dir string) (int, error) {
+	counts, err := countProviderAccounts(dir)
+	return counts.Antigravity, err
+}
+
+func countProviderAccounts(dir string) (providerAccountCounts, error) {
 	entries, err := os.ReadDir(dir)
 	if errors.Is(err, fs.ErrNotExist) {
-		return 0, nil
+		return providerAccountCounts{}, nil
 	}
 	if err != nil {
-		return 0, err
+		return providerAccountCounts{}, err
 	}
-	count := 0
+	var counts providerAccountCounts
 	for _, entry := range entries {
 		name := strings.ToLower(entry.Name())
-		if entry.IsDir() || !strings.HasPrefix(name, "antigravity-") || !strings.HasSuffix(name, ".json") {
+		provider := ""
+		switch {
+		case strings.HasPrefix(name, "antigravity-"):
+			provider = "antigravity"
+		case strings.HasPrefix(name, "xai-"):
+			provider = "xai"
+		}
+		if entry.IsDir() || provider == "" || !strings.HasSuffix(name, ".json") {
 			continue
 		}
 		path := filepath.Join(dir, entry.Name())
 		info, errInfo := entry.Info()
 		if errInfo != nil {
-			return 0, fmt.Errorf("检查账号文件 %s: %w", path, errInfo)
+			return providerAccountCounts{}, fmt.Errorf("检查账号文件 %s: %w", path, errInfo)
 		}
 		if info.Size() <= 0 || info.Size() > 4<<20 {
-			return 0, fmt.Errorf("账号文件大小异常: %s", path)
+			return providerAccountCounts{}, fmt.Errorf("账号文件大小异常: %s", path)
 		}
 		raw, errRead := os.ReadFile(path)
 		if errRead != nil {
-			return 0, fmt.Errorf("读取账号文件 %s: %w", path, errRead)
+			return providerAccountCounts{}, fmt.Errorf("读取账号文件 %s: %w", path, errRead)
 		}
 		var metadata map[string]any
 		if errJSON := json.Unmarshal(raw, &metadata); errJSON != nil {
-			return 0, fmt.Errorf("账号文件不是有效 JSON %s: %w", path, errJSON)
+			return providerAccountCounts{}, fmt.Errorf("账号文件不是有效 JSON %s: %w", path, errJSON)
 		}
 		authType, _ := metadata["type"].(string)
 		accessToken, _ := metadata["access_token"].(string)
 		refreshToken, _ := metadata["refresh_token"].(string)
 		projectID, _ := metadata["project_id"].(string)
-		if !strings.EqualFold(strings.TrimSpace(authType), "antigravity") || strings.TrimSpace(accessToken) == "" || strings.TrimSpace(refreshToken) == "" || strings.TrimSpace(projectID) == "" {
-			return 0, fmt.Errorf("账号文件缺少 Antigravity 类型、令牌或项目字段: %s", path)
+		if !strings.EqualFold(strings.TrimSpace(authType), provider) || strings.TrimSpace(accessToken) == "" || strings.TrimSpace(refreshToken) == "" {
+			return providerAccountCounts{}, fmt.Errorf("账号文件缺少 %s 类型或令牌字段: %s", provider, path)
 		}
-		count++
+		if provider == "antigravity" && strings.TrimSpace(projectID) == "" {
+			return providerAccountCounts{}, fmt.Errorf("账号文件缺少 Antigravity 项目字段: %s", path)
+		}
+		if provider == "antigravity" {
+			counts.Antigravity++
+		} else {
+			counts.XAI++
+		}
 	}
-	return count, nil
+	return counts, nil
 }
 
 func modelIDs(models []modelInfo) []string {

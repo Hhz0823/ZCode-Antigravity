@@ -1,14 +1,14 @@
 ZCode Antigravity Bridge - macOS Universal test build
 ====================================================
 
-版本：0.2.9-test
+版本：0.3.0-test
 架构：Apple Silicon (arm64) + Intel (x86_64)
 最低系统：macOS 12
 
 用途
 ----
-本程序让 macOS 版 ZCode 通过只监听本机的 Anthropic-compatible Provider
-调用 Antigravity 中的 Gemini 3.7 Flash 与 Gemini 3.6 Flash。
+本程序让 macOS 版 ZCode 和其他 Agent 通过只监听本机的兼容 Provider
+调用 Antigravity Gemini 与 xAI Grok 文本模型，并在菜单栏显示所选账号额度。
 
 这是非官方测试版，会使用未公开的 Antigravity 接口。Google 可能限流、暂停
 API 权限或封禁账号。请只使用专门的测试账号，不要使用主 Gmail、Workspace
@@ -21,9 +21,10 @@ API 权限或封禁账号。请只使用专门的测试账号，不要使用主 
 3. 完全退出 ZCode；仅关闭窗口不一定会退出应用。
 4. 首次打开时，按住 Control 点击“ZCode Antigravity.app”，选择“打开”。
    当前 App 使用临时签名，没有 Apple Developer ID，也没有公证。
-5. 双击“ZCode Antigravity.app”，在无终端控制面板中点击“一键接入 ZCode”。
-6. 浏览器完成 Google OAuth；成功后重新打开 ZCode。
-7. 在 ZCode 中选择 Antigravity (Local Bridge)，先发送一条短消息验收。
+5. 双击“ZCode Antigravity.app”，在控制面板选择 Antigravity 或 Grok / xAI。
+6. 按需完成 Google OAuth 或 xAI 设备授权，再点击“一键接入 ZCode”。
+7. 在 ZCode 中选择 Antigravity + Grok (Local Bridge) 下的目标模型，先发送一条短消息验收。
+8. 关闭网页面板后菜单栏额度组件继续运行；点击图标可重开面板，菜单中可切换账号或退出。
 
 普通使用只需打开 App，不会弹出 Terminal。“Terminal Tools”中的 .command 是
 维护和诊断入口，双击它们时 macOS 会按设计显示终端窗口。如果已把 App 拖入
@@ -47,7 +48,7 @@ proxyURL。支持 http、https 和 socks5，且应只指向可信的本机代理
 - ZCode 配置：~/.zcode/v2/config.json，或 setting.json 指向的数据目录
 - 修改 ZCode 配置前会建立有上限的备份。
 - 本地 API key 为随机值；API、OAuth callback 和控制中心只监听 127.0.0.1。
-- Google access/refresh token 用随机 AES-256-GCM 主密钥加密；主密钥保存在
+- Google / xAI access/refresh token 用随机 AES-256-GCM 主密钥加密；主密钥保存在
   macOS 登录钥匙串，服务名为 io.github.hhz0823.zcode-antigravity。
 - 发布包不包含用户 token、账号 JSON、本地 API key、日志或 ZCode 配置。
 - 停止 Bridge 或删除 Provider 不会撤销 Google 授权。
@@ -65,6 +66,7 @@ proxyURL。支持 http、https 和 socks5，且应只指向可信的本机代理
 
 - Setup-and-Start.command：首次登录、启动并写入 ZCode Provider
 - Login-Antigravity.command：添加或刷新账号
+- Login-Grok.command：添加或刷新 Grok / xAI 账号
 - Start-ZCode-Antigravity.command：启动网关并同步模型
 - Status.command：查看状态
 - Doctor.command：本机静态检查

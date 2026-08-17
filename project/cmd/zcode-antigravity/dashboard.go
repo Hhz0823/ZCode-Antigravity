@@ -30,6 +30,9 @@ type guiRuntime struct {
 	operationMu  sync.Mutex
 	operation    guiOperation
 	quotaMu      sync.Mutex
+	providerMu   sync.RWMutex
+	provider     string
+	trayRefresh  chan struct{}
 	lastActivity atomic.Int64
 	shutdown     func()
 }
@@ -44,15 +47,17 @@ type guiOperation struct {
 }
 
 type dashboardStatus struct {
-	Version   string        `json:"version"`
-	Gateway   dashboardItem `json:"gateway"`
-	Proxy     dashboardItem `json:"proxy"`
-	TUN       dashboardItem `json:"tun"`
-	ZCode     dashboardItem `json:"zcode"`
-	Accounts  int           `json:"accounts"`
-	Models    []string      `json:"models"`
-	Operation guiOperation  `json:"operation"`
-	UpdatedAt time.Time     `json:"updatedAt"`
+	Version          string                `json:"version"`
+	Gateway          dashboardItem         `json:"gateway"`
+	Proxy            dashboardItem         `json:"proxy"`
+	TUN              dashboardItem         `json:"tun"`
+	ZCode            dashboardItem         `json:"zcode"`
+	Accounts         int                   `json:"accounts"`
+	ProviderAccounts providerAccountCounts `json:"providerAccounts"`
+	SelectedProvider string                `json:"selectedProvider"`
+	Models           []string              `json:"models"`
+	Operation        guiOperation          `json:"operation"`
+	UpdatedAt        time.Time             `json:"updatedAt"`
 }
 
 type dashboardItem struct {
@@ -64,6 +69,10 @@ type dashboardItem struct {
 
 type guiActionRequest struct {
 	Action string `json:"action"`
+}
+
+type guiProviderRequest struct {
+	Provider string `json:"provider"`
 }
 
 func (a *app) runGUI(autoSetup bool) error {
@@ -78,15 +87,19 @@ func (a *app) runGUI(autoSetup bool) error {
 	}
 
 	runtime := &guiRuntime{
-		app:       a,
-		token:     base64.RawURLEncoding.EncodeToString(tokenBytes),
-		autoSetup: autoSetup,
+		app:         a,
+		token:       base64.RawURLEncoding.EncodeToString(tokenBytes),
+		autoSetup:   autoSetup,
+		provider:    preferredInitialProvider(a.paths.AuthDir),
+		trayRefresh: make(chan struct{}, 1),
 	}
 	runtime.lastActivity.Store(time.Now().UnixNano())
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", runtime.serveDashboard)
 	mux.HandleFunc("/api/status", runtime.authorized(runtime.serveStatus))
 	mux.HandleFunc("/api/quota", runtime.authorized(runtime.serveQuota))
+	mux.HandleFunc("/api/provider", runtime.authorized(runtime.serveProvider))
+	mux.HandleFunc("/api/connectors", runtime.authorized(runtime.serveConnectors))
 	mux.HandleFunc("/api/action", runtime.authorized(runtime.serveAction))
 	mux.HandleFunc("/api/heartbeat", runtime.authorized(runtime.serveHeartbeat))
 	mux.HandleFunc("/api/close", runtime.authorized(runtime.serveClose))
@@ -111,7 +124,9 @@ func (a *app) runGUI(autoSetup bool) error {
 	go func() {
 		serveErrCh <- server.Serve(listener)
 	}()
-	go runtime.stopWhenInactive(shutdownCh)
+	if !platformTraySupported() {
+		go runtime.stopWhenInactive(shutdownCh)
+	}
 
 	address := listener.Addr().(*net.TCPAddr)
 	dashboardURL := fmt.Sprintf("http://127.0.0.1:%d/?session=%s", address.Port, url.QueryEscape(runtime.token))
@@ -121,6 +136,26 @@ func (a *app) runGUI(autoSetup bool) error {
 	if errOpen := launchDashboardWindow(dashboardURL); errOpen != nil {
 		runtime.shutdown()
 		return fmt.Errorf("打开控制中心窗口: %w", errOpen)
+	}
+	if platformTraySupported() {
+		go func() {
+			errServe := <-serveErrCh
+			if errServe != nil && !errors.Is(errServe, http.ErrServerClosed) {
+				runtime.shutdown()
+			}
+		}()
+		errTray := runPlatformTray(shutdownCh, trayHooks{
+			Open:           func() { _ = launchDashboardWindow(dashboardURL) },
+			Refresh:        runtime.traySnapshot,
+			SelectProvider: runtime.setProvider,
+			Updates:        runtime.trayRefresh,
+			Quit:           runtime.shutdown,
+		})
+		runtime.shutdown()
+		if errTray != nil {
+			return fmt.Errorf("任务栏小组件: %w", errTray)
+		}
+		return nil
 	}
 
 	select {
@@ -203,10 +238,15 @@ func (g *guiRuntime) serveStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *guiRuntime) status() dashboardStatus {
-	status := dashboardStatus{Version: version, Models: []string{}, UpdatedAt: time.Now().UTC()}
-	accounts, errAccounts := countAntigravityAccounts(g.app.paths.AuthDir)
+	status := dashboardStatus{Version: version, Models: []string{}, SelectedProvider: g.currentProvider(), UpdatedAt: time.Now().UTC()}
+	accounts, errAccounts := countProviderAccounts(g.app.paths.AuthDir)
 	if errAccounts == nil {
-		status.Accounts = accounts
+		status.ProviderAccounts = accounts
+		if status.SelectedProvider == "xai" {
+			status.Accounts = accounts.XAI
+		} else {
+			status.Accounts = accounts.Antigravity
+		}
 	}
 
 	current, errState := g.app.loadState()
@@ -214,7 +254,9 @@ func (g *guiRuntime) status() dashboardStatus {
 		if errProbe := g.app.probeGateway(current.Port); errProbe == nil {
 			status.Gateway = dashboardItem{OK: true, Label: "网关在线", Detail: g.app.gatewayURL(current.Port), Running: true}
 			if catalog, errModels := g.app.fetchModels(current.Port); errModels == nil {
-				if models, errSelect := selectZCodeModels(catalog); errSelect == nil {
+				includeAntigravity := status.SelectedProvider == "antigravity" && accounts.Antigravity > 0
+				includeXAI := status.SelectedProvider == "xai" && accounts.XAI > 0
+				if models, errSelect := selectAgentModels(catalog, includeAntigravity, includeXAI); errSelect == nil {
 					status.Models = modelIDs(models)
 				}
 			}
@@ -249,7 +291,7 @@ func (g *guiRuntime) status() dashboardStatus {
 	} else if errProvider != nil {
 		status.ZCode = dashboardItem{Label: "ZCode 配置不可读", Detail: errProvider.Error(), Running: g.app.zcodeRunning()}
 	} else {
-		status.ZCode = dashboardItem{Label: "ZCode 尚未接入", Detail: "只会注入 Gemini 3.7 Flash 与 3.6 Flash", Running: g.app.zcodeRunning()}
+		status.ZCode = dashboardItem{Label: "ZCode 尚未接入", Detail: "可选择 Gemini 或 Grok 文本模型", Running: g.app.zcodeRunning()}
 	}
 
 	g.operationMu.Lock()
@@ -283,12 +325,66 @@ func (g *guiRuntime) serveQuota(w http.ResponseWriter, r *http.Request) {
 	}
 	g.quotaMu.Lock()
 	defer g.quotaMu.Unlock()
-	report, errQuota := g.app.fetchQuotaReport()
+	provider := normalizeProvider(r.URL.Query().Get("provider"))
+	if strings.TrimSpace(r.URL.Query().Get("provider")) == "" {
+		provider = g.currentProvider()
+	}
+	report, errQuota := g.app.fetchProviderQuotaReport(provider)
 	if errQuota != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": errQuota.Error()})
 		return
 	}
 	writeJSON(w, http.StatusOK, report)
+}
+
+func preferredInitialProvider(authDir string) string {
+	counts, err := countProviderAccounts(authDir)
+	if err == nil && counts.Antigravity == 0 && counts.XAI > 0 {
+		return "xai"
+	}
+	return "antigravity"
+}
+
+func (g *guiRuntime) currentProvider() string {
+	g.providerMu.RLock()
+	defer g.providerMu.RUnlock()
+	return normalizeProvider(g.provider)
+}
+
+func (g *guiRuntime) setProvider(provider string) {
+	g.providerMu.Lock()
+	g.provider = normalizeProvider(provider)
+	g.providerMu.Unlock()
+	if g.trayRefresh != nil {
+		select {
+		case g.trayRefresh <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func (g *guiRuntime) serveProvider(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		writeJSON(w, http.StatusOK, map[string]string{"provider": g.currentProvider()})
+		return
+	}
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodGet+", "+http.MethodPost)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var request guiProviderRequest
+	if errJSON := json.NewDecoder(io.LimitReader(r.Body, 16<<10)).Decode(&request); errJSON != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
+		return
+	}
+	provider := strings.ToLower(strings.TrimSpace(request.Provider))
+	if provider != "antigravity" && provider != "xai" && provider != "grok" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported provider"})
+		return
+	}
+	g.setProvider(provider)
+	writeJSON(w, http.StatusOK, map[string]string{"provider": g.currentProvider()})
 }
 
 func (g *guiRuntime) serveAction(w http.ResponseWriter, r *http.Request) {
@@ -311,7 +407,7 @@ func (g *guiRuntime) serveAction(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		return
 	}
-	if !map[string]bool{"setup": true, "login": true, "sync": true, "stop": true}[action] {
+	if !map[string]bool{"setup": true, "login": true, "login-grok": true, "sync": true, "stop": true}[action] {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported action"})
 		return
 	}
@@ -347,12 +443,32 @@ func (g *guiRuntime) runOperation(action string) {
 		defer release()
 		switch action {
 		case "setup":
-			errOperation = g.app.setup()
+			if g.currentProvider() == "xai" {
+				counts, errCounts := countProviderAccounts(g.app.paths.AuthDir)
+				if errCounts != nil {
+					errOperation = errCounts
+				} else if counts.XAI == 0 {
+					errOperation = g.app.loginGrok()
+				}
+				if errOperation == nil {
+					errOperation = g.app.startAndConfigure()
+				}
+			} else {
+				errOperation = g.app.setup()
+			}
 			if errOperation == nil {
 				errOperation = openZCodeApplication()
 			}
 		case "login":
 			errOperation = g.app.login()
+			if errOperation == nil {
+				g.setProvider("antigravity")
+			}
+		case "login-grok":
+			errOperation = g.app.loginGrok()
+			if errOperation == nil {
+				g.setProvider("xai")
+			}
 		case "sync":
 			errOperation = g.app.startAndConfigure()
 		case "stop":
@@ -374,11 +490,13 @@ func (g *guiRuntime) runOperation(action string) {
 func operationStartMessage(action string) string {
 	switch action {
 	case "setup":
-		return "正在登录、启动网关并直接接入 ZCode…"
+		return "正在登录所选提供商、启动网关并接入 ZCode…"
 	case "login":
 		return "正在打开 Google OAuth 登录…"
+	case "login-grok":
+		return "正在打开 xAI 设备授权…"
 	case "sync":
-		return "正在同步两个 Gemini 模型…"
+		return "正在同步 Gemini / Grok 模型…"
 	case "stop":
 		return "正在安全停止本地网关…"
 	default:
@@ -392,8 +510,10 @@ func operationSuccessMessage(action string) string {
 		return "ZCode 已接入并启动"
 	case "login":
 		return "Antigravity 登录成功"
+	case "login-grok":
+		return "Grok / xAI 登录成功"
 	case "sync":
-		return "Gemini 3.7 / 3.6 已同步"
+		return "Gemini / Grok 模型已同步"
 	case "stop":
 		return "本地网关已停止"
 	default:
@@ -417,7 +537,24 @@ func (g *guiRuntime) serveClose(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-	go g.shutdown()
+	if !platformTraySupported() {
+		go g.shutdown()
+	}
+}
+
+func (g *guiRuntime) traySnapshot() traySnapshot {
+	provider := g.currentProvider()
+	g.quotaMu.Lock()
+	report, err := g.app.fetchProviderQuotaReport(provider)
+	g.quotaMu.Unlock()
+	if err != nil {
+		name := "Antigravity"
+		if provider == "xai" {
+			name = "Grok"
+		}
+		return traySnapshot{Provider: provider, Summary: name + " 额度暂不可用", Detail: err.Error()}
+	}
+	return traySnapshotFromReport(provider, report)
 }
 
 func (g *guiRuntime) stopWhenInactive(shutdown <-chan struct{}) {

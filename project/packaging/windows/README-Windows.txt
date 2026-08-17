@@ -3,9 +3,9 @@ ZCode Antigravity Bridge - Windows x64 test build
 
 Purpose
 -------
-This package lets ZCode use Gemini 3.7 Flash and Gemini 3.6 Flash through a local
-Antigravity Anthropic-compatible Provider. No other upstream model is written to ZCode.
-It is a local bridge, not an MCP server and not a ZCode skill.
+This package lets ZCode and other local agents use Antigravity Gemini or xAI Grok text
+models through a loopback-only compatible Provider. The control center switches account,
+model, quota, and connector views together. Image/video generation models are not injected.
 
 Important risk
 --------------
@@ -20,18 +20,18 @@ Requirements
 ------------
 - Windows 10 or Windows 11, x64
 - ZCode 3.7.x installed and opened at least once
-- A browser and access to Google login / Antigravity
+- A browser and access to Google or xAI login for the provider you choose
 - No administrator rights, Node.js, Go, Python, Docker, or firewall rule is required
 
 First test
 ----------
 Recommended: fully exit ZCode from the tray, enable v2rayN TUN, and double-click
-ZCode-Antigravity-Setup-v0.2.9-test.exe. This is a native Windows GUI installer: it shows no
+ZCode-Antigravity-Setup-v0.3.0-test.exe. This is a native Windows GUI installer: it shows no
 terminal, verifies the embedded ZIP plus all three executables, installs only for the current
 user, creates Desktop/Start Menu shortcuts, and opens the control center after completion.
 
 For the single-BAT fallback, fully exit ZCode from the tray, enable v2rayN TUN, and double-click
-ZCode-Antigravity-OneClick-v0.2.9-test.bat. It verifies and extracts its embedded package,
+ZCode-Antigravity-OneClick-v0.3.0-test.bat. It verifies and extracts its embedded package,
 then opens the graphical control center without leaving a terminal window. The control center
 opens OAuth when needed, writes the verified ZCode Provider directly, and starts ZCode after
 successful readback.
@@ -42,10 +42,10 @@ For the expanded package:
 3. In the Windows system tray, right-click ZCode and choose Exit. Closing the ZCode window
    normally leaves ZCode.exe running in the tray; the bridge refuses to edit while it runs.
 4. Double-click Setup-and-Start.bat. The graphical control center opens without a terminal window.
-5. Complete Google OAuth in the browser and keep the control center open until it reports success.
+5. Select Antigravity or Grok / xAI and complete the corresponding browser authorization.
 6. The first model-directory load can take up to about 35 seconds on a poor connection.
-7. Reopen ZCode. Select Provider "Antigravity (Local Bridge)". The only choices are
-   gemini-3.7-flash and gemini-3.6-flash.
+7. Reopen ZCode. Select Provider "Antigravity + Grok (Local Bridge)" and choose the desired
+   Gemini or Grok text model. The system-tray quota widget remains available after closing the panel.
 8. Run Test-Gemini-3.7-Flash.bat once. It sends a small real inference request and writes a
    redacted audit result to %LOCALAPPDATA%\ZCodeAntigravity\last-smoke-test.json.
 9. In ZCode, select gemini-3.7-flash and send one small prompt.
@@ -81,9 +81,9 @@ Ports
 
 Files and privacy
 -----------------
-- Google access/refresh tokens, the random local API key, logs, and runtime state are stored in:
+- Google/xAI access/refresh tokens, the random local API key, logs, and runtime state are stored in:
     %LOCALAPPDATA%\ZCodeAntigravity
-- On Windows, Antigravity access/refresh token fields are encrypted with current-user DPAPI.
+- On Windows, OAuth access/refresh token fields are encrypted with current-user DPAPI.
 - They are NOT included in this ZIP and are not written into ZCode credentials.json.
 - ZCode config.json contains only the random local gateway key, not Google tokens.
 - The single BAT embeds program files only; it contains no OAuth token, account JSON, local
@@ -100,9 +100,15 @@ Graphical control center and quota
 ----------------------------------
 - Desktop/Start Menu shortcut: ZCode Antigravity 控制中心
 - The window is a Windows GUI executable and does not create a terminal window.
-- It shows v2rayN TUN, proxy, bridge, ZCode, account, and two-model status in one view.
+- It shows v2rayN TUN, proxy, bridge, ZCode, provider accounts, models, quota, and Agent connectors.
+- Closing the browser panel leaves a native system-tray widget running. Click to reopen; use its
+  menu to switch Antigravity/Grok, refresh quota, or exit the widget.
 - Gemini weekly and five-hour remaining quota use exact percentages, reset times, and animated
   two-layer wave meters. AI credit balance is shown separately so it is not confused with model quota.
+- Grok uses the official Grok Build billing response for shared weekly/monthly usage, reset time,
+  pay-as-you-go limits, and Extra Usage Credits. It never estimates account quota from local tokens.
+- Connector cards generate copyable Grok Build, Codex, Claude Code, OpenCode, and generic client
+  settings. The control center does not overwrite those agents' existing config files.
 - The blue-white telemetry theme adds entrance, status, counter, button, and operation feedback
   animations. Windows/browser reduced-motion preference disables nonessential motion.
 - Quota is read through the already authenticated local bridge. Only a random-key-protected
@@ -116,6 +122,7 @@ Available scripts
 - Run-Menu.bat                  Interactive menu
 - Setup-and-Start.bat           Open the GUI and start first-time setup
 - Login-Antigravity.bat         Add or refresh an Antigravity account
+- Login-Grok.bat                Add or refresh a Grok / xAI account
 - Start-ZCode-Antigravity.bat   Start/reuse the bridge and sync models
 - Sync-ZCode.bat                Refresh the ZCode model list
 - Status.bat                    Health, port, account-file count, and model list
@@ -127,9 +134,9 @@ Available scripts
 
 Installer formats
 -----------------
-- ZCode-Antigravity-Setup-v0.2.9-test.exe: recommended no-terminal current-user installer.
-- ZCode-Antigravity-OneClick-v0.2.9-test.bat: fallback single-file installer.
-- ZCode-Antigravity-Windows-x64-0.2.9-test.zip: manually verifiable expanded package.
+- ZCode-Antigravity-Setup-v0.3.0-test.exe: recommended no-terminal current-user installer.
+- ZCode-Antigravity-OneClick-v0.3.0-test.bat: fallback single-file installer.
+- ZCode-Antigravity-Windows-x64-0.3.0-test.zip: manually verifiable expanded package.
 - The EXE installer is custom-built and unsigned. It does not require administrator rights or
   7-Zip on the target computer; Windows SmartScreen may still require manual confirmation.
 
@@ -159,7 +166,8 @@ Troubleshooting
   so rerunning the same BAT no longer tries to overwrite a running backend.
 - "ParserError: UnexpectedToken" with garbled Chinese text: do not use the 0.2.6-test EXE.
   Version 0.2.8-test writes the embedded script with a UTF-8 BOM for Windows PowerShell 5.1.
-- 401 / no models: run Login-Antigravity.bat, then Start-ZCode-Antigravity.bat.
+- 401 / no models: select the correct provider, run Login-Antigravity.bat or Login-Grok.bat,
+  then run Start-ZCode-Antigravity.bat.
 - 403 / 429 / model unavailable: account entitlement, risk control, or quota is upstream.
 - Missing/404 for gemini-3.7-flash-high: verify Antigravity desktop is 2.8.1 or newer, restart this
   bridge so its client-version refresh runs, then check the live account catalog and entitlement.
@@ -192,16 +200,17 @@ and translated by the bridge to Gemini generationConfig.thinkingConfig.thinkingL
 The client-visible model IDs intentionally omit the redundant -high suffix; the local gateway
 maps them to the exact upstream High catalog entries before inference and maps response IDs back.
 
-ZCode model allowlist
+ZCode model selection
 ---------------------
-Every setup and sync exposes exactly gemini-3.7-flash and gemini-3.6-flash to ZCode. They map to
-the exact upstream gemini-3.7-flash-high and gemini-3.6-flash-high entries. Setup fails clearly if
-either mapped model is absent. Extra Gemini, Claude, GPT, or agent models are not written to ZCode.
+Antigravity exposes exactly gemini-3.7-flash and gemini-3.6-flash, mapped to their exact upstream
+High entries. Grok exposes the text models returned for the logged-in xAI account. Imagine image
+and video models and unrelated providers are excluded. Missing required Gemini or Grok text models
+cause a clear setup error instead of silently substituting another model.
 
 Build versions
 --------------
-- ZCode Antigravity Bridge: 0.2.9-test
+- ZCode Antigravity Bridge: 0.3.0-test
 - CLIProxyAPI base: v7.2.132, commit 78f0c4079e3e6273d65d03b5549cffc898703264
-- Local build: 7.2.132-zcode.11
+- Local build: 7.2.132-zcode.12
 
 Read THIRD-PARTY-NOTICES.txt and LICENSE-CLIProxyAPI.txt for upstream details.

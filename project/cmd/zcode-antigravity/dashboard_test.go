@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -62,6 +64,9 @@ func TestDashboardThemeIncludesCrispResponsiveMotion(t *testing.T) {
 		"drawPath(w, base+5",
 		"Math.min(Math.max(devicePixelRatio || 1, 1), 4)",
 		"prefers-reduced-motion: reduce",
+		"data-provider=\"xai\"",
+		"Agent Connectors",
+		"data-action=\"login-grok\"",
 		"animation: none !important",
 	} {
 		if !strings.Contains(dashboardHTML, expected) {
@@ -76,5 +81,36 @@ func TestDashboardThemeIncludesCrispResponsiveMotion(t *testing.T) {
 		if strings.Contains(dashboardHTML, forbidden) {
 			t.Fatalf("dashboard still contains jagged-text trigger %q", forbidden)
 		}
+	}
+}
+
+func TestTraySnapshotAndIconRepresentSelectedProvider(t *testing.T) {
+	weekly := 72.0
+	fiveHour := 41.0
+	lowerWeekly := 63.0
+	report := quotaReport{
+		Provider: "antigravity",
+		Accounts: []quotaAccount{{
+			Plan: "Pro",
+			Groups: []quotaGroup{{Buckets: []quotaBucket{
+				{Name: "每周剩余额度", RemainingPercent: &weekly},
+				{Name: "5 小时剩余额度", RemainingPercent: &fiveHour},
+			}}},
+		}, {
+			Plan:   "Pro",
+			Groups: []quotaGroup{{Buckets: []quotaBucket{{Name: "每周剩余额度", RemainingPercent: &lowerWeekly}}}},
+		}},
+	}
+	snapshot := traySnapshotFromReport("antigravity", report)
+	if snapshot.Summary != "Antigravity · 周 63% · 5小时 41%" || snapshot.Remaining == nil || *snapshot.Remaining != 41 || !strings.Contains(snapshot.Detail, "2 个账号") {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+	icon := quotaTrayIcon(snapshot.Remaining, "antigravity", false)
+	decoded, err := png.Decode(bytes.NewReader(icon))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Bounds().Dx() != 44 || decoded.Bounds().Dy() != 44 {
+		t.Fatalf("icon bounds = %v", decoded.Bounds())
 	}
 }

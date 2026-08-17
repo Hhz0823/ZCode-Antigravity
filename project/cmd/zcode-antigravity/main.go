@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const version = "0.2.9-test"
+const version = "0.3.0-test"
 
 var defaultCommand = "menu"
 
@@ -69,6 +69,8 @@ func run(args []string) int {
 		commandErr = app.setup()
 	case "login":
 		commandErr = app.login()
+	case "login-grok", "login-xai":
+		commandErr = app.loginGrok()
 	case "start":
 		commandErr = app.startAndConfigure()
 	case "sync", "configure-zcode":
@@ -108,6 +110,7 @@ func printHelp() {
 用法:
   ZCode-Antigravity setup            首次登录、启动并配置 ZCode
   ZCode-Antigravity login            登录/添加 Antigravity 账号
+  ZCode-Antigravity login-grok       登录/添加 Grok / xAI 账号
   ZCode-Antigravity start            启动网关并同步 ZCode Provider
   ZCode-Antigravity sync             重新同步模型列表到 ZCode
   ZCode-Antigravity status           查看端口、账号和模型状态
@@ -135,6 +138,7 @@ func (a *app) menu() error {
 		fmt.Println("6. 从 ZCode 删除本 Provider")
 		fmt.Println("7. 本机检查")
 		fmt.Println("8. 真实测试 Gemini 3.7 Flash")
+		fmt.Println("9. 登录/添加 Grok / xAI 账号")
 		fmt.Println("0. 退出")
 		fmt.Print("请选择: ")
 		line, err := reader.ReadString('\n')
@@ -173,6 +177,10 @@ func (a *app) menu() error {
 		case "8":
 			if err := a.smokeModel("gemini-3.7-flash"); err != nil {
 				fmt.Printf("\n模型测试失败: %v\n", err)
+			}
+		case "9":
+			if err := a.loginGrok(); err != nil {
+				fmt.Printf("\nGrok 登录失败: %v\n", err)
 			}
 		case "0", "q", "quit", "exit":
 			return nil

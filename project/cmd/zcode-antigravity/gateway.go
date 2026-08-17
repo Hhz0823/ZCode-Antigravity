@@ -22,6 +22,8 @@ import (
 type modelInfo struct {
 	ID                        string           `json:"id"`
 	DisplayName               string           `json:"display_name"`
+	OwnedBy                   string           `json:"owned_by"`
+	Type                      string           `json:"type"`
 	MaxInputTokens            int              `json:"max_input_tokens"`
 	MaxTokens                 int              `json:"max_tokens"`
 	Thinking                  *thinkingSupport `json:"thinking"`
@@ -259,12 +261,12 @@ func (a *app) startAndConfigure() (returnErr error) {
 	if _, err := os.Stat(a.paths.Backend); err != nil {
 		return fmt.Errorf("缺少网关程序 %s: %w", a.paths.Backend, err)
 	}
-	accounts, errAccounts := countAntigravityAccounts(a.paths.AuthDir)
+	accounts, errAccounts := countProviderAccounts(a.paths.AuthDir)
 	if errAccounts != nil {
 		return errAccounts
 	}
-	if accounts == 0 {
-		return fmt.Errorf("没有有效 Antigravity 账号；请先运行 login 命令或平台登录脚本")
+	if accounts.total() == 0 {
+		return fmt.Errorf("没有有效账号；请先登录 Antigravity 或 Grok")
 	}
 	startedPID := 0
 	configurationComplete := false
@@ -354,9 +356,12 @@ func (a *app) startAndConfigure() (returnErr error) {
 	if err != nil {
 		return err
 	}
-	models, err := selectZCodeModels(catalog)
-	if err != nil {
-		return err
+	models, warnings := selectAvailableAgentModels(catalog, accounts.Antigravity > 0, accounts.XAI > 0)
+	for _, warning := range warnings {
+		fmt.Printf("模型提供商警告: %v\n", warning)
+	}
+	if len(models) == 0 {
+		return fmt.Errorf("没有可同步的 Gemini / Grok 文本模型: %w", errors.Join(warnings...))
 	}
 	backup, changed, err := a.configureZCode(port, models)
 	if err != nil {
@@ -378,7 +383,7 @@ func (a *app) startAndConfigure() (returnErr error) {
 	}
 	if changed {
 		fmt.Printf("ZCode Provider 已写入并备份原配置: %s\n", backup)
-		fmt.Println("请完全退出并重新打开 ZCode，然后选择 Antigravity (Local Bridge) 模型。")
+		fmt.Printf("请完全退出并重新打开 ZCode，然后选择 %s 模型。\n", providerName)
 	} else {
 		fmt.Println("ZCode Provider 已是最新配置。")
 	}
@@ -475,14 +480,59 @@ func (a *app) login() error {
 	return nil
 }
 
+func (a *app) loginGrok() error {
+	if _, err := os.Stat(a.paths.Backend); err != nil {
+		return fmt.Errorf("缺少网关程序 %s: %w", a.paths.Backend, err)
+	}
+	port := a.settings.PreferredPort
+	if current, err := a.loadState(); err == nil && current.Port >= a.settings.PreferredPort && current.Port <= a.settings.PortScanEnd {
+		port = current.Port
+	}
+	if err := a.writeBackendConfig(port); err != nil {
+		return fmt.Errorf("准备 Grok 登录配置: %w", err)
+	}
+	fmt.Println("浏览器将打开 xAI 设备授权页。完成验证前请不要关闭此窗口。")
+	started := a.now()
+	var captured bytes.Buffer
+	cmd := exec.Command(a.paths.Backend, "-config", a.paths.Config, "-xai-login")
+	cmd.Dir = a.paths.Data
+	prepareChildProcess(cmd)
+	if browserPath := preferredBrowserExecutable(); browserPath != "" {
+		cmd.Env = append(os.Environ(), "CLIPROXY_BROWSER="+browserPath)
+	}
+	if a.guiMode {
+		cmd.Stdout = &captured
+		cmd.Stderr = &captured
+	} else {
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = io.MultiWriter(os.Stdout, &captured)
+		cmd.Stderr = io.MultiWriter(os.Stderr, &captured)
+	}
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("xAI OAuth 登录进程失败: %w", err)
+	}
+	if !strings.Contains(strings.ToLower(captured.String()), "xai authentication successful") {
+		return fmt.Errorf("Grok 登录程序未确认成功，请检查登录页和日志")
+	}
+	if !hasRecentProviderAccount(a.paths.AuthDir, "xai-", started.Add(-2*time.Second)) {
+		return fmt.Errorf("Grok 登录程序报告成功，但未找到新凭据文件")
+	}
+	fmt.Printf("Grok / xAI 登录成功。凭据只保存在当前用户目录: %s\n", a.paths.AuthDir)
+	return nil
+}
+
 func hasRecentAntigravityAccount(dir string, since time.Time) bool {
+	return hasRecentProviderAccount(dir, "antigravity-", since)
+}
+
+func hasRecentProviderAccount(dir, prefix string, since time.Time) bool {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return false
 	}
 	for _, entry := range entries {
 		name := strings.ToLower(entry.Name())
-		if entry.IsDir() || !strings.HasPrefix(name, "antigravity-") || !strings.HasSuffix(name, ".json") {
+		if entry.IsDir() || !strings.HasPrefix(name, strings.ToLower(prefix)) || !strings.HasSuffix(name, ".json") {
 			continue
 		}
 		if info, err := entry.Info(); err == nil && !info.ModTime().Before(since) {
@@ -503,20 +553,23 @@ func (a *app) syncZCode() error {
 	if err := a.probeGateway(current.Port); err != nil {
 		return fmt.Errorf("网关未运行: %w", err)
 	}
-	accounts, errAccounts := countAntigravityAccounts(a.paths.AuthDir)
+	accounts, errAccounts := countProviderAccounts(a.paths.AuthDir)
 	if errAccounts != nil {
 		return errAccounts
 	}
-	if accounts == 0 {
-		return fmt.Errorf("没有 Antigravity 账号，请先运行 login 命令或平台登录脚本")
+	if accounts.total() == 0 {
+		return fmt.Errorf("没有 Antigravity 或 Grok 账号，请先登录")
 	}
 	catalog, err := a.waitForModels(current.Port, 35*time.Second)
 	if err != nil {
 		return err
 	}
-	models, err := selectZCodeModels(catalog)
-	if err != nil {
-		return err
+	models, warnings := selectAvailableAgentModels(catalog, accounts.Antigravity > 0, accounts.XAI > 0)
+	for _, warning := range warnings {
+		fmt.Printf("模型提供商警告: %v\n", warning)
+	}
+	if len(models) == 0 {
+		return fmt.Errorf("没有可同步的 Gemini / Grok 文本模型: %w", errors.Join(warnings...))
 	}
 	backup, changed, err := a.configureZCode(current.Port, models)
 	if err != nil {
@@ -545,12 +598,13 @@ func (a *app) status() error {
 	if err != nil {
 		return err
 	}
-	accounts, accountErr := countAntigravityAccounts(a.paths.AuthDir)
+	accounts, accountErr := countProviderAccounts(a.paths.AuthDir)
 	if accountErr != nil {
 		return accountErr
 	}
 	fmt.Printf("程序目录: %s\n", a.paths.Root)
-	fmt.Printf("Antigravity 账号文件: %d\n", accounts)
+	fmt.Printf("Antigravity 账号文件: %d\n", accounts.Antigravity)
+	fmt.Printf("Grok / xAI 账号文件: %d\n", accounts.XAI)
 	if current.Port == 0 {
 		fmt.Println("网关状态: 未启动")
 		return fmt.Errorf("没有已记录的网关端口")
@@ -564,9 +618,12 @@ func (a *app) status() error {
 	if err != nil {
 		return err
 	}
-	models, err := selectZCodeModels(catalog)
-	if err != nil {
-		return err
+	models, warnings := selectAvailableAgentModels(catalog, accounts.Antigravity > 0, accounts.XAI > 0)
+	for _, warning := range warnings {
+		fmt.Printf("模型提供商警告: %v\n", warning)
+	}
+	if len(models) == 0 {
+		return fmt.Errorf("没有可用的 Gemini / Grok 文本模型: %w", errors.Join(warnings...))
 	}
 	fmt.Printf("网关状态: 正常 %s\n", a.gatewayURL(current.Port))
 	fmt.Printf("ZCode 可选模型: %d\n", len(models))
@@ -599,9 +656,6 @@ func (a *app) smokeModel(model string) error {
 	if model == "" {
 		return fmt.Errorf("模型 ID 不能为空")
 	}
-	if !isAllowedZCodeModel(model) {
-		return fmt.Errorf("模型 %q 不在允许列表；仅支持 %s", model, strings.Join(zcodeModelAllowlist, ", "))
-	}
 	current, errState := a.loadState()
 	if errState != nil {
 		return errState
@@ -617,14 +671,19 @@ func (a *app) smokeModel(model string) error {
 		return errModels
 	}
 	found := false
+	var selected modelInfo
 	for _, available := range models {
 		if available.ID == model {
 			found = true
+			selected = available
 			break
 		}
 	}
 	if !found {
 		return fmt.Errorf("模型目录中不存在精确 ID %q", model)
+	}
+	if !isManagedAgentModel(selected) {
+		return fmt.Errorf("模型 %q 不是受支持的 Gemini / Grok 文本模型", model)
 	}
 	payload := map[string]any{
 		"model":      model,

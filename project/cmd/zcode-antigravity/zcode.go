@@ -30,7 +30,19 @@ var zcodeModelAliases = []zcodeModelAlias{
 }
 
 func (a *app) configureZCode(port int, models []modelInfo) (backup string, changed bool, err error) {
-	models, err = selectZCodeModels(models)
+	if len(models) == 0 {
+		return "", false, fmt.Errorf("没有可写入 ZCode 的模型")
+	}
+	includeAntigravity, includeXAI := false, false
+	for _, model := range models {
+		if isAllowedZCodeModel(model.ID) {
+			includeAntigravity = true
+		}
+		if isXAITextModel(model) {
+			includeXAI = true
+		}
+	}
+	models, err = selectAgentModels(models, includeAntigravity, includeXAI)
 	if err != nil {
 		return "", false, err
 	}
@@ -125,6 +137,10 @@ func (a *app) configureZCode(port int, models []modelInfo) (backup string, chang
 }
 
 func selectZCodeModels(catalog []modelInfo) ([]modelInfo, error) {
+	return selectAgentModels(catalog, true, false)
+}
+
+func selectAgentModels(catalog []modelInfo, includeAntigravity, includeXAI bool) ([]modelInfo, error) {
 	byID := make(map[string]modelInfo, len(catalog))
 	for _, model := range catalog {
 		id := strings.TrimSpace(model.ID)
@@ -134,20 +150,84 @@ func selectZCodeModels(catalog []modelInfo) ([]modelInfo, error) {
 		model.ID = id
 		byID[id] = model
 	}
-	selected := make([]modelInfo, 0, len(zcodeModelAllowlist))
-	missing := make([]string, 0)
-	for _, id := range zcodeModelAllowlist {
-		model, ok := byID[id]
-		if !ok {
-			missing = append(missing, id)
-			continue
+	selected := make([]modelInfo, 0, len(zcodeModelAllowlist)+8)
+	if includeAntigravity {
+		missing := make([]string, 0)
+		for _, id := range zcodeModelAllowlist {
+			model, ok := byID[id]
+			if !ok {
+				missing = append(missing, id)
+				continue
+			}
+			selected = append(selected, model)
 		}
-		selected = append(selected, model)
+		if len(missing) > 0 {
+			return nil, fmt.Errorf("Antigravity 当前账号缺少必须模型: %s；请确认客户端已更新并且账号具有 Gemini 3.7/3.6 Flash 权限", strings.Join(missing, ", "))
+		}
 	}
-	if len(missing) > 0 {
-		return nil, fmt.Errorf("Antigravity 当前账号缺少必须模型: %s；请确认客户端已更新并且账号具有 Gemini 3.7/3.6 Flash 权限", strings.Join(missing, ", "))
+	if includeXAI {
+		grok := make([]modelInfo, 0, len(catalog))
+		for _, model := range catalog {
+			if isXAITextModel(model) {
+				grok = append(grok, model)
+			}
+		}
+		sort.Slice(grok, func(i, j int) bool { return grok[i].ID < grok[j].ID })
+		if len(grok) == 0 {
+			return nil, fmt.Errorf("xAI 账号已登录，但模型目录中没有可用的 Grok 文本模型")
+		}
+		selected = append(selected, grok...)
+	}
+	if len(selected) == 0 {
+		return nil, fmt.Errorf("没有已登录的模型提供商")
 	}
 	return selected, nil
+}
+
+// selectAvailableAgentModels keeps the two providers independent: a temporary
+// catalog or entitlement issue on one side must not make the other provider
+// unusable. Callers can surface warnings while continuing with valid models.
+func selectAvailableAgentModels(catalog []modelInfo, includeAntigravity, includeXAI bool) ([]modelInfo, []error) {
+	selected := make([]modelInfo, 0, len(zcodeModelAllowlist)+8)
+	warnings := make([]error, 0, 2)
+	if includeAntigravity {
+		models, err := selectAgentModels(catalog, true, false)
+		if err != nil {
+			warnings = append(warnings, err)
+		} else {
+			selected = append(selected, models...)
+		}
+	}
+	if includeXAI {
+		models, err := selectAgentModels(catalog, false, true)
+		if err != nil {
+			warnings = append(warnings, err)
+		} else {
+			selected = append(selected, models...)
+		}
+	}
+	if !includeAntigravity && !includeXAI {
+		warnings = append(warnings, fmt.Errorf("没有已登录的模型提供商"))
+	}
+	return selected, warnings
+}
+
+func isXAITextModel(model modelInfo) bool {
+	id := strings.ToLower(strings.TrimSpace(model.ID))
+	if !strings.HasPrefix(id, "grok-") || strings.Contains(id, "imagine") || strings.Contains(id, "image") || strings.Contains(id, "video") {
+		return false
+	}
+	for _, modality := range model.SupportedOutputModalities {
+		value := strings.ToLower(strings.TrimSpace(modality))
+		if value != "" && value != "text" {
+			return false
+		}
+	}
+	return true
+}
+
+func isManagedAgentModel(model modelInfo) bool {
+	return isAllowedZCodeModel(model.ID) || isXAITextModel(model)
 }
 
 func isAllowedZCodeModel(id string) bool {

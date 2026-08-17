@@ -24,6 +24,8 @@ state.json
 *.7z
 /dist/
 /release/
+/output/
+/.playwright-cli/
 
 # Editor and OS noise
 .DS_Store

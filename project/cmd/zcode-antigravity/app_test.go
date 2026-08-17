@@ -303,6 +303,39 @@ func TestSelectZCodeModelsRequiresBothModels(t *testing.T) {
 	}
 }
 
+func TestSelectAgentModelsSeparatesGrokFromMedia(t *testing.T) {
+	catalog := append(requiredTestModels(),
+		modelInfo{ID: "grok-4.5", DisplayName: "Grok 4.5", SupportedOutputModalities: []string{"text"}},
+		modelInfo{ID: "grok-build-0.1", DisplayName: "Grok Build"},
+		modelInfo{ID: "grok-imagine-image", SupportedOutputModalities: []string{"image"}},
+		modelInfo{ID: "claude-opus-4-6"},
+	)
+	grok, err := selectAgentModels(catalog, false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(modelIDs(grok)); got != "[grok-4.5 grok-build-0.1]" {
+		t.Fatalf("Grok models = %s", got)
+	}
+	combined, err := selectAgentModels(catalog, true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(modelIDs(combined)); got != "[gemini-3.6-flash gemini-3.7-flash grok-4.5 grok-build-0.1]" {
+		t.Fatalf("combined models = %s", got)
+	}
+}
+
+func TestSelectAvailableAgentModelsIsolatesProviderFailure(t *testing.T) {
+	models, warnings := selectAvailableAgentModels(requiredTestModels(), true, true)
+	if got := fmt.Sprint(modelIDs(models)); got != "[gemini-3.6-flash gemini-3.7-flash]" {
+		t.Fatalf("unexpected surviving provider models: %s", got)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0].Error(), "Grok") {
+		t.Fatalf("expected one Grok warning, got %v", warnings)
+	}
+}
+
 func TestConfigureZCodeBacksUpAndPreservesOtherProviders(t *testing.T) {
 	a := testApp(t)
 	if err := os.MkdirAll(filepath.Dir(a.paths.ZCodeConfig), 0o700); err != nil {
@@ -562,6 +595,23 @@ func TestCountAntigravityAccountsValidatesJSONAndTokens(t *testing.T) {
 	}
 	if _, err := countAntigravityAccounts(a.paths.AuthDir); err == nil {
 		t.Fatal("malformed account file was silently accepted")
+	}
+}
+
+func TestCountProviderAccountsIncludesXAI(t *testing.T) {
+	a := testApp(t)
+	if err := os.WriteFile(filepath.Join(a.paths.AuthDir, "antigravity-valid.json"), []byte(`{"type":"antigravity","access_token":"access","refresh_token":"refresh","project_id":"project"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(a.paths.AuthDir, "xai-valid.json"), []byte(`{"type":"xai","access_token":"access","refresh_token":"refresh","sub":"user"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	counts, err := countProviderAccounts(a.paths.AuthDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counts.Antigravity != 1 || counts.XAI != 1 || counts.total() != 2 {
+		t.Fatalf("counts = %#v", counts)
 	}
 }
 
