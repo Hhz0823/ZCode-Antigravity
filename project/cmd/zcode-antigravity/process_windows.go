@@ -64,7 +64,8 @@ func terminateOwnedProcess(pid int, expectedPath string) error {
 	if err != nil {
 		return err
 	}
-	if !strings.EqualFold(filepath.Clean(actualAbs), filepath.Clean(expectedAbs)) {
+	if !strings.EqualFold(filepath.Clean(actualAbs), filepath.Clean(expectedAbs)) &&
+		!sameManagedBackendRoot(expectedAbs, actualAbs) {
 		return fmt.Errorf("PID %d 指向 %s，不是本程序的 %s；已拒绝停止", pid, actualAbs, expectedAbs)
 	}
 	cmd := exec.Command("taskkill.exe", "/PID", strconv.Itoa(pid), "/T", "/F")
@@ -74,6 +75,33 @@ func terminateOwnedProcess(pid int, expectedPath string) error {
 		return fmt.Errorf("taskkill 失败: %w (%s)", err, strings.TrimSpace(string(output)))
 	}
 	return nil
+}
+
+// sameManagedBackendRoot accepts a running backend from an older installed app
+// directory while still refusing to terminate arbitrary processes. This is
+// needed when a newer manager reused a healthy older gateway and an old release
+// recorded its own backend path in state.json.
+func sameManagedBackendRoot(expectedPath, actualPath string) bool {
+	expectedRoot, expectedOK := managedBackendRoot(expectedPath)
+	actualRoot, actualOK := managedBackendRoot(actualPath)
+	return expectedOK && actualOK && strings.EqualFold(expectedRoot, actualRoot)
+}
+
+func managedBackendRoot(path string) (string, bool) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", false
+	}
+	backendDir := filepath.Dir(filepath.Clean(abs))
+	appDir := filepath.Dir(backendDir)
+	root := filepath.Dir(appDir)
+	if !strings.EqualFold(filepath.Base(abs), "cli-proxy-api.exe") ||
+		!strings.EqualFold(filepath.Base(backendDir), "backend") ||
+		!strings.HasPrefix(strings.ToLower(filepath.Base(appDir)), "app-") ||
+		len(filepath.Base(appDir)) <= len("app-") {
+		return "", false
+	}
+	return filepath.Clean(root), true
 }
 
 func windowsProcessPath(pid int) (string, error) {

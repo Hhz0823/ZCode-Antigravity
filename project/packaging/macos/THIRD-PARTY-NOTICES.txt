@@ -27,5 +27,12 @@ https://github.com/lbjlaq/Antigravity-Manager
 No Tauri, React, or source files from that project are included. See
 project/docs/ANTIGRAVITY-MANAGER-REFERENCE.md in the source distribution.
 
+The v0.4.6 menu-bar quota hierarchy and effective-throughput terminology were independently
+implemented after reviewing shanggqm/codexU (snapshot eb28c8f), licensed MIT:
+https://github.com/shanggqm/codexU
+
+No SwiftUI, Tauri, React, Rust, or other source files from codexU are included. See
+project/docs/CODEXU-REFERENCE.md in the source distribution.
+
 ZCode, Google, Gemini, Antigravity, Grok, xAI, macOS, and Apple are names or marks of their
 respective owners. This project is unofficial and is not endorsed by them.

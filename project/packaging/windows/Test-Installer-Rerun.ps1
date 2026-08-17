@@ -73,7 +73,8 @@ api-keys:
   - "$apiKey"
 logging-to-file: false
 request-log: false
-usage-statistics-enabled: false
+usage-statistics-enabled: true
+redis-usage-queue-retention-seconds: 3600
 plugins:
   enabled: false
   dir: "plugins"

@@ -1,6 +1,6 @@
 # Antigravity Manager 参考说明
 
-ZCode Antigravity `v0.4.5-test` 的额度面板与定时刷新体验参考了
+ZCode Antigravity `v0.4.6-test` 的额度面板与定时刷新体验参考了
 [lbjlaq/Antigravity-Manager](https://github.com/lbjlaq/Antigravity-Manager) 的产品思路，
 包括账号摘要、分组额度、彩色进度条、重置时间和后台周期刷新。
 

@@ -34,6 +34,7 @@ type guiRuntime struct {
 	providerMu     sync.RWMutex
 	provider       string
 	trayRefresh    chan struct{}
+	usage          *usageTracker
 	persistentTray bool
 	lastActivity   atomic.Int64
 	shutdown       func()
@@ -102,6 +103,7 @@ func (a *app) runUIHost(autoSetup, launchBrowser bool) error {
 		autoSetup:      autoSetup,
 		provider:       preferredInitialProvider(a.paths.AuthDir),
 		trayRefresh:    make(chan struct{}, 1),
+		usage:          newUsageTracker(a.paths.UsageMetrics),
 		persistentTray: launchBrowser && platformTraySupported(),
 	}
 	runtime.lastActivity.Store(time.Now().UnixNano())
@@ -109,6 +111,7 @@ func (a *app) runUIHost(autoSetup, launchBrowser bool) error {
 	mux.HandleFunc("/", runtime.serveDashboard)
 	mux.HandleFunc("/api/status", runtime.authorized(runtime.serveStatus))
 	mux.HandleFunc("/api/quota", runtime.authorized(runtime.serveQuota))
+	mux.HandleFunc("/api/usage", runtime.authorized(runtime.serveUsage))
 	mux.HandleFunc("/api/provider", runtime.authorized(runtime.serveProvider))
 	mux.HandleFunc("/api/connectors", runtime.authorized(runtime.serveConnectors))
 	mux.HandleFunc("/api/action", runtime.authorized(runtime.serveAction))
@@ -135,6 +138,7 @@ func (a *app) runUIHost(autoSetup, launchBrowser bool) error {
 	go func() {
 		serveErrCh <- server.Serve(listener)
 	}()
+	go runtime.monitorUsage(shutdownCh)
 	if launchBrowser && !platformTraySupported() {
 		go runtime.stopWhenInactive(shutdownCh)
 	}

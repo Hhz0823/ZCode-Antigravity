@@ -1,25 +1,26 @@
 ZCode Antigravity Bridge build information
 ===========================================
 
-Package: ZCode-Antigravity-Windows-x64-0.4.5-test
+Package: ZCode-Antigravity-Windows-x64-0.4.6-test
 Build date (UTC): 2026-08-17
 Target: Windows x64 (PE32+ Go console Core and Rust/Win32 GUI control center)
 
 Manager
 -------
-Version: 0.4.5-test
+Version: 0.4.6-test
 Go: 1.26.4
 CGO: disabled
 SHA-256: __MANAGER_SHA256__
 
 Control center
 --------------
-Version: 0.4.5-test
+Version: 0.4.6-test
 Language: Rust 2024 Edition
 Bindings: windows-sys 0.61.2
 Subsystem: Windows GUI (no console window)
 Process DPI: Per-Monitor DPI V2
 Quota view: protected loopback route, redacted cache, grouped native bars, 5-minute refresh
+Token view: protocol usage, output/reasoning tokens, generation/effective token/s, no prompt text
 Theme: native Microsoft YaHei UI, ClearType, owner-drawn blue dashboard and bundled icon
 SHA-256: __CONTROL_CENTER_SHA256__
 
@@ -54,14 +55,20 @@ Local backend patches
 18. Add official xAI device OAuth, Grok text-model selection, Grok Build billing display, and encrypted-token-safe management proxying.
 19. Generate copyable Grok Build, Codex, Claude Code, OpenCode, and generic Agent connector configurations.
 20. Retry Antigravity quota requests without project metadata after HTTP 403 and fall back to per-model quota data.
+21. Collect sanitized backend usage records and expose provider-specific output Token, reasoning Token, and token/s metrics.
+22. Show five-hour/week reset details and recent token performance on taskbar click; double-click opens the window.
+23. Keep Antigravity/Grok quota caches isolated and reject stale provider-switch display updates.
+24. Keep provider-specific Token caches isolated so Grok never displays Gemini usage while switching.
+25. Preserve the real historical backend path when reusing a gateway and safely recover same-root legacy state during upgrades.
+26. Honor --auto-setup in the native control center so a successful installer launch begins bridge setup automatically.
 
 Verification evidence
 ---------------------
-Current v0.4.5-test build-host checks:
+Current v0.4.6-test build-host checks:
 - Manager go test ./... and Windows x64 build: passed
 - Manager go test -race: passed on the macOS build host
 - CLIProxyAPI go mod verify, go test ./..., and Windows x64 build: passed
-- Rust control center cargo check and Clippy -D warnings: passed
+- Rust control center cargo check: passed; cargo-clippy is not installed on the macOS build host
 - Go native-host baseURL and connector baseURL protocol regression tests: passed
 - Antigravity quota HTTP 403 projectless retry and fetchAvailableModels fallback tests: passed
 - Rust x86_64-pc-windows-gnu release build, PE32+ GUI subsystem, icon resource, and imports: passed
@@ -71,8 +78,12 @@ Current v0.4.5-test build-host checks:
 - Windows child-process CREATE_NO_WINDOW test and Windows x64 test-binary cross-compile: passed
 - Provider/model selection, Grok billing proxy, tray state, and five Agent connector tests: passed
 - Native SwiftUI macOS main executable and native Rust Windows main executable build checks: passed
-- v0.4.5-test target Windows 11 real-account quota cards and 144-DPI full-window capture: passed
-- 15-second connection poll left quota fetchedAt/cache write time unchanged; five-minute quota cadence is isolated: passed
+- v0.4.6-test target Windows 11 real-account quota cards and 144-DPI full-window capture: passed
+- 5-second connection/Token poll left quota fetchedAt/cache write time unchanged; five-minute quota cadence is isolated: passed
+- Real response usage sample (45 output Token, 31.1 generation Token/s) and sanitized local persistence: passed
+- Taskbar single-click menu (5-hour 100%, week 98%, reset times, latest Token/s): passed
+- Antigravity -> Grok -> Antigravity switch isolation and immediate cached restoration: passed
+- v0.4.5 stale backend-path upgrade recovery plus installer-triggered automatic setup: passed
 
 Historical v0.2.6-test Windows/runtime checks retained as the regression baseline:
 - Local end-to-end smoke with fake non-network credentials: passed

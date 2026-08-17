@@ -26,14 +26,14 @@ Requirements
 First test
 ----------
 Recommended: fully exit ZCode from the tray, enable v2rayN TUN, and double-click
-ZCode-Antigravity-Setup-v0.4.5-test.exe. This is a native Windows GUI installer: it shows no
+ZCode-Antigravity-Setup-v0.4.6-test.exe. This is a native Windows GUI installer: it shows no
 terminal, verifies the embedded ZIP plus all three executables, installs only for the current
 user, creates Desktop/Start Menu shortcuts, and opens the control center after completion.
 Do not use v0.4.0-test on Windows; its Rust client expected baseUrl while the Go Core correctly
 emitted baseURL, so startup stopped before the control center could open.
 
 For the single-BAT fallback, fully exit ZCode from the tray, enable v2rayN TUN, and double-click
-ZCode-Antigravity-OneClick-v0.4.5-test.bat. It verifies and extracts its embedded package,
+ZCode-Antigravity-OneClick-v0.4.6-test.bat. It verifies and extracts its embedded package,
 then opens the graphical control center without leaving a terminal window. The control center
 opens OAuth when needed, writes the verified ZCode Provider directly, and starts ZCode after
 successful readback.
@@ -98,6 +98,9 @@ Files and privacy
 - The quota cache is redacted and stores only display-ready values under:
     %LOCALAPPDATA%\ZCodeAntigravity\quota-cache.json
   It does not contain a complete email, project ID, access token, or refresh token.
+- Token performance is stored as sanitized provider/model/token/timing samples under:
+    %LOCALAPPDATA%\ZCodeAntigravity\usage-metrics.json
+  It does not store prompt text, model replies, API keys, OAuth tokens, or complete account data.
 
 Graphical control center and quota
 ----------------------------------
@@ -107,14 +110,22 @@ Graphical control center and quota
 - It uses Segoe UI Variable, ClearType, Per-Monitor DPI V2, native controls, a bundled icon, and
   responsive layout for mixed DPI and different desktop resolutions.
 - It shows v2rayN TUN, proxy, bridge, ZCode, provider accounts, models, quota, and Agent connectors.
-- Closing the native window leaves a system-tray widget running. Click to reopen; use its
-  menu to switch Antigravity/Grok, refresh quota, or exit the widget.
+- When the installer opens it with --auto-setup, the native client immediately begins the same
+  one-click setup operation; a separate manual click is not required after a successful install.
+- Closing the native window leaves a system-tray widget running. Single-click opens a summary
+  menu with five-hour/week remaining quota, reset times, latest output tokens, and token/s;
+  double-click reopens the window. The same menu switches providers, refreshes, or exits.
 - Gemini weekly and five-hour remaining quota use exact percentages, reset times, and a native
   progress display. AI credit balance is shown separately so it is not confused with model quota.
 - Connection state remains responsive while live quota calls run on a five-minute schedule.
   Manual refresh, provider switching, and a completed local operation refresh quota immediately.
 - The quota dashboard uses account summary cards, grouped color-coded bars, reset time, last
   refresh time, and preserves the last successful display when a later refresh fails.
+- Successful model responses display protocol-reported output/reasoning Token and token/s. When
+  TTFT exists, speed is output Token divided by the post-first-byte generation duration; otherwise
+  the UI explicitly labels output Token divided by full-call duration as effective throughput.
+- Antigravity and Grok keep separate quota and Token caches. A slow Grok refresh cannot display
+  Gemini usage, and switching back restores the last Antigravity values immediately.
 - Grok uses the official Grok Build billing response for shared weekly/monthly usage, reset time,
   pay-as-you-go limits, and Extra Usage Credits. It never estimates account quota from local tokens.
 - Connector cards generate copyable Grok Build, Codex, Claude Code, OpenCode, and generic client
@@ -145,9 +156,9 @@ Available scripts
 
 Installer formats
 -----------------
-- ZCode-Antigravity-Setup-v0.4.5-test.exe: recommended no-terminal current-user installer.
-- ZCode-Antigravity-OneClick-v0.4.5-test.bat: fallback single-file installer.
-- ZCode-Antigravity-Windows-x64-0.4.5-test.zip: manually verifiable expanded package.
+- ZCode-Antigravity-Setup-v0.4.6-test.exe: recommended no-terminal current-user installer.
+- ZCode-Antigravity-OneClick-v0.4.6-test.bat: fallback single-file installer.
+- ZCode-Antigravity-Windows-x64-0.4.6-test.zip: manually verifiable expanded package.
 - The EXE installer is custom-built and unsigned. It does not require administrator rights or
   7-Zip on the target computer; Windows SmartScreen may still require manual confirmation.
 
@@ -222,7 +233,7 @@ cause a clear setup error instead of silently substituting another model.
 
 Build versions
 --------------
-- ZCode Antigravity Bridge: 0.4.5-test
+- ZCode Antigravity Bridge: 0.4.6-test
 - Native control center: Rust 1.96, windows-sys 0.61.2, ureq 3.4.0
 - CLIProxyAPI base: v7.2.132, commit 78f0c4079e3e6273d65d03b5549cffc898703264
 - Local build: 7.2.132-zcode.12

@@ -1,18 +1,21 @@
 Windows acceptance checklist
 ============================
 
-[ ] ZCode-Antigravity-Setup-v0.4.5-test.exe opens a native confirmation dialog without a terminal.
+[ ] ZCode-Antigravity-Setup-v0.4.6-test.exe opens a native confirmation dialog without a terminal.
 [ ] Control-center refresh, login, sync, stop, port inspection, and ZCode launch never flash a console window.
 [ ] The native EXE writes install.ps1 with exactly one EF BB BF UTF-8 BOM before Windows PowerShell 5.1 parses it.
 [ ] The EXE installer --extract-only workflow reproduces every package file and hash exactly.
 [ ] The EXE refuses installation while ZCode or the target control center is still running.
-[ ] Successful EXE installation creates current-user Desktop/Start Menu shortcuts and opens the GUI.
+[ ] Successful EXE installation creates current-user Desktop/Start Menu shortcuts, opens the GUI, and automatically begins one-click setup.
 [ ] Verify-Package.bat reports three [OK] lines.
 [ ] The single BAT --extract-only workflow verifies its embedded ZIP and all three executable hashes.
 [ ] Normal double-click returns immediately without leaving a terminal window and opens the control center.
 [ ] The control center shortcut is created on the Desktop and in the current-user Start Menu.
 [ ] Control center APIs listen only on 127.0.0.1 and reject requests without the per-launch session key.
 [ ] Weekly and five-hour remaining quota show exact percentages, reset times, and native progress state.
+[ ] A single left-click on the taskbar icon opens a menu showing the selected provider, account count, five-hour quota, weekly quota, reset times, latest output tokens, and token/s.
+[ ] After one successful model response, the main panel shows protocol-reported output/reasoning tokens and generation token/s; it never derives tokens from text length.
+[ ] Switching Antigravity/Grok shows a switching state, keeps provider-specific cached quota and Token data, and ignores stale results from the previous provider.
 [ ] Keep the panel open for at least 15 seconds; connection state may update but quota fetchedAt must not change before the five-minute interval.
 [ ] At 150% display scaling, all four status cards, the quota card, and the full action column remain inside the window.
 [ ] Segoe UI Variable text stays crisp at 100%, 125%, 150%, 200%, and a mixed-DPI monitor move.
@@ -31,7 +34,7 @@ Windows acceptance checklist
 [ ] After fully exiting ZCode, Sync-ZCode.bat creates a timestamped backup.
 [ ] ZCode shows Provider "Antigravity + Grok (Local Bridge)"; Antigravity has exactly the two managed Gemini entries.
 [ ] Grok / xAI login uses browser device authorization, then exposes text models but no Imagine image/video models.
-[ ] System-tray click reopens the panel; provider switch changes quota/model cards; Exit removes the tray and releases port 18200-18250.
+[ ] System-tray double-click reopens the panel; provider switch changes quota/model cards; Exit removes the tray and releases port 18200-18250.
 [ ] Agent connector cards render for Grok Build, Codex, Claude Code, OpenCode, and generic clients without overwriting external files.
 [ ] Model list contains gemini-3.7-flash with 1,048,576 context tokens and no redundant -high suffix.
 [ ] Model list contains gemini-3.6-flash and contains no Claude, GPT, agent, image, or other Gemini model.

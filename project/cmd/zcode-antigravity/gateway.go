@@ -79,7 +79,8 @@ logging-to-file: true
 logs-max-total-size-mb: 50
 error-logs-max-files: 5
 request-log: false
-usage-statistics-enabled: false
+usage-statistics-enabled: true
+redis-usage-queue-retention-seconds: 3600
 proxy-url: %s
 passthrough-headers: false
 request-retry: 2
@@ -369,7 +370,6 @@ func (a *app) startAndConfigure() (returnErr error) {
 	}
 	current, _ := a.loadState()
 	current.Port = port
-	current.BackendPath = a.paths.Backend
 	current.ZCodeConfig = a.paths.ZCodeConfig
 	current.Models = modelIDs(models)
 	current.LastHealthTime = a.now().UTC()

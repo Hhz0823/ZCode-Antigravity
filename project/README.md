@@ -9,8 +9,9 @@ authentication, API and OAuth callback port scanning, ZCode data-directory resol
 bounded config backups/logs, atomic Windows replacement, model synchronization, real-model
 smoke testing, image/audio/video request translation, safe no-op reuse while ZCode is running,
 PID/path-safe stop, managed-provider removal, a strict Gemini plus Grok-text model selector,
-Grok billing, Agent connector cards, a hidden native-host API, SwiftUI/AppKit macOS UI,
-Rust/Win32 Windows UI, and SHA-256 verified Windows installers.
+Grok billing, protocol-derived output-token and token/s metrics, detailed taskbar/menu-bar quota
+menus, Agent connector cards, a hidden native-host API, SwiftUI/AppKit macOS UI, Rust/Win32
+Windows UI, and SHA-256 verified Windows installers.
 
 Build and package the macOS Universal App:
 
@@ -48,13 +49,16 @@ expanded ZIP, Rust GUI installer, and single-BAT fallback in one flow.
 The backend is CLIProxyAPI v7.2.132 with
 [`docs/CLIProxyAPI-v7.2.132-zcode.patch`](docs/CLIProxyAPI-v7.2.132-zcode.patch).
 See the Windows package README for the risk boundary and test workflow.
+The quota-card reference boundary is documented in
+[`docs/ANTIGRAVITY-MANAGER-REFERENCE.md`](docs/ANTIGRAVITY-MANAGER-REFERENCE.md); the taskbar and
+throughput reference boundary is documented in [`docs/CODEXU-REFERENCE.md`](docs/CODEXU-REFERENCE.md).
 
 Build the single-BAT installer from a verified expanded package:
 
 ```powershell
 .\packaging\windows\Build-Single-Bat.ps1 `
   -PackageDir C:\path\to\expanded-package `
-  -OutputFile C:\path\to\ZCode-Antigravity-OneClick-v0.4.5-test.bat
+  -OutputFile C:\path\to\ZCode-Antigravity-OneClick-v0.4.6-test.bat
 ```
 
 Build the native no-console EXE installer from the same verified package:
@@ -62,5 +66,5 @@ Build the native no-console EXE installer from the same verified package:
 ```powershell
 .\packaging\windows\Build-Exe-Installer.ps1 `
   -PackageDir C:\path\to\expanded-package `
-  -OutputFile C:\path\to\ZCode-Antigravity-Setup-v0.4.5-test.exe
+  -OutputFile C:\path\to\ZCode-Antigravity-Setup-v0.4.6-test.exe
 ```

@@ -53,6 +53,7 @@ type paths struct {
 	ZCodeConfig   string
 	ZCodeBackups  string
 	PackageReadme string
+	UsageMetrics  string
 }
 
 type app struct {
@@ -137,6 +138,7 @@ func newApp(rootOverride string) (*app, error) {
 	p.State = filepath.Join(p.Data, "state.json")
 	p.Secret = filepath.Join(p.Data, "local-api-key")
 	p.Lock = filepath.Join(p.Data, "manager.lock")
+	p.UsageMetrics = filepath.Join(p.Data, "usage-metrics.json")
 
 	for _, dir := range []string{p.Data, p.AuthDir, p.LogsDir} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {

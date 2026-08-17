@@ -5,6 +5,7 @@ mod protocol;
 use protocol::{ConnectorResponse, NativeConnection};
 use serde::Deserialize;
 use serde_json::json;
+use std::collections::HashMap;
 use std::ffi::c_void;
 use std::io::{BufRead, BufReader};
 use std::os::windows::process::CommandExt;
@@ -25,15 +26,16 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-const VERSION: &str = "0.4.5-test";
+const VERSION: &str = "0.4.6-test";
 const SS_LEFT: u32 = 0;
 const CF_UNICODETEXT_VALUE: u32 = 13;
 const WM_REFRESH_READY: u32 = WM_APP + 1;
 const WM_OPERATION_POSTED: u32 = WM_APP + 2;
+const WM_PROVIDER_READY: u32 = WM_APP + 3;
 const WM_TRAY: u32 = WM_APP + 20;
 const TIMER_REFRESH: usize = 1;
 const TIMER_OPERATION_POLL: usize = 2;
-const STATUS_REFRESH_MS: u32 = 15_000;
+const STATUS_REFRESH_MS: u32 = 5_000;
 const QUOTA_REFRESH_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 const COLOR_SIDEBAR: COLORREF = 0x00442308;
@@ -171,6 +173,7 @@ struct DashboardStatus {
 #[serde(rename_all = "camelCase")]
 struct QuotaReport {
     fetched_at: Option<String>,
+    provider: String,
     source: String,
     stale: bool,
     accounts: Vec<QuotaAccount>,
@@ -199,6 +202,7 @@ struct QuotaGroup {
 #[serde(rename_all = "camelCase")]
 struct QuotaBucket {
     name: String,
+    window: String,
     remaining_percent: Option<f64>,
     reset_time: Option<String>,
 }
@@ -214,11 +218,52 @@ struct CreditInfo {
 struct RefreshResult {
     status: Result<DashboardStatus, String>,
     quota: Option<Result<QuotaReport, String>>,
+    usage: Result<UsageReport, String>,
     connectors: Result<ConnectorResponse, String>,
+    requested_provider: String,
 }
 
 struct OperationPostResult {
     error: Option<String>,
+}
+
+struct ProviderSelectResult {
+    requested: String,
+    previous: String,
+    error: Option<String>,
+}
+
+#[derive(Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UsageSample {
+    timestamp: String,
+    model: String,
+    output_tokens: i64,
+    reasoning_tokens: i64,
+    latency_ms: i64,
+    ttft_ms: i64,
+    generation_ms: i64,
+    output_tokens_per_second: f64,
+    speed_basis: String,
+}
+
+#[derive(Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UsageAggregate {
+    requests: i32,
+    output_tokens: i64,
+    reasoning_tokens: i64,
+    average_tokens_per_second: f64,
+}
+
+#[derive(Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UsageReport {
+    provider: String,
+    available: bool,
+    latest: Option<UsageSample>,
+    total: UsageAggregate,
+    warning: Option<String>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -255,12 +300,18 @@ struct AppState {
     font_title: isize,
     dpi: u32,
     refreshing: bool,
+    refresh_again: bool,
     operation_pending: bool,
+    provider_switching: bool,
     quitting: bool,
     provider: String,
     connectors_text: String,
     quota: Option<QuotaReport>,
+    quota_cache: HashMap<String, QuotaReport>,
     quota_error: Option<String>,
+    usage: Option<UsageReport>,
+    usage_cache: HashMap<String, UsageReport>,
+    provider_accounts: ProviderAccounts,
     last_quota_refresh: Option<Instant>,
 }
 
@@ -275,12 +326,18 @@ impl AppState {
             font_title: 0,
             dpi: 96,
             refreshing: false,
+            refresh_again: false,
             operation_pending: false,
+            provider_switching: false,
             quitting: false,
             provider: "antigravity".to_string(),
             connectors_text: String::new(),
             quota: None,
+            quota_cache: HashMap::new(),
             quota_error: None,
+            usage: None,
+            usage_cache: HashMap::new(),
+            provider_accounts: ProviderAccounts::default(),
             last_quota_refresh: None,
         }
     }
@@ -881,6 +938,22 @@ fn quota_lowest(report: &QuotaReport) -> Option<f64> {
         .reduce(f64::min)
 }
 
+fn format_integer(value: i64) -> String {
+    let negative = value < 0;
+    let digits = value.unsigned_abs().to_string();
+    let mut output = String::with_capacity(digits.len() + digits.len() / 3 + usize::from(negative));
+    if negative {
+        output.push('-');
+    }
+    for (index, ch) in digits.chars().enumerate() {
+        if index > 0 && (digits.len() - index) % 3 == 0 {
+            output.push(',');
+        }
+        output.push(ch);
+    }
+    output
+}
+
 unsafe fn paint_quota_dashboard(hdc: HDC, state: &AppState, m: &LayoutMetrics) {
     let inset = scale(20, m.dpi);
     let content_left = m.main_x + inset;
@@ -888,7 +961,7 @@ unsafe fn paint_quota_dashboard(hdc: HDC, state: &AppState, m: &LayoutMetrics) {
     let summary_top = m.content_top + scale(60, m.dpi);
     let summary_height = scale(if m.compact { 48 } else { 58 }, m.dpi);
     let summary_gap = scale(8, m.dpi);
-    let summary_width = (content_right - content_left - summary_gap * 2) / 3;
+    let summary_width = (content_right - content_left - summary_gap * 4) / 5;
     let report = state.quota.as_ref();
     let account_count = report.map(|value| value.accounts.len()).unwrap_or(0);
     let lowest = report.and_then(quota_lowest);
@@ -896,6 +969,15 @@ unsafe fn paint_quota_dashboard(hdc: HDC, state: &AppState, m: &LayoutMetrics) {
         .and_then(|value| value.fetched_at.as_deref())
         .and_then(|value| value.get(11..19))
         .unwrap_or("等待首次刷新");
+    let latest_usage = state.usage.as_ref().and_then(|usage| usage.latest.as_ref());
+    let speed_label = if latest_usage
+        .map(|sample| sample.speed_basis.as_str())
+        == Some("generation")
+    {
+        "生成速度"
+    } else {
+        "有效吞吐"
+    };
     let summary = [
         ("账号", account_count.to_string()),
         (
@@ -904,7 +986,27 @@ unsafe fn paint_quota_dashboard(hdc: HDC, state: &AppState, m: &LayoutMetrics) {
                 .map(|value| format!("{value:.0}%"))
                 .unwrap_or_else(|| "—".to_string()),
         ),
-        ("自动刷新", "每 5 分钟".to_string()),
+        (
+            "最近输出",
+            latest_usage
+                .map(|sample| format!("{} tok", format_integer(sample.output_tokens)))
+                .unwrap_or_else(|| "—".to_string()),
+        ),
+        (
+            speed_label,
+            latest_usage
+                .map(|sample| format!("{:.1} tok/s", sample.output_tokens_per_second))
+                .unwrap_or_else(|| "—".to_string()),
+        ),
+        (
+            "本地累计",
+            state
+                .usage
+                .as_ref()
+                .filter(|usage| usage.available)
+                .map(|usage| format!("{} tok", format_integer(usage.total.output_tokens)))
+                .unwrap_or_else(|| "—".to_string()),
+        ),
     ];
     for (index, (label, value)) in summary.iter().enumerate() {
         let left = content_left + index as i32 * (summary_width + summary_gap);
@@ -941,6 +1043,8 @@ unsafe fn paint_quota_dashboard(hdc: HDC, state: &AppState, m: &LayoutMetrics) {
                 state.font_bold,
                 if index == 1 {
                     lowest.map(quota_percent_color).unwrap_or(COLOR_TEXT)
+                } else if index == 3 {
+                    COLOR_PRIMARY
                 } else {
                     COLOR_TEXT
                 },
@@ -965,7 +1069,7 @@ unsafe fn paint_quota_dashboard(hdc: HDC, state: &AppState, m: &LayoutMetrics) {
             })
             .unwrap_or("等待数据")
     };
-    let meta = format!("{source} · 最近刷新 {refresh_text} · 下次自动刷新不超过 5 分钟");
+    let meta = format!("{source} · 额度刷新 {refresh_text} / 每 5 分钟 · Token 统计每 5 秒更新");
     unsafe {
         draw_label(
             hdc,
@@ -982,13 +1086,64 @@ unsafe fn paint_quota_dashboard(hdc: HDC, state: &AppState, m: &LayoutMetrics) {
         );
     }
 
+    let usage_meta = if let Some(usage) = state.usage.as_ref() {
+        let warning = usage
+            .warning
+            .as_deref()
+            .filter(|value| !value.is_empty())
+            .map(|value| format!(" · {value}"))
+            .unwrap_or_default();
+        if let Some(latest) = usage.latest.as_ref() {
+            let basis = if latest.speed_basis == "generation" {
+                format!(
+                    "生成 {:.1}s · 首字节 {:.1}s",
+                    latest.generation_ms as f64 / 1000.0,
+                    latest.ttft_ms as f64 / 1000.0
+                )
+            } else {
+                format!("完整调用 {:.1}s（有效吞吐）", latest.latency_ms as f64 / 1000.0)
+            };
+            format!(
+                "{} · 输出 {} token（推理 {}）· {} · 本地 {} 次平均 {:.1} tok/s / 累计推理 {} · {}{}",
+                latest.model,
+                format_integer(latest.output_tokens),
+                format_integer(latest.reasoning_tokens),
+                basis,
+                usage.total.requests,
+                usage.total.average_tokens_per_second,
+                format_integer(usage.total.reasoning_tokens),
+                short_iso_time(&latest.timestamp),
+                warning
+            )
+        } else {
+            format!("Token 统计已启用，等待首次成功的模型响应{warning}")
+        }
+    } else {
+        "Token 统计正在连接本地网关…".to_string()
+    };
+    unsafe {
+        draw_label(
+            hdc,
+            &usage_meta,
+            RECT {
+                left: content_left,
+                top: meta_top + scale(20, m.dpi),
+                right: content_right,
+                bottom: meta_top + scale(42, m.dpi),
+            },
+            state.font,
+            COLOR_MUTED,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+        );
+    }
+
     let models_y = m.content_bottom - inset - scale(76, m.dpi);
     let rows_bottom = if m.compact {
         m.content_bottom - inset
     } else {
         models_y - scale(8, m.dpi)
     };
-    let mut row_top = meta_top + scale(28, m.dpi);
+    let mut row_top = meta_top + scale(50, m.dpi);
     let row_height = scale(if m.compact { 42 } else { 55 }, m.dpi);
     let mut rows_drawn = 0usize;
     if let Some(report) = report {
@@ -1514,9 +1669,12 @@ fn request_refresh(hwnd: HWND, force_quota: bool) {
     let Some(state_lock) = STATE.get() else {
         return;
     };
-    let (connection, hwnd_value, fetch_quota) = {
+    let (connection, hwnd_value, fetch_quota, requested_provider) = {
         let mut state = state_lock.lock().unwrap();
         if state.refreshing {
+            if force_quota {
+                state.refresh_again = true;
+            }
             return;
         }
         state.refreshing = true;
@@ -1528,27 +1686,30 @@ fn request_refresh(hwnd: HWND, force_quota: bool) {
             state.host.connection.clone(),
             hwnd as isize,
             !state.operation_pending && (force_quota || quota_due),
+            state.provider.clone(),
         )
     };
     thread::spawn(move || {
         let status = api_get::<DashboardStatus>(&connection, "/api/status");
-        let provider = status
-            .as_ref()
-            .map(|value| value.selected_provider.as_str())
-            .unwrap_or("antigravity");
         let quota = if fetch_quota {
             Some(api_get::<QuotaReport>(
                 &connection,
-                &format!("/api/quota?provider={provider}"),
+                &format!("/api/quota?provider={requested_provider}"),
             ))
         } else {
             None
         };
+        let usage = api_get::<UsageReport>(
+            &connection,
+            &format!("/api/usage?provider={requested_provider}"),
+        );
         let connectors = api_get::<ConnectorResponse>(&connection, "/api/connectors");
         let update = Box::new(RefreshResult {
             status,
             quota,
+            usage,
             connectors,
+            requested_provider,
         });
         unsafe {
             let _ = PostMessageW(
@@ -1598,7 +1759,9 @@ unsafe fn apply_refresh(update: RefreshResult) {
     let RefreshResult {
         status,
         quota,
+        usage,
         connectors,
+        requested_provider,
     } = update;
     let (
         controls,
@@ -1606,38 +1769,73 @@ unsafe fn apply_refresh(update: RefreshResult) {
         provider,
         operation_running,
         operation_finished,
-        quota_attempted,
         quota_for_tray,
+        usage_for_tray,
+        provider_switching,
+        refresh_again,
     ) = {
         let mut state = state_lock.lock().unwrap();
         state.refreshing = false;
         let was_pending = state.operation_pending;
         if let Ok(status) = &status {
-            state.provider = status.selected_provider.clone();
+            state.provider_accounts = status.provider_accounts.clone();
+            if !state.provider_switching {
+                state.provider = status.selected_provider.clone();
+            }
             state.operation_pending = status.operation.running;
         }
         if let Ok(connectors) = &connectors {
             state.connectors_text = connectors_text(connectors);
         }
-        let quota_attempted = quota.is_some();
         if let Some(result) = &quota {
-            state.last_quota_refresh = Some(Instant::now());
+            if requested_provider == state.provider {
+                state.last_quota_refresh = Some(Instant::now());
+            }
             match result {
                 Ok(report) => {
-                    state.quota = Some(report.clone());
-                    state.quota_error = None;
+                    let report_provider = if report.provider == "xai" {
+                        "xai"
+                    } else {
+                        "antigravity"
+                    };
+                    state
+                        .quota_cache
+                        .insert(report_provider.to_string(), report.clone());
+                    if report_provider == state.provider {
+                        state.quota = Some(report.clone());
+                        state.quota_error = None;
+                    }
                 }
-                Err(error) => state.quota_error = Some(error.clone()),
+                Err(error) if requested_provider == state.provider => {
+                    state.quota_error = Some(error.clone())
+                }
+                Err(_) => {}
             }
         }
+        if let Ok(report) = &usage {
+            let report_provider = if report.provider == "xai" {
+                "xai"
+            } else {
+                "antigravity"
+            };
+            state
+                .usage_cache
+                .insert(report_provider.to_string(), report.clone());
+            if report_provider == state.provider {
+                state.usage = Some(report.clone());
+            }
+        }
+        let refresh_again = std::mem::take(&mut state.refresh_again);
         (
             state.controls,
             state.hwnd as HWND,
             state.provider.clone(),
             state.operation_pending,
             was_pending && !state.operation_pending,
-            quota_attempted,
             state.quota.clone(),
+            state.usage.clone(),
+            state.provider_switching,
+            refresh_again,
         )
     };
     unsafe {
@@ -1657,13 +1855,21 @@ unsafe fn apply_refresh(update: RefreshResult) {
                 .or(status.operation.message.as_deref());
             set_text(
                 controls.subtitle,
-                operation_message.unwrap_or(if status.operation.running {
-                    "本地操作正在进行…"
-                } else if status.gateway.ok {
-                    "本地安全核心在线"
+                if provider_switching {
+                    if provider == "xai" {
+                        "正在切换到 Grok / xAI…"
+                    } else {
+                        "正在切换到 Antigravity…"
+                    }
                 } else {
-                    "请选择提供商并执行一键接入"
-                }),
+                    operation_message.unwrap_or(if status.operation.running {
+                        "本地操作正在进行…"
+                    } else if status.gateway.ok {
+                        "本地安全核心在线"
+                    } else {
+                        "请选择提供商并执行一键接入"
+                    })
+                },
             );
             set_text(controls.status_tun, &format_item("TUN", &status.tun));
             set_text(controls.status_proxy, &format_item("PROXY", &status.proxy));
@@ -1686,11 +1892,11 @@ unsafe fn apply_refresh(update: RefreshResult) {
             );
             set_text(
                 controls.provider_antigravity,
-                &format!("Antigravity  {}", status.provider_accounts.antigravity),
+                &format!("Antigravity · {} 个账号", status.provider_accounts.antigravity),
             );
             set_text(
                 controls.provider_grok,
-                &format!("Grok / xAI  {}", status.provider_accounts.xai),
+                &format!("Grok / xAI · {} 个账号", status.provider_accounts.xai),
             );
             SendMessageW(
                 controls.provider_antigravity as HWND,
@@ -1725,19 +1931,18 @@ unsafe fn apply_refresh(update: RefreshResult) {
             set_text(controls.subtitle, &format!("状态刷新失败：{error}"))
         },
     }
-    if quota_attempted {
-        let percent = quota_for_tray
-            .as_ref()
-            .and_then(quota_lowest)
-            .map(|value| value.round() as i32);
-        update_tray(hwnd, &provider, percent);
-    }
+    update_tray(
+        hwnd,
+        &provider,
+        quota_for_tray.as_ref(),
+        usage_for_tray.as_ref(),
+    );
     unsafe {
         InvalidateRect(hwnd, null(), 0);
         InvalidateRect(controls.provider_antigravity as HWND, null(), 1);
         InvalidateRect(controls.provider_grok as HWND, null(), 1);
     }
-    if operation_finished {
+    if operation_finished || refresh_again {
         request_refresh(hwnd, true);
     }
 }
@@ -1819,29 +2024,99 @@ fn select_provider(hwnd: HWND, provider: &'static str) {
     let Some(state_lock) = STATE.get() else {
         return;
     };
-    let (connection, antigravity, grok) = {
+    let (connection, antigravity, grok, previous) = {
         let mut state = state_lock.lock().unwrap();
+        if state.provider_switching || state.provider == provider {
+            return;
+        }
+        let previous = state.provider.clone();
+        state.provider_switching = true;
         state.provider = provider.to_string();
-        state.quota = None;
+        state.quota = state.quota_cache.get(provider).cloned();
+        state.usage = state.usage_cache.get(provider).cloned();
         state.quota_error = None;
         state.last_quota_refresh = None;
         (
             state.host.connection.clone(),
             state.controls.provider_antigravity as HWND,
             state.controls.provider_grok as HWND,
+            previous,
         )
     };
     unsafe {
+        EnableWindow(antigravity, 0);
+        EnableWindow(grok, 0);
         InvalidateRect(antigravity, null(), 1);
         InvalidateRect(grok, null(), 1);
+        if let Some(state) = STATE.get() {
+            let controls = state.lock().unwrap().controls;
+            set_text(
+                controls.subtitle,
+                if provider == "xai" {
+                    "正在切换到 Grok / xAI…"
+                } else {
+                    "正在切换到 Antigravity…"
+                },
+            );
+        }
+        InvalidateRect(hwnd, null(), 0);
     }
     let hwnd_value = hwnd as isize;
     thread::spawn(move || {
-        let _ = api_post(&connection, "/api/provider", json!({"provider": provider}));
+        let result = Box::new(ProviderSelectResult {
+            requested: provider.to_string(),
+            previous,
+            error: api_post(&connection, "/api/provider", json!({"provider": provider})).err(),
+        });
         unsafe {
-            let _ = PostMessageW(hwnd_value as HWND, WM_TIMER, TIMER_REFRESH, 0);
+            let _ = PostMessageW(
+                hwnd_value as HWND,
+                WM_PROVIDER_READY,
+                0,
+                Box::into_raw(result) as LPARAM,
+            );
         }
     });
+}
+
+unsafe fn finish_provider_selection(hwnd: HWND, result: ProviderSelectResult) {
+    let Some(state_lock) = STATE.get() else {
+        return;
+    };
+    let (controls, error) = {
+        let mut state = state_lock.lock().unwrap();
+        state.provider_switching = false;
+        if result.error.is_some() {
+            state.provider = result.previous.clone();
+            state.quota = state.quota_cache.get(&result.previous).cloned();
+            state.usage = state.usage_cache.get(&result.previous).cloned();
+        } else {
+            state.provider = result.requested.clone();
+            state.quota = state.quota_cache.get(&result.requested).cloned();
+            state.usage = state.usage_cache.get(&result.requested).cloned();
+            state.last_quota_refresh = None;
+        }
+        (state.controls, result.error)
+    };
+    unsafe {
+        EnableWindow(controls.provider_antigravity as HWND, 1);
+        EnableWindow(controls.provider_grok as HWND, 1);
+        InvalidateRect(controls.provider_antigravity as HWND, null(), 1);
+        InvalidateRect(controls.provider_grok as HWND, null(), 1);
+        InvalidateRect(hwnd, null(), 0);
+    }
+    if let Some(error) = error {
+        unsafe {
+            set_text(controls.subtitle, &format!("提供商切换失败：{error}"));
+            MessageBoxW(
+                hwnd,
+                wide(&format!("提供商切换失败：{error}")).as_ptr(),
+                wide("ZCode Antigravity").as_ptr(),
+                MB_OK | MB_ICONERROR,
+            );
+        }
+    }
+    request_refresh(hwnd, true);
 }
 
 unsafe fn copy_to_clipboard(hwnd: HWND, value: &str) -> Result<(), String> {
@@ -1900,7 +2175,71 @@ fn copy_wide_fixed<const N: usize>(target: &mut [u16; N], text: &str) {
     target[encoded.len()] = 0;
 }
 
-fn update_tray(hwnd: HWND, provider: &str, percent: Option<i32>) {
+#[derive(Clone)]
+struct QuotaWindowSummary {
+    remaining: f64,
+    reset_time: Option<String>,
+}
+
+fn quota_window_summary(report: &QuotaReport, kind: &str) -> Option<QuotaWindowSummary> {
+    let mut selected: Option<QuotaWindowSummary> = None;
+    for account in &report.accounts {
+        for group in account.groups.as_deref().unwrap_or(&[]) {
+            for bucket in &group.buckets {
+                let search = format!("{} {} {}", group.name, bucket.name, bucket.window).to_lowercase();
+                let matches = if kind == "five" {
+                    search.contains("5小时")
+                        || search.contains("5 小时")
+                        || search.contains("5-hour")
+                        || search.contains("5 hour")
+                        || search.contains("5h")
+                } else {
+                    search.contains("week")
+                        || search.contains('周')
+                        || search.contains("7-day")
+                        || search.contains("7 day")
+                        || search.contains("7天")
+                };
+                let Some(remaining) = bucket.remaining_percent.filter(|_| matches) else {
+                    continue;
+                };
+                if selected
+                    .as_ref()
+                    .map(|current| remaining < current.remaining)
+                    .unwrap_or(true)
+                {
+                    selected = Some(QuotaWindowSummary {
+                        remaining,
+                        reset_time: bucket.reset_time.clone(),
+                    });
+                }
+            }
+        }
+    }
+    selected
+}
+
+fn quota_window_menu_text(label: &str, value: Option<&QuotaWindowSummary>) -> String {
+    match value {
+        Some(value) => {
+            let reset = value
+                .reset_time
+                .as_deref()
+                .map(short_iso_time)
+                .map(|time| format!(" · 重置 {time}"))
+                .unwrap_or_default();
+            format!("{label}剩余：{:.0}%{reset}", value.remaining)
+        }
+        None => format!("{label}剩余：当前提供商未提供"),
+    }
+}
+
+fn update_tray(
+    hwnd: HWND,
+    provider: &str,
+    quota: Option<&QuotaReport>,
+    usage: Option<&UsageReport>,
+) {
     let mut data: NOTIFYICONDATAW = unsafe { std::mem::zeroed() };
     data.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
     data.hWnd = hwnd;
@@ -1911,12 +2250,22 @@ fn update_tray(hwnd: HWND, provider: &str, percent: Option<i32>) {
     } else {
         "Antigravity"
     };
-    copy_wide_fixed(
-        &mut data.szTip,
-        &percent
-            .map(|value| format!("ZCode · {provider} 最低剩余额度 {value}%"))
-            .unwrap_or_else(|| format!("ZCode · {provider} 额度暂不可用")),
-    );
+    let five = quota.and_then(|report| quota_window_summary(report, "five"));
+    let week = quota.and_then(|report| quota_window_summary(report, "week"));
+    let mut parts = vec![format!("ZCode · {provider}")];
+    if let Some(five) = five {
+        parts.push(format!("5小时 {:.0}%", five.remaining));
+    }
+    if let Some(week) = week {
+        parts.push(format!("本周 {:.0}%", week.remaining));
+    }
+    if let Some(latest) = usage.and_then(|report| report.latest.as_ref()) {
+        parts.push(format!("{:.1} tok/s", latest.output_tokens_per_second));
+    }
+    if parts.len() == 1 {
+        parts.push("额度暂不可用".to_string());
+    }
+    copy_wide_fixed(&mut data.szTip, &parts.join(" · "));
     unsafe { Shell_NotifyIconW(NIM_MODIFY, &data) };
 }
 
@@ -1930,12 +2279,61 @@ unsafe fn remove_tray_icon(hwnd: HWND) {
 
 unsafe fn show_tray_menu(hwnd: HWND) {
     let menu = unsafe { CreatePopupMenu() };
-    let provider = STATE
+    let (provider, quota, usage, accounts) = STATE
         .get()
-        .map(|state| state.lock().unwrap().provider.clone())
+        .map(|state| {
+            let state = state.lock().unwrap();
+            (
+                state.provider.clone(),
+                state.quota.clone(),
+                state.usage.clone(),
+                state.provider_accounts.clone(),
+            )
+        })
         .unwrap_or_default();
+    let provider_name = if provider == "xai" { "Grok / xAI" } else { "Antigravity" };
+    let account_count = if provider == "xai" { accounts.xai } else { accounts.antigravity };
+    let five = quota.as_ref().and_then(|report| quota_window_summary(report, "five"));
+    let week = quota.as_ref().and_then(|report| quota_window_summary(report, "week"));
     unsafe {
-        AppendMenuW(menu, MF_STRING, ID_TRAY_OPEN, wide("打开控制中心").as_ptr());
+        AppendMenuW(
+            menu,
+            MF_STRING | MF_GRAYED,
+            0,
+            wide(&format!("{provider_name} · {account_count} 个账号")).as_ptr(),
+        );
+        AppendMenuW(
+            menu,
+            MF_STRING | MF_GRAYED,
+            0,
+            wide(&quota_window_menu_text("5 小时", five.as_ref())).as_ptr(),
+        );
+        AppendMenuW(
+            menu,
+            MF_STRING | MF_GRAYED,
+            0,
+            wide(&quota_window_menu_text("本周", week.as_ref())).as_ptr(),
+        );
+        if let Some(latest) = usage.as_ref().and_then(|report| report.latest.as_ref()) {
+            AppendMenuW(
+                menu,
+                MF_STRING | MF_GRAYED,
+                0,
+                wide(&format!(
+                    "最近输出：{} token · {:.1} token/s",
+                    format_integer(latest.output_tokens),
+                    latest.output_tokens_per_second
+                ))
+                .as_ptr(),
+            );
+        } else {
+            AppendMenuW(
+                menu,
+                MF_STRING | MF_GRAYED,
+                0,
+                wide("Token 统计：等待首次模型响应").as_ptr(),
+            );
+        }
         AppendMenuW(menu, MF_SEPARATOR, 0, null());
         AppendMenuW(
             menu,
@@ -1951,6 +2349,7 @@ unsafe fn show_tray_menu(hwnd: HWND) {
         );
         AppendMenuW(menu, MF_STRING, ID_TRAY_REFRESH, wide("刷新额度").as_ptr());
         AppendMenuW(menu, MF_SEPARATOR, 0, null());
+        AppendMenuW(menu, MF_STRING, ID_TRAY_OPEN, wide("打开控制中心").as_ptr());
         AppendMenuW(menu, MF_STRING, ID_TRAY_QUIT, wide("退出").as_ptr());
         let mut point = POINT::default();
         GetCursorPos(&mut point);
@@ -2144,6 +2543,13 @@ unsafe extern "system" fn window_proc(
             }
             0
         }
+        WM_PROVIDER_READY => {
+            if lparam != 0 {
+                let result = unsafe { Box::from_raw(lparam as *mut ProviderSelectResult) };
+                unsafe { finish_provider_selection(hwnd, *result) };
+            }
+            0
+        }
         WM_REFRESH_READY => {
             if lparam != 0 {
                 let update = unsafe { Box::from_raw(lparam as *mut RefreshResult) };
@@ -2153,7 +2559,8 @@ unsafe extern "system" fn window_proc(
         }
         WM_TRAY => {
             match lparam as u32 {
-                WM_LBUTTONUP | WM_LBUTTONDBLCLK => unsafe {
+                WM_LBUTTONUP => unsafe { show_tray_menu(hwnd) },
+                WM_LBUTTONDBLCLK => unsafe {
                     ShowWindow(hwnd, SW_RESTORE);
                     SetForegroundWindow(hwnd);
                 },
@@ -2218,6 +2625,9 @@ fn show_fatal(message: &str) {
 }
 
 fn main() {
+    let auto_setup = std::env::args_os()
+        .skip(1)
+        .any(|argument| argument.to_string_lossy().eq_ignore_ascii_case("--auto-setup"));
     unsafe {
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
         let controls = INITCOMMONCONTROLSEX {
@@ -2313,6 +2723,9 @@ fn main() {
             SWP_NOZORDER | SWP_NOACTIVATE,
         );
         UpdateWindow(hwnd);
+        if auto_setup {
+            PostMessageW(hwnd, WM_COMMAND, ID_SETUP as WPARAM, 0);
+        }
         let mut message = MSG::default();
         while GetMessageW(&mut message, null_mut(), 0, 0) > 0 {
             TranslateMessage(&message);

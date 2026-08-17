@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "0.4.5-test"
+private let appVersion = "0.4.6-test"
 private let quotaRefreshInterval: TimeInterval = 5 * 60
 
 private extension Notification.Name {
@@ -89,6 +89,37 @@ struct CreditInfo: Decodable {
     let amount: Double
     let creditType: String
     let upstreamLabel: String
+}
+
+struct UsageSample: Decodable {
+    let timestamp: String
+    let provider: String
+    let model: String
+    let outputTokens: Int64
+    let nonReasoningTokens: Int64
+    let reasoningTokens: Int64
+    let totalTokens: Int64
+    let latencyMs: Int64
+    let ttftMs: Int64
+    let generationMs: Int64
+    let outputTokensPerSecond: Double
+    let speedBasis: String
+}
+
+struct UsageAggregate: Decodable {
+    let requests: Int
+    let outputTokens: Int64
+    let reasoningTokens: Int64
+    let averageTokensPerSecond: Double
+    let trackedFrom: String?
+}
+
+struct UsageReport: Decodable {
+    let provider: String
+    let available: Bool
+    let latest: UsageSample?
+    let total: UsageAggregate
+    let warning: String?
 }
 
 struct ConnectorResponse: Decodable {
@@ -236,7 +267,9 @@ final class BridgeModel: ObservableObject {
     @Published var status: DashboardStatus?
     @Published var quota: QuotaReport?
     @Published var connectors: ConnectorResponse?
+    @Published var usage: UsageReport?
     @Published var provider = "antigravity"
+    @Published var providerSwitching = false
     @Published var loading = true
     @Published var message = "正在启动本地安全核心…"
     @Published var errorMessage: String?
@@ -246,6 +279,8 @@ final class BridgeModel: ObservableObject {
     private var connection: NativeConnection?
     private var pollingTask: Task<Void, Never>?
     private var lastQuotaRefreshAttempt: Date?
+    private var quotaCache: [String: QuotaReport] = [:]
+    private var usageCache: [String: UsageReport] = [:]
     private var notificationTokens: [NSObjectProtocol] = []
 
     init() {
@@ -273,7 +308,7 @@ final class BridgeModel: ObservableObject {
                 await refreshAll()
                 pollingTask = Task { [weak self] in
                     while !Task.isCancelled {
-                        try? await Task.sleep(nanoseconds: 15_000_000_000)
+                        try? await Task.sleep(nanoseconds: 5_000_000_000)
                         await self?.refreshAll(showLoading: false, forceQuota: false)
                     }
                 }
@@ -298,9 +333,14 @@ final class BridgeModel: ObservableObject {
             let operationWasRunning = status?.operation.running == true
             let latest: DashboardStatus = try await request(path: "/api/status")
             status = latest
-            provider = latest.selectedProvider
+            if !providerSwitching { provider = latest.selectedProvider }
             errorMessage = nil
             connectors = await optionalRequest(path: "/api/connectors")
+            let usageProvider = provider
+            if let latestUsage: UsageReport = await optionalRequest(path: "/api/usage?provider=\(usageProvider)") {
+                usageCache[usageProvider] = latestUsage
+                if provider == usageProvider { usage = latestUsage }
+            }
             let providerChanged = previousProvider != provider
             let operationFinished = operationWasRunning && !latest.operation.running
             let quotaDue = lastQuotaRefreshAttempt.map { Date().timeIntervalSince($0) >= quotaRefreshInterval } ?? true
@@ -309,6 +349,7 @@ final class BridgeModel: ObservableObject {
                 do {
                     let latestQuota: QuotaReport = try await request(path: "/api/quota?provider=\(provider)")
                     quota = latestQuota
+                    quotaCache[provider] = latestQuota
                     quotaError = nil
                     lastQuotaRefresh = Date()
                 } catch {
@@ -316,29 +357,42 @@ final class BridgeModel: ObservableObject {
                 }
             }
             message = latest.operation.message ?? (latest.gateway.ok ? "网关在线" : "等待接入")
-            StatusBarController.shared.update(provider: provider, quota: quota, status: latest)
+            StatusBarController.shared.update(provider: provider, quota: quota, usage: usage, status: latest)
         } catch {
             errorMessage = error.localizedDescription
             message = "状态刷新失败"
-            StatusBarController.shared.update(provider: provider, quota: quota, status: status)
+            StatusBarController.shared.update(provider: provider, quota: quota, usage: usage, status: status)
         }
         loading = false
     }
 
     func selectProvider(_ value: String) async {
         let normalized = value == "xai" || value == "grok" ? "xai" : "antigravity"
+        guard !providerSwitching, normalized != provider else { return }
+        let previous = provider
+        providerSwitching = true
         provider = normalized
+        quota = quotaCache[normalized]
+        usage = usageCache[normalized]
+        if let latestUsage: UsageReport = await optionalRequest(path: "/api/usage?provider=\(normalized)") {
+            usageCache[normalized] = latestUsage
+            if provider == normalized { usage = latestUsage }
+        }
+        message = normalized == "xai" ? "正在切换到 Grok / xAI…" : "正在切换到 Antigravity…"
         do {
             let _: [String: String] = try await request(path: "/api/provider", method: "POST", body: ["provider": normalized])
-            quota = nil
             quotaError = nil
             lastQuotaRefresh = nil
             lastQuotaRefreshAttempt = nil
             connectors = nil
             await refreshAll(showLoading: false, forceQuota: true)
         } catch {
+            provider = previous
+            quota = quotaCache[previous]
+            usage = usageCache[previous]
             errorMessage = error.localizedDescription
         }
+        providerSwitching = false
     }
 
     func runAction(_ action: String) async {
@@ -405,6 +459,9 @@ final class StatusBarController: NSObject {
 
     private var statusItem: NSStatusItem?
     private let summaryItem = NSMenuItem(title: "额度：正在读取…", action: nil, keyEquivalent: "")
+    private let fiveHourItem = NSMenuItem(title: "5 小时剩余：正在读取…", action: nil, keyEquivalent: "")
+    private let weeklyItem = NSMenuItem(title: "本周剩余：正在读取…", action: nil, keyEquivalent: "")
+    private let tokenItem = NSMenuItem(title: "Token 统计：等待首次响应", action: nil, keyEquivalent: "")
     private let antigravityItem = NSMenuItem(title: "使用 Antigravity", action: #selector(selectAntigravity), keyEquivalent: "")
     private let grokItem = NSMenuItem(title: "使用 Grok", action: #selector(selectGrok), keyEquivalent: "")
 
@@ -416,8 +473,10 @@ final class StatusBarController: NSObject {
         item.button?.toolTip = "ZCode Antigravity 额度"
 
         let menu = NSMenu()
-        summaryItem.isEnabled = false
-        menu.addItem(summaryItem)
+        for infoItem in [summaryItem, fiveHourItem, weeklyItem, tokenItem] {
+            infoItem.isEnabled = false
+            menu.addItem(infoItem)
+        }
         menu.addItem(.separator())
         antigravityItem.target = self
         grokItem.target = self
@@ -439,24 +498,57 @@ final class StatusBarController: NSObject {
         setProviderChecks("antigravity")
     }
 
-    func update(provider: String, quota: QuotaReport?, status: DashboardStatus?) {
+    func update(provider: String, quota: QuotaReport?, usage: UsageReport?, status: DashboardStatus?) {
         DispatchQueue.main.async {
             self.setProviderChecks(provider)
-            let name = provider == "xai" ? "Grok" : "Antigravity"
-            let remaining = quota?.accounts
-                .flatMap { $0.groups ?? [] }
-                .flatMap(\.buckets)
-                .compactMap(\.remainingPercent)
-                .min()
-            if let remaining {
-                self.summaryItem.title = String(format: "%@ 最低剩余额度 %.0f%%", name, remaining)
-                self.statusItem?.button?.title = String(format: " %.0f%%", remaining)
+            let name = provider == "xai" ? "Grok / xAI" : "Antigravity"
+            let count = provider == "xai" ? status?.providerAccounts.xai ?? 0 : status?.providerAccounts.antigravity ?? 0
+            self.summaryItem.title = "\(name) · \(count) 个账号"
+            let five = self.quotaWindow(quota, kind: "five")
+            let week = self.quotaWindow(quota, kind: "week")
+            self.fiveHourItem.title = self.quotaMenuTitle("5 小时", bucket: five)
+            self.weeklyItem.title = self.quotaMenuTitle("本周", bucket: week)
+            if let latest = usage?.latest {
+                let speedLabel = latest.speedBasis == "generation" ? "生成速度" : "有效吞吐"
+                self.tokenItem.title = String(format: "最近输出：%@ token · %@ %.1f token/s", self.formatInteger(latest.outputTokens), speedLabel, latest.outputTokensPerSecond)
             } else {
-                self.summaryItem.title = "\(name) 额度暂不可用"
-                self.statusItem?.button?.title = ""
+                self.tokenItem.title = "Token 统计：等待首次成功的模型响应"
             }
-            self.statusItem?.button?.toolTip = self.summaryItem.title
+            var buttonParts: [String] = []
+            if let remaining = five?.remainingPercent { buttonParts.append(String(format: "5h %.0f%%", remaining)) }
+            if let remaining = week?.remainingPercent { buttonParts.append(String(format: "周 %.0f%%", remaining)) }
+            self.statusItem?.button?.title = buttonParts.isEmpty ? "" : " " + buttonParts.joined(separator: " · ")
+            self.statusItem?.button?.toolTip = [self.summaryItem.title, self.fiveHourItem.title, self.weeklyItem.title, self.tokenItem.title].joined(separator: "\n")
         }
+    }
+
+    private func quotaWindow(_ quota: QuotaReport?, kind: String) -> QuotaBucket? {
+        quota?.accounts
+            .flatMap { $0.groups ?? [] }
+            .flatMap { group in
+                group.buckets.filter { bucket in
+                    let search = "\(group.name) \(bucket.name) \(bucket.window)".lowercased()
+                    if kind == "five" {
+                        return search.contains("5小时") || search.contains("5 小时") || search.contains("5-hour") || search.contains("5 hour") || search.contains("5h")
+                    }
+                    return search.contains("week") || search.contains("周") || search.contains("7-day") || search.contains("7 day") || search.contains("7天")
+                }
+            }
+            .filter { $0.remainingPercent != nil }
+            .min { ($0.remainingPercent ?? 101) < ($1.remainingPercent ?? 101) }
+    }
+
+    private func quotaMenuTitle(_ label: String, bucket: QuotaBucket?) -> String {
+        guard let bucket, let remaining = bucket.remainingPercent else { return "\(label)剩余：当前提供商未提供" }
+        let reset = bucket.resetTime.map { " · 重置 " + String($0.prefix(16)).replacingOccurrences(of: "T", with: " ") } ?? ""
+        return String(format: "%@剩余：%.0f%%%@", label, remaining, reset)
+    }
+
+    private func formatInteger(_ value: Int64) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 
     private func setProviderChecks(_ provider: String) {
@@ -601,12 +693,24 @@ struct DashboardView: View {
                     Label("刷新", systemImage: "arrow.clockwise")
                 }
             }
-            Picker("账号提供商", selection: Binding(get: { model.provider }, set: { value in Task { await model.selectProvider(value) } })) {
-                Text("Antigravity  \(model.status?.providerAccounts.antigravity ?? 0)").tag("antigravity")
-                Text("Grok / xAI  \(model.status?.providerAccounts.xai ?? 0)").tag("xai")
+            HStack(spacing: 10) {
+                ProviderChoiceButton(
+                    title: "Antigravity",
+                    subtitle: "Google · Gemini",
+                    count: model.status?.providerAccounts.antigravity ?? 0,
+                    selected: model.provider != "xai",
+                    switching: model.providerSwitching && model.provider != "xai"
+                ) { Task { await model.selectProvider("antigravity") } }
+                ProviderChoiceButton(
+                    title: "Grok / xAI",
+                    subtitle: "Grok Build",
+                    count: model.status?.providerAccounts.xai ?? 0,
+                    selected: model.provider == "xai",
+                    switching: model.providerSwitching && model.provider == "xai"
+                ) { Task { await model.selectProvider("xai") } }
             }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 430)
+            .frame(maxWidth: 560)
+            .disabled(model.providerSwitching)
             if let error = model.errorMessage {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.callout)
@@ -634,6 +738,7 @@ struct DashboardView: View {
             NativeCard {
                 VStack(alignment: .leading, spacing: 16) {
                     CardTitle(kicker: model.provider == "xai" ? "GROK USAGE" : "ANTIGRAVITY USAGE", title: model.provider == "xai" ? "Grok 共享额度" : "Gemini 模型额度", icon: "chart.bar.fill")
+                    performanceSummary
                     quotaContent
                 }
             }
@@ -651,6 +756,57 @@ struct DashboardView: View {
             }
             .frame(width: 330)
         }
+    }
+
+    private var performanceSummary: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 9)], spacing: 9) {
+                QuotaSummaryTile(
+                    title: "最近输出",
+                    value: model.usage?.latest.map { "\(formatToken($0.outputTokens)) tok" } ?? "—",
+                    icon: "text.line.last.and.arrowtriangle.forward",
+                    tint: .blue
+                )
+                QuotaSummaryTile(
+                    title: model.usage?.latest?.speedBasis == "generation" ? "生成速度" : "有效吞吐",
+                    value: model.usage?.latest.map { String(format: "%.1f tok/s", $0.outputTokensPerSecond) } ?? "—",
+                    icon: "speedometer",
+                    tint: .purple
+                )
+                QuotaSummaryTile(
+                    title: "推理 Token",
+                    value: model.usage?.latest.map { formatToken($0.reasoningTokens) } ?? "—",
+                    icon: "brain.head.profile",
+                    tint: .orange
+                )
+                QuotaSummaryTile(
+                    title: "本地累计输出",
+                    value: model.usage?.available == true ? "\(formatToken(model.usage?.total.outputTokens ?? 0)) tok" : "—",
+                    icon: "sum",
+                    tint: .green
+                )
+            }
+            if let latest = model.usage?.latest {
+                let timing = latest.speedBasis == "generation"
+                    ? String(format: "生成 %.1fs · 首字节 %.1fs", Double(latest.generationMs) / 1000, Double(latest.ttftMs) / 1000)
+                    : String(format: "完整调用 %.1fs · 当前显示有效吞吐", Double(latest.latencyMs) / 1000)
+                Text("\(latest.model) · \(timing) · 本地 \(model.usage?.total.requests ?? 0) 次平均 \(String(format: "%.1f", model.usage?.total.averageTokensPerSecond ?? 0)) tok/s")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            } else {
+                Text("Token 统计已启用；完成一次模型响应后显示真实输出量与速度，不保存提示词或回复。")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func formatToken(_ value: Int64) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 
     @ViewBuilder
@@ -776,6 +932,49 @@ struct DashboardView: View {
                 }
             }
         }
+    }
+}
+
+struct ProviderChoiceButton: View {
+    let title: String
+    let subtitle: String
+    let count: Int
+    let selected: Bool
+    let switching: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(selected ? Color.accentColor : Color.secondary.opacity(0.22))
+                        .frame(width: 25, height: 25)
+                    if switching {
+                        ProgressView().controlSize(.mini).tint(.white)
+                    } else if selected {
+                        Image(systemName: "checkmark").font(.caption.bold()).foregroundStyle(.white)
+                    } else {
+                        Circle().fill(Color(nsColor: .controlBackgroundColor)).frame(width: 9, height: 9)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.callout.weight(.semibold))
+                    Text(subtitle).font(.caption2).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                Text("\(count) 个账号")
+                    .font(.caption.monospacedDigit().weight(.medium))
+                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+            }
+            .padding(.horizontal, 13)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(selected ? Color.accentColor.opacity(0.12) : Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 11))
+        .overlay(RoundedRectangle(cornerRadius: 11).stroke(selected ? Color.accentColor.opacity(0.75) : Color.primary.opacity(0.08), lineWidth: selected ? 1.5 : 1))
+        .animation(.easeInOut(duration: 0.18), value: selected)
     }
 }
 

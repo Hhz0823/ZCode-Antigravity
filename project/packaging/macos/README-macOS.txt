@@ -1,7 +1,7 @@
 ZCode Antigravity Bridge - macOS Universal test build
 ====================================================
 
-版本：0.4.5-test
+版本：0.4.6-test
 架构：Apple Silicon (arm64) + Intel (x86_64)
 最低系统：macOS 12
 
@@ -12,6 +12,8 @@ ZCode Antigravity Bridge - macOS Universal test build
 App 会在程序坞显示图标，并在菜单栏持续显示所选账号额度。
 额度卡片按账号和时间窗口显示彩色进度条、重置时间与最低余量；程序每 5 分钟
 自动刷新一次额度，手动刷新、切换提供商和接入完成后会立即刷新。
+菜单栏点击菜单同时显示 5 小时 / 本周余量与重置时间；主界面显示协议返回的
+最近输出 Token、推理 Token、Token/s 和本地累计输出，不保存提示词或回复。
 
 这是非官方测试版，会使用未公开的 Antigravity 接口。Google 可能限流、暂停
 API 权限或封禁账号。请只使用专门的测试账号，不要使用主 Gmail、Workspace
@@ -54,6 +56,8 @@ proxyURL。支持 http、https 和 socks5，且应只指向可信的本机代理
 - Google / xAI access/refresh token 用随机 AES-256-GCM 主密钥加密；主密钥保存在
   macOS 登录钥匙串，服务名为 io.github.hhz0823.zcode-antigravity。
 - 发布包不包含用户 token、账号 JSON、本地 API key、日志或 ZCode 配置。
+- usage-metrics.json 只保存提供商、模型、Token 数、耗时与时间戳，不保存提示词、
+  模型回复、API key、OAuth token 或完整账号信息。
 - 停止 Bridge 或删除 Provider 不会撤销 Google 授权。
 
 源码构建
