@@ -1,5 +1,8 @@
 #![windows_subsystem = "windows"]
 
+mod protocol;
+
+use protocol::{ConnectorResponse, NativeConnection};
 use serde::Deserialize;
 use serde_json::json;
 use std::ffi::c_void;
@@ -21,7 +24,7 @@ use windows_sys::Win32::UI::HiDpi::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-const VERSION: &str = "0.4.0-test";
+const VERSION: &str = "0.4.1-test";
 const SS_LEFT: u32 = 0;
 const CF_UNICODETEXT_VALUE: u32 = 13;
 const WM_REFRESH_READY: u32 = WM_APP + 1;
@@ -45,13 +48,6 @@ const ID_TRAY_GROK: usize = 303;
 const ID_TRAY_QUIT: usize = 304;
 
 static STATE: OnceLock<Mutex<AppState>> = OnceLock::new();
-
-#[derive(Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct NativeConnection {
-    base_url: String,
-    session: String,
-}
 
 struct NativeHost {
     child: Child,
@@ -187,21 +183,6 @@ struct CreditInfo {
     available: bool,
     amount: f64,
     credit_type: String,
-}
-
-#[derive(Clone, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ConnectorResponse {
-    model: String,
-    base_url: String,
-    connectors: Vec<AgentConnector>,
-}
-
-#[derive(Clone, Default, Deserialize)]
-struct AgentConnector {
-    name: String,
-    description: String,
-    snippets: std::collections::BTreeMap<String, String>,
 }
 
 struct RefreshResult {

@@ -2,6 +2,15 @@
 
 最新验证日期：2026-08-17（Asia/Shanghai）
 
+## v0.4.1-test Windows 启动修复
+
+- 用户实机截图确认 v0.4.0 Rust 客户端启动时报告 `missing field baseUrl`。根因是 Go
+  `native-host` 的协议字段为 `baseURL`，而 Serde 默认把 Rust `base_url` 映射为 `baseUrl`。
+- `NativeConnection` 与 `ConnectorResponse` 现显式使用规范字段 `baseURL`，并兼容读取旧式
+  `baseUrl`；没有降低随机 loopback 会话密钥边界。
+- 协议结构已拆到可在 macOS 构建机执行的 Rust library，两个真实 Go JSON 形状回归测试通过，
+  防止连接阶段或 Agent 配置阶段再次出现同类 acronym 映射错误。
+
 ## v0.4.0-test 原生客户端验证
 
 - macOS 用户界面已改为 SwiftUI + AppKit；`LSUIElement=false`、App Icon、Dock 注册和

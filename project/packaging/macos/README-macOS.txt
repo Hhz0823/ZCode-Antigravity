@@ -1,7 +1,7 @@
 ZCode Antigravity Bridge - macOS Universal test build
 ====================================================
 
-版本：0.4.0-test
+版本：0.4.1-test
 架构：Apple Silicon (arm64) + Intel (x86_64)
 最低系统：macOS 12
 
