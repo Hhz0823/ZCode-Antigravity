@@ -22,7 +22,7 @@ foreach ($required in @($runtimeScript, $manager, $controlCenter, $backend)) {
 
 $forbiddenNames = @('local-api-key', 'state.json', 'config.yaml', 'last-smoke-test.json')
 $forbidden = @(Get-ChildItem -LiteralPath $packageFull -Recurse -File | Where-Object {
-    $_.Name -in $forbiddenNames -or $_.Name -like 'antigravity-*.json' -or $_.Extension -eq '.log'
+    $_.Name -in $forbiddenNames -or $_.Name -like 'antigravity-*.json' -or $_.Name -like 'xai-*.json' -or $_.Extension -eq '.log'
 })
 if ($forbidden.Count -gt 0) {
     throw "Package contains runtime credentials/state/logs: $($forbidden.FullName -join ', ')"

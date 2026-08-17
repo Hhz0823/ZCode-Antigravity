@@ -20,6 +20,14 @@ foreach ($required in @($mainTemplate, $encodingSource, $installScript, $manager
     }
 }
 
+$forbiddenNames = @('local-api-key', 'state.json', 'config.yaml', 'last-smoke-test.json')
+$forbidden = @(Get-ChildItem -LiteralPath $packageFull -Recurse -File | Where-Object {
+    $_.Name -in $forbiddenNames -or $_.Name -like 'antigravity-*.json' -or $_.Name -like 'xai-*.json' -or $_.Extension -eq '.log'
+})
+if ($forbidden.Count -gt 0) {
+    throw "Package contains runtime credentials/state/logs: $($forbidden.FullName -join ', ')"
+}
+
 $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $buildRoot = [IO.Path]::GetFullPath((Join-Path $tempRoot ('zcode-antigravity-exe-build-' + [Guid]::NewGuid().ToString('N'))))
 if (-not $buildRoot.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase) -or
