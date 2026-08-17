@@ -48,7 +48,7 @@ func (g *guiRuntime) serveConnectors(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": errSelect.Error()})
 		return
 	}
-	model := preferredConnectorModel(provider, models)
+	model := preferredConnectorModel(provider, models, g.app.currentSettings().BackgroundModel)
 	baseURL := g.app.gatewayURL(current.Port)
 	writeJSON(w, http.StatusOK, connectorResponse{
 		Provider:   provider,
@@ -58,8 +58,12 @@ func (g *guiRuntime) serveConnectors(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func preferredConnectorModel(provider string, models []modelInfo) string {
-	preferred := []string{"gemini-3.7-flash", "gemini-3.6-flash"}
+func preferredConnectorModel(provider string, models []modelInfo, backgroundModel string) string {
+	preferred := []string{}
+	if provider != "xai" && strings.TrimSpace(backgroundModel) != "" {
+		preferred = append(preferred, strings.TrimSpace(backgroundModel))
+	}
+	preferred = append(preferred, "gemini-3.7-flash", "gemini-3.6-flash")
 	if provider == "xai" {
 		preferred = []string{"grok-build-0.1", "grok-4.6", "grok-4.5", "grok-code-fast-1"}
 	}

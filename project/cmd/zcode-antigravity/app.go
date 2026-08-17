@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -36,6 +37,17 @@ type settings struct {
 	CallbackPreferredPort int    `json:"callbackPreferredPort"`
 	CallbackScanEnd       int    `json:"callbackScanEnd"`
 	ProxyURL              string `json:"proxyURL"`
+	RoutingStrategy       string `json:"routingStrategy"`
+	SessionAffinity       bool   `json:"sessionAffinity"`
+	SessionAffinityTTL    string `json:"sessionAffinityTTL"`
+	RequestRetry          int    `json:"requestRetry"`
+	MaxRetryCredentials   int    `json:"maxRetryCredentials"`
+	MaxRetryInterval      int    `json:"maxRetryInterval"`
+	AutoRefreshMinutes    int    `json:"autoRefreshMinutes"`
+	QuotaWarningPercent   int    `json:"quotaWarningPercent"`
+	BackgroundModel       string `json:"backgroundModel"`
+	Theme                 string `json:"theme"`
+	LiquidGlass           bool   `json:"liquidGlass"`
 }
 
 type paths struct {
@@ -50,6 +62,7 @@ type paths struct {
 	Secret        string
 	Lock          string
 	Settings      string
+	UserSettings  string
 	ZCodeConfig   string
 	ZCodeBackups  string
 	PackageReadme string
@@ -59,6 +72,7 @@ type paths struct {
 type app struct {
 	paths        paths
 	settings     settings
+	settingsMu   sync.RWMutex
 	apiKey       string
 	now          func() time.Time
 	zcodeRunning func() bool
@@ -83,6 +97,17 @@ func defaultSettings() settings {
 		PortScanEnd:           18180,
 		CallbackPreferredPort: 51121,
 		CallbackScanEnd:       51221,
+		RoutingStrategy:       "round-robin",
+		SessionAffinity:       true,
+		SessionAffinityTTL:    "2h",
+		RequestRetry:          2,
+		MaxRetryCredentials:   2,
+		MaxRetryInterval:      20,
+		AutoRefreshMinutes:    5,
+		QuotaWarningPercent:   20,
+		BackgroundModel:       "gemini-3.6-flash",
+		Theme:                 "system",
+		LiquidGlass:           true,
 	}
 }
 
@@ -139,6 +164,7 @@ func newApp(rootOverride string) (*app, error) {
 	p.Secret = filepath.Join(p.Data, "local-api-key")
 	p.Lock = filepath.Join(p.Data, "manager.lock")
 	p.UsageMetrics = filepath.Join(p.Data, "usage-metrics.json")
+	p.UserSettings = filepath.Join(p.Data, "manager-settings.json")
 
 	for _, dir := range []string{p.Data, p.AuthDir, p.LogsDir} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -146,6 +172,10 @@ func newApp(rootOverride string) (*app, error) {
 		}
 	}
 	s, err := loadSettings(p.Settings)
+	if err != nil {
+		return nil, err
+	}
+	s, err = overlaySettings(p.UserSettings, s)
 	if err != nil {
 		return nil, err
 	}
@@ -268,6 +298,11 @@ func readZCodeDataBaseDir(base string) (value string, exists bool, err error) {
 
 func loadSettings(path string) (settings, error) {
 	s := defaultSettings()
+	return overlaySettings(path, s)
+}
+
+func overlaySettings(path string, base settings) (settings, error) {
+	s := base
 	raw, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return s, nil
@@ -278,16 +313,77 @@ func loadSettings(path string) (settings, error) {
 	if err := json.Unmarshal(raw, &s); err != nil {
 		return s, fmt.Errorf("settings.json 不是有效 JSON: %w", err)
 	}
-	if s.PreferredPort < 1024 || s.PreferredPort > 65535 || s.PortScanEnd < s.PreferredPort || s.PortScanEnd > 65535 || s.PortScanEnd-s.PreferredPort > 1000 {
-		return s, fmt.Errorf("settings.json 的 API 端口范围无效")
-	}
-	if s.CallbackPreferredPort < 1024 || s.CallbackPreferredPort > 65535 || s.CallbackScanEnd < s.CallbackPreferredPort || s.CallbackScanEnd > 65535 || s.CallbackScanEnd-s.CallbackPreferredPort > 1000 {
-		return s, fmt.Errorf("settings.json 的 OAuth 回调端口范围无效")
-	}
-	if err := validateProxyURL(s.ProxyURL); err != nil {
+	s.RoutingStrategy = strings.ToLower(strings.TrimSpace(s.RoutingStrategy))
+	s.SessionAffinityTTL = strings.TrimSpace(s.SessionAffinityTTL)
+	s.ProxyURL = strings.TrimSpace(s.ProxyURL)
+	s.BackgroundModel = strings.TrimSpace(s.BackgroundModel)
+	s.Theme = strings.ToLower(strings.TrimSpace(s.Theme))
+	if err := validateSettings(s); err != nil {
 		return s, err
 	}
 	return s, nil
+}
+
+func validateSettings(s settings) error {
+	if s.PreferredPort < 1024 || s.PreferredPort > 65535 || s.PortScanEnd < s.PreferredPort || s.PortScanEnd > 65535 || s.PortScanEnd-s.PreferredPort > 1000 {
+		return fmt.Errorf("settings.json 的 API 端口范围无效")
+	}
+	if s.CallbackPreferredPort < 1024 || s.CallbackPreferredPort > 65535 || s.CallbackScanEnd < s.CallbackPreferredPort || s.CallbackScanEnd > 65535 || s.CallbackScanEnd-s.CallbackPreferredPort > 1000 {
+		return fmt.Errorf("settings.json 的 OAuth 回调端口范围无效")
+	}
+	if err := validateProxyURL(s.ProxyURL); err != nil {
+		return err
+	}
+	if s.RoutingStrategy != "round-robin" && s.RoutingStrategy != "weighted-round-robin" && s.RoutingStrategy != "fill-first" {
+		return fmt.Errorf("settings.json 的 routingStrategy 无效")
+	}
+	if strings.TrimSpace(s.SessionAffinityTTL) == "" || len(s.SessionAffinityTTL) > 16 {
+		return fmt.Errorf("settings.json 的 sessionAffinityTTL 无效")
+	}
+	if s.RequestRetry < 0 || s.RequestRetry > 10 || s.MaxRetryCredentials < 0 || s.MaxRetryCredentials > 20 || s.MaxRetryInterval < 1 || s.MaxRetryInterval > 300 {
+		return fmt.Errorf("settings.json 的重试设置无效")
+	}
+	if s.AutoRefreshMinutes < 1 || s.AutoRefreshMinutes > 60 {
+		return fmt.Errorf("settings.json 的 autoRefreshMinutes 必须在 1-60 之间")
+	}
+	if s.QuotaWarningPercent < 1 || s.QuotaWarningPercent > 90 {
+		return fmt.Errorf("settings.json 的 quotaWarningPercent 必须在 1-90 之间")
+	}
+	if len(strings.TrimSpace(s.BackgroundModel)) > 160 {
+		return fmt.Errorf("settings.json 的 backgroundModel 过长")
+	}
+	if s.Theme != "system" && s.Theme != "light" && s.Theme != "dark" {
+		return fmt.Errorf("settings.json 的 theme 无效")
+	}
+	return nil
+}
+
+func (a *app) currentSettings() settings {
+	a.settingsMu.RLock()
+	defer a.settingsMu.RUnlock()
+	return a.settings
+}
+
+func (a *app) saveUserSettings(s settings) error {
+	s.RoutingStrategy = strings.ToLower(strings.TrimSpace(s.RoutingStrategy))
+	s.SessionAffinityTTL = strings.TrimSpace(s.SessionAffinityTTL)
+	s.ProxyURL = strings.TrimSpace(s.ProxyURL)
+	s.BackgroundModel = strings.TrimSpace(s.BackgroundModel)
+	s.Theme = strings.ToLower(strings.TrimSpace(s.Theme))
+	if err := validateSettings(s); err != nil {
+		return err
+	}
+	raw, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := writeAtomic(a.paths.UserSettings, append(raw, '\n'), 0o600); err != nil {
+		return fmt.Errorf("保存管理设置: %w", err)
+	}
+	a.settingsMu.Lock()
+	a.settings = s
+	a.settingsMu.Unlock()
+	return nil
 }
 
 func validateProxyURL(value string) error {

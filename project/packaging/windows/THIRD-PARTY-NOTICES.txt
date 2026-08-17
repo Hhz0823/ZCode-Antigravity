@@ -32,14 +32,14 @@ RUST-DEPENDENCIES.txt; unmodified upstream license files are under rust-licenses
 Interface behavior reference
 ============================
 
-The v0.4.5 quota card behavior and information hierarchy were independently implemented after
+The v0.5.0 account, quota, protocol, routing, retry, and refresh behavior was independently implemented after
 reviewing lbjlaq/Antigravity-Manager (snapshot a2e3c45), licensed CC BY-NC-SA 4.0:
 https://github.com/lbjlaq/Antigravity-Manager
 
 No Tauri, React, or source files from that project are included. See
 project/docs/ANTIGRAVITY-MANAGER-REFERENCE.md in the source distribution.
 
-The v0.4.7 dashboard, taskbar widget, quota hierarchy, and effective-throughput terminology were independently
+The v0.5.0 liquid-glass dashboard, taskbar widget, quota hierarchy, and effective-throughput terminology were independently
 implemented after reviewing shanggqm/codexU (snapshot eb28c8f), licensed MIT:
 https://github.com/shanggqm/codexU
 

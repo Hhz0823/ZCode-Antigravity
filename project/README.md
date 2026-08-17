@@ -11,7 +11,8 @@ smoke testing, image/audio/video request translation, safe no-op reuse while ZCo
 PID/path-safe stop, managed-provider removal, a strict Gemini plus Grok-text model selector,
 Grok billing, protocol-derived output-token and token/s metrics, detailed taskbar/menu-bar quota
 menus, Agent connector cards, a hidden native-host API, SwiftUI/AppKit macOS UI, Rust/Win32
-Windows UI, and SHA-256 verified Windows installers.
+Windows UI, an authenticated manager API for accounts/protocols/routing/retry/UI settings,
+Codex U-inspired liquid-glass native dashboards, and SHA-256 verified Windows installers.
 
 Build and package the macOS Universal App:
 
@@ -58,7 +59,7 @@ Build the single-BAT installer from a verified expanded package:
 ```powershell
 .\packaging\windows\Build-Single-Bat.ps1 `
   -PackageDir C:\path\to\expanded-package `
-  -OutputFile C:\path\to\ZCode-Antigravity-OneClick-v0.4.7-test.bat
+  -OutputFile C:\path\to\ZCode-Antigravity-OneClick-v0.5.0-test.bat
 ```
 
 Build the native no-console EXE installer from the same verified package:
@@ -66,5 +67,5 @@ Build the native no-console EXE installer from the same verified package:
 ```powershell
 .\packaging\windows\Build-Exe-Installer.ps1 `
   -PackageDir C:\path\to\expanded-package `
-  -OutputFile C:\path\to\ZCode-Antigravity-Setup-v0.4.7-test.exe
+  -OutputFile C:\path\to\ZCode-Antigravity-Setup-v0.5.0-test.exe
 ```

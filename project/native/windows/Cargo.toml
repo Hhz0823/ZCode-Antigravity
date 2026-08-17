@@ -1,6 +1,6 @@
 [package]
 name = "zcode-antigravity-native"
-version = "0.4.7-test"
+version = "0.5.0-test"
 edition = "2024"
 license = "LicenseRef-Proprietary"
 publish = false
@@ -12,6 +12,7 @@ ureq = { version = "3.4.0", default-features = false, features = ["json"] }
 windows-sys = { version = "0.61.2", features = [
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
+  "Win32_Graphics_Dwm",
   "Win32_System_DataExchange",
   "Win32_System_LibraryLoader",
   "Win32_System_Memory",

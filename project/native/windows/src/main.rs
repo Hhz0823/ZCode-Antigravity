@@ -15,6 +15,7 @@ use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 use windows_sys::Win32::Foundation::*;
+use windows_sys::Win32::Graphics::Dwm::*;
 use windows_sys::Win32::Graphics::Gdi::*;
 use windows_sys::Win32::System::DataExchange::*;
 use windows_sys::Win32::System::LibraryLoader::*;
@@ -26,7 +27,7 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-const VERSION: &str = "0.4.7-test";
+const VERSION: &str = "0.5.0-test";
 const SS_LEFT: u32 = 0;
 const CF_UNICODETEXT_VALUE: u32 = 13;
 const WM_REFRESH_READY: u32 = WM_APP + 1;
@@ -36,29 +37,35 @@ const WM_TRAY: u32 = WM_APP + 20;
 const TIMER_REFRESH: usize = 1;
 const TIMER_OPERATION_POLL: usize = 2;
 const STATUS_REFRESH_MS: u32 = 5_000;
-const QUOTA_REFRESH_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 // codexU-inspired native palette. COLORREF stores bytes as 0x00BBGGRR.
-const COLOR_BACKGROUND: COLORREF = 0x00FCFAF8;
-const COLOR_CARD: COLORREF = 0x00FFFFFF;
-const COLOR_BORDER: COLORREF = 0x00F0E8E2;
-const COLOR_SURFACE_INSET: COLORREF = 0x00F9F5F1;
+const COLOR_BACKGROUND: COLORREF = 0x00482014;
+const COLOR_CARD: COLORREF = 0x00532B1E;
+const COLOR_BORDER: COLORREF = 0x00BA7E71;
+const COLOR_SURFACE_INSET: COLORREF = 0x00603427;
 const COLOR_PRIMARY: COLORREF = 0x00F76628;
 const COLOR_PRIMARY_DARK: COLORREF = 0x00ED591F;
-const COLOR_PRIMARY_SOFT: COLORREF = 0x00FFF3ED;
-const COLOR_SECONDARY: COLORREF = 0x00FF6D8B;
-const COLOR_TEXT: COLORREF = 0x00271811;
-const COLOR_MUTED: COLORREF = 0x0063554B;
-const COLOR_TERTIARY: COLORREF = 0x0080726B;
+const COLOR_PRIMARY_SOFT: COLORREF = 0x00693629;
+const COLOR_SECONDARY: COLORREF = 0x00F755A8;
+const COLOR_TEXT: COLORREF = 0x00FFF4F0;
+const COLOR_MUTED: COLORREF = 0x00DEBBAC;
+const COLOR_TERTIARY: COLORREF = 0x00C29784;
 const COLOR_LIGHT_TEXT: COLORREF = 0x00FFFFFF;
-const COLOR_SUCCESS: COLORREF = 0x004AA316;
-const COLOR_WARNING: COLORREF = 0x000677D9;
-const COLOR_DANGER: COLORREF = 0x002626DC;
-const COLOR_TRACK: COLORREF = 0x00F3EFEA;
+const COLOR_SUCCESS: COLORREF = 0x0077DC49;
+const COLOR_WARNING: COLORREF = 0x0049B1FF;
+const COLOR_DANGER: COLORREF = 0x006450FF;
+const COLOR_TRACK: COLORREF = 0x007C4D3F;
 
 const ID_PROVIDER_ANTIGRAVITY: i32 = 100;
 const ID_PROVIDER_GROK: i32 = 101;
 const ID_REFRESH: i32 = 102;
+const ID_NAV_OVERVIEW: i32 = 110;
+const ID_NAV_ACCOUNTS: i32 = 111;
+const ID_NAV_PROXY: i32 = 112;
+const ID_NAV_ROUTING: i32 = 113;
+const ID_NAV_CONNECTORS: i32 = 114;
+const ID_NAV_ANALYTICS: i32 = 115;
+const ID_NAV_SETTINGS: i32 = 116;
 const ID_SETUP: i32 = 200;
 const ID_LOGIN_ANTIGRAVITY: i32 = 201;
 const ID_LOGIN_GROK: i32 = 202;
@@ -66,6 +73,21 @@ const ID_SYNC: i32 = 203;
 const ID_OPEN_ZCODE: i32 = 204;
 const ID_STOP: i32 = 205;
 const ID_COPY_CONNECTORS: i32 = 206;
+const ID_ROUTE_ROUND_ROBIN: i32 = 220;
+const ID_ROUTE_WEIGHTED: i32 = 221;
+const ID_ROUTE_FILL_FIRST: i32 = 222;
+const ID_TOGGLE_AFFINITY: i32 = 223;
+const ID_TOGGLE_GLASS: i32 = 224;
+const ID_REFRESH_FIVE: i32 = 225;
+const ID_REFRESH_TEN: i32 = 226;
+
+const SECTION_OVERVIEW: usize = 0;
+const SECTION_ACCOUNTS: usize = 1;
+const SECTION_PROXY: usize = 2;
+const SECTION_ROUTING: usize = 3;
+const SECTION_CONNECTORS: usize = 4;
+const SECTION_ANALYTICS: usize = 5;
+const SECTION_SETTINGS: usize = 6;
 
 static STATE: OnceLock<Mutex<AppState>> = OnceLock::new();
 
@@ -216,6 +238,7 @@ struct RefreshResult {
     quota: Option<Result<QuotaReport, String>>,
     usage: Result<UsageReport, String>,
     connectors: Result<ConnectorResponse, String>,
+    manager: Result<ManagerReport, String>,
     requested_provider: String,
 }
 
@@ -259,7 +282,70 @@ struct UsageReport {
     available: bool,
     latest: Option<UsageSample>,
     total: UsageAggregate,
+    recent: Vec<UsageSample>,
     warning: Option<String>,
+}
+
+#[derive(Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ManagerReport {
+    accounts: Vec<ManagerAccount>,
+    proxy: ManagerProxy,
+    routing: ManagerRouting,
+    settings: ManagerSettings,
+    features: Vec<ManagerFeature>,
+}
+
+#[derive(Clone, Default, Deserialize)]
+struct ManagerAccount {
+    provider: String,
+    label: String,
+    plan: Option<String>,
+    status: String,
+}
+
+#[derive(Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ManagerProxy {
+    running: bool,
+    base_url: Option<String>,
+    protocols: Vec<ManagerProtocol>,
+}
+
+#[derive(Clone, Default, Deserialize)]
+struct ManagerProtocol {
+    name: String,
+    path: String,
+    description: String,
+}
+
+#[derive(Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ManagerRouting {
+    strategy: String,
+    session_affinity: bool,
+    session_affinity_ttl: String,
+    request_retry: i32,
+    credential_retry: i32,
+    retry_interval: i32,
+    background_model: String,
+}
+
+#[derive(Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ManagerSettings {
+    auto_refresh_minutes: i32,
+    quota_warning_percent: i32,
+    proxy_url: String,
+    theme: String,
+    liquid_glass: bool,
+}
+
+#[derive(Clone, Default, Deserialize)]
+struct ManagerFeature {
+    name: String,
+    description: String,
+    available: bool,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -268,6 +354,7 @@ struct Controls {
     provider_antigravity: isize,
     provider_grok: isize,
     refresh: isize,
+    nav: [isize; 7],
     status_tun: isize,
     status_proxy: isize,
     status_bridge: isize,
@@ -284,6 +371,13 @@ struct Controls {
     open_zcode: isize,
     stop: isize,
     copy_connectors: isize,
+    route_round_robin: isize,
+    route_weighted: isize,
+    route_fill_first: isize,
+    toggle_affinity: isize,
+    toggle_glass: isize,
+    refresh_five: isize,
+    refresh_ten: isize,
     footer: isize,
 }
 
@@ -308,6 +402,8 @@ struct AppState {
     usage: Option<UsageReport>,
     usage_cache: HashMap<String, UsageReport>,
     provider_accounts: ProviderAccounts,
+    manager: Option<ManagerReport>,
+    section: usize,
     last_quota_refresh: Option<Instant>,
 }
 
@@ -334,6 +430,8 @@ impl AppState {
             usage: None,
             usage_cache: HashMap::new(),
             provider_accounts: ProviderAccounts::default(),
+            manager: None,
+            section: SECTION_OVERVIEW,
             last_quota_refresh: None,
         }
     }
@@ -463,6 +561,21 @@ unsafe fn create_controls(hwnd: HWND) {
             font,
         )
     };
+    for (index, (label, id)) in [
+        ("总览", ID_NAV_OVERVIEW),
+        ("账号", ID_NAV_ACCOUNTS),
+        ("API 代理", ID_NAV_PROXY),
+        ("模型路由", ID_NAV_ROUTING),
+        ("Agent 接入", ID_NAV_CONNECTORS),
+        ("用量统计", ID_NAV_ANALYTICS),
+        ("设置", ID_NAV_SETTINGS),
+    ]
+    .iter()
+    .enumerate()
+    {
+        c.nav[index] =
+            unsafe { create_control(hwnd, "BUTTON", label, BS_OWNERDRAW as u32, *id, font_bold) };
+    }
     c.status_tun =
         unsafe { create_control(hwnd, "STATIC", "TUN\r\n正在检查", SS_LEFT, 0, font) };
     c.status_proxy =
@@ -553,6 +666,76 @@ unsafe fn create_controls(hwnd: HWND) {
             "复制当前 Agent 配置",
             BS_OWNERDRAW as u32,
             ID_COPY_CONNECTORS,
+            font,
+        )
+    };
+    c.route_round_robin = unsafe {
+        create_control(
+            hwnd,
+            "BUTTON",
+            "均衡轮询",
+            BS_OWNERDRAW as u32,
+            ID_ROUTE_ROUND_ROBIN,
+            font_bold,
+        )
+    };
+    c.route_weighted = unsafe {
+        create_control(
+            hwnd,
+            "BUTTON",
+            "加权轮询",
+            BS_OWNERDRAW as u32,
+            ID_ROUTE_WEIGHTED,
+            font_bold,
+        )
+    };
+    c.route_fill_first = unsafe {
+        create_control(
+            hwnd,
+            "BUTTON",
+            "填满优先",
+            BS_OWNERDRAW as u32,
+            ID_ROUTE_FILL_FIRST,
+            font_bold,
+        )
+    };
+    c.toggle_affinity = unsafe {
+        create_control(
+            hwnd,
+            "BUTTON",
+            "会话亲和：开启",
+            BS_OWNERDRAW as u32,
+            ID_TOGGLE_AFFINITY,
+            font,
+        )
+    };
+    c.toggle_glass = unsafe {
+        create_control(
+            hwnd,
+            "BUTTON",
+            "液态玻璃：开启",
+            BS_OWNERDRAW as u32,
+            ID_TOGGLE_GLASS,
+            font,
+        )
+    };
+    c.refresh_five = unsafe {
+        create_control(
+            hwnd,
+            "BUTTON",
+            "额度每 5 分钟刷新",
+            BS_OWNERDRAW as u32,
+            ID_REFRESH_FIVE,
+            font,
+        )
+    };
+    c.refresh_ten = unsafe {
+        create_control(
+            hwnd,
+            "BUTTON",
+            "额度每 10 分钟刷新",
+            BS_OWNERDRAW as u32,
+            ID_REFRESH_TEN,
             font,
         )
     };
@@ -687,11 +870,24 @@ unsafe fn layout(hwnd: HWND) {
     };
     move_control(
         controls.subtitle,
-        m.main_x,
-        scale(if m.compact { 130 } else { 150 }, m.dpi),
-        m.main_w - scale(220, m.dpi),
+        m.main_x + scale(if m.compact { 78 } else { 88 }, m.dpi),
+        scale(if m.compact { 57 } else { 65 }, m.dpi),
+        m.main_w - scale(if m.compact { 250 } else { 310 }, m.dpi),
         scale(22, m.dpi),
     );
+    let nav_y = scale(if m.compact { 104 } else { 116 }, m.dpi);
+    let nav_h = scale(if m.compact { 36 } else { 38 }, m.dpi);
+    let nav_gap = scale(5, m.dpi);
+    let nav_w = (m.main_w - nav_gap * 6) / 7;
+    for (index, handle) in controls.nav.iter().enumerate() {
+        move_control(
+            *handle,
+            m.main_x + index as i32 * (nav_w + nav_gap),
+            nav_y,
+            nav_w,
+            nav_h,
+        );
+    }
     move_control(
         controls.provider_antigravity,
         m.main_x,
@@ -765,6 +961,13 @@ unsafe fn layout(hwnd: HWND) {
         controls.open_zcode,
         controls.stop,
         controls.copy_connectors,
+        controls.route_round_robin,
+        controls.route_weighted,
+        controls.route_fill_first,
+        controls.toggle_affinity,
+        controls.toggle_glass,
+        controls.refresh_five,
+        controls.refresh_ten,
     ]
     .iter()
     .enumerate()
@@ -787,6 +990,127 @@ unsafe fn layout(hwnd: HWND) {
         scale(24, m.dpi),
     );
     unsafe { ShowWindow(controls.footer as HWND, SW_HIDE) };
+
+    let route_top = m.content_top + scale(96, m.dpi);
+    let route_gap = scale(8, m.dpi);
+    let route_width = (m.left_w - inset * 2 - route_gap * 2) / 3;
+    for (index, handle) in [
+        controls.route_round_robin,
+        controls.route_weighted,
+        controls.route_fill_first,
+    ]
+    .iter()
+    .enumerate()
+    {
+        move_control(
+            *handle,
+            m.main_x + inset + index as i32 * (route_width + route_gap),
+            route_top,
+            route_width,
+            scale(56, m.dpi),
+        );
+    }
+    move_control(
+        controls.toggle_affinity,
+        m.main_x + inset,
+        route_top + scale(72, m.dpi),
+        m.left_w - inset * 2,
+        scale(46, m.dpi),
+    );
+    let section = state_lock.lock().unwrap().section;
+    let (action_handles, action_count) = match section {
+        SECTION_ACCOUNTS => (
+            [
+                controls.login_antigravity,
+                controls.login_grok,
+                0,
+                0,
+                0,
+                0,
+                0,
+            ],
+            2,
+        ),
+        SECTION_PROXY => (
+            [controls.setup, controls.sync, controls.stop, 0, 0, 0, 0],
+            3,
+        ),
+        SECTION_ROUTING => ([controls.sync, 0, 0, 0, 0, 0, 0], 1),
+        SECTION_CONNECTORS => ([controls.copy_connectors, 0, 0, 0, 0, 0, 0], 1),
+        SECTION_SETTINGS => (
+            [
+                controls.toggle_glass,
+                controls.refresh_five,
+                controls.refresh_ten,
+                0,
+                0,
+                0,
+                0,
+            ],
+            3,
+        ),
+        SECTION_ANALYTICS => ([0, 0, 0, 0, 0, 0, 0], 0),
+        _ => (
+            [
+                controls.setup,
+                controls.login_antigravity,
+                controls.login_grok,
+                controls.sync,
+                controls.open_zcode,
+                controls.stop,
+                controls.copy_connectors,
+            ],
+            7,
+        ),
+    };
+    for (index, handle) in action_handles.iter().take(action_count).enumerate() {
+        move_control(
+            *handle,
+            m.action_x + inset,
+            m.content_top
+                + scale(if m.compact { 72 } else { 78 }, m.dpi)
+                + index as i32 * (m.button_h + m.button_gap),
+            m.action_w - inset * 2,
+            m.button_h,
+        );
+    }
+    unsafe { apply_section_visibility(controls, section, m.compact) };
+}
+
+unsafe fn show_control(handle: isize, visible: bool) {
+    if handle != 0 {
+        unsafe { ShowWindow(handle as HWND, if visible { SW_SHOW } else { SW_HIDE }) };
+    }
+}
+
+unsafe fn apply_section_visibility(controls: Controls, section: usize, compact: bool) {
+    let overview = section == SECTION_OVERVIEW;
+    let accounts = section == SECTION_ACCOUNTS;
+    let proxy = section == SECTION_PROXY;
+    let routing = section == SECTION_ROUTING;
+    let connectors = section == SECTION_CONNECTORS;
+    unsafe {
+        show_control(controls.quota_title, overview || accounts);
+        show_control(controls.models, overview && !compact);
+        show_control(
+            controls.action_header,
+            overview || accounts || proxy || routing || connectors || section == SECTION_SETTINGS,
+        );
+        show_control(controls.setup, overview || proxy);
+        show_control(controls.login_antigravity, overview || accounts);
+        show_control(controls.login_grok, overview || accounts);
+        show_control(controls.sync, overview || proxy || routing);
+        show_control(controls.open_zcode, overview);
+        show_control(controls.stop, overview || proxy);
+        show_control(controls.copy_connectors, overview || connectors);
+        show_control(controls.route_round_robin, routing);
+        show_control(controls.route_weighted, routing);
+        show_control(controls.route_fill_first, routing);
+        show_control(controls.toggle_affinity, routing);
+        show_control(controls.toggle_glass, section == SECTION_SETTINGS);
+        show_control(controls.refresh_five, section == SECTION_SETTINGS);
+        show_control(controls.refresh_ten, section == SECTION_SETTINGS);
+    }
 }
 
 unsafe fn recreate_fonts(hwnd: HWND, dpi: u32) {
@@ -819,13 +1143,22 @@ unsafe fn recreate_fonts(hwnd: HWND, dpi: u32) {
         controls.open_zcode,
         controls.stop,
         controls.copy_connectors,
+        controls.toggle_affinity,
+        controls.toggle_glass,
+        controls.refresh_five,
+        controls.refresh_ten,
         controls.footer,
     ];
     let bold_controls = [
         controls.provider_antigravity,
         controls.provider_grok,
         controls.setup,
+        controls.route_round_robin,
+        controls.route_weighted,
+        controls.route_fill_first,
     ];
+    let mut bold_controls = bold_controls.to_vec();
+    bold_controls.extend_from_slice(&controls.nav);
     let title_controls = [controls.quota_title, controls.action_header];
     for handle in normal_controls {
         if handle != 0 {
@@ -864,6 +1197,139 @@ unsafe fn fill_color(hdc: HDC, rect: &RECT, color: COLORREF) {
     }
 }
 
+unsafe fn enable_liquid_glass(hwnd: HWND) {
+    let backdrop = DWMSBT_TRANSIENTWINDOW;
+    let corners = DWMWCP_ROUND;
+    let host_backdrop: i32 = 1;
+    let dark_mode: i32 = 1;
+    let caption_color = COLOR_BACKGROUND;
+    let caption_text_color = COLOR_TEXT;
+    unsafe {
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_SYSTEMBACKDROP_TYPE as u32,
+            &backdrop as *const _ as *const c_void,
+            std::mem::size_of_val(&backdrop) as u32,
+        );
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE as u32,
+            &corners as *const _ as *const c_void,
+            std::mem::size_of_val(&corners) as u32,
+        );
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_USE_HOSTBACKDROPBRUSH as u32,
+            &host_backdrop as *const _ as *const c_void,
+            std::mem::size_of_val(&host_backdrop) as u32,
+        );
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_USE_IMMERSIVE_DARK_MODE as u32,
+            &dark_mode as *const _ as *const c_void,
+            std::mem::size_of_val(&dark_mode) as u32,
+        );
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_CAPTION_COLOR as u32,
+            &caption_color as *const _ as *const c_void,
+            std::mem::size_of_val(&caption_color) as u32,
+        );
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_TEXT_COLOR as u32,
+            &caption_text_color as *const _ as *const c_void,
+            std::mem::size_of_val(&caption_text_color) as u32,
+        );
+    }
+}
+
+fn blend_color(background: COLORREF, accent: COLORREF, amount: f64) -> COLORREF {
+    let amount = amount.clamp(0.0, 1.0);
+    let channel = |shift: u32| {
+        let base = ((background >> shift) & 0xff) as f64;
+        let value = ((accent >> shift) & 0xff) as f64;
+        (base + (value - base) * amount).round() as u32
+    };
+    channel(0) | (channel(8) << 8) | (channel(16) << 16)
+}
+
+unsafe fn paint_liquid_background(hdc: HDC, rect: &RECT, dpi: u32) {
+    let base = 0x0050271B;
+    let mut vertices = [
+        TRIVERTEX {
+            x: rect.left,
+            y: rect.top,
+            Red: 0x1400,
+            Green: 0x2C00,
+            Blue: 0x6A00,
+            Alpha: 0,
+        },
+        TRIVERTEX {
+            x: rect.right,
+            y: rect.bottom,
+            Red: 0x3700,
+            Green: 0x2700,
+            Blue: 0x5E00,
+            Alpha: 0,
+        },
+    ];
+    let mesh = GRADIENT_RECT {
+        UpperLeft: 0,
+        LowerRight: 1,
+    };
+    unsafe {
+        GradientFill(
+            hdc,
+            vertices.as_mut_ptr(),
+            vertices.len() as u32,
+            &mesh as *const _ as *const c_void,
+            1,
+            GRADIENT_FILL_RECT_H,
+        );
+    }
+    for index in (1..=12).rev() {
+        let radius = scale(42 + index * 26, dpi);
+        let amount = 0.025 + (13 - index) as f64 * 0.012;
+        let color = blend_color(base, COLOR_PRIMARY, amount);
+        let brush = unsafe { CreateSolidBrush(color) };
+        let old = unsafe { SelectObject(hdc, brush as HGDIOBJ) };
+        let old_pen = unsafe { SelectObject(hdc, GetStockObject(NULL_PEN)) };
+        unsafe {
+            Ellipse(
+                hdc,
+                -radius / 2,
+                -radius / 2,
+                radius * 3 / 2,
+                radius * 3 / 2,
+            );
+            SelectObject(hdc, old_pen);
+            SelectObject(hdc, old);
+            DeleteObject(brush as HGDIOBJ);
+        }
+    }
+    for index in (1..=11).rev() {
+        let radius = scale(48 + index * 30, dpi);
+        let amount = 0.02 + (12 - index) as f64 * 0.012;
+        let color = blend_color(base, COLOR_SECONDARY, amount);
+        let brush = unsafe { CreateSolidBrush(color) };
+        let old = unsafe { SelectObject(hdc, brush as HGDIOBJ) };
+        let old_pen = unsafe { SelectObject(hdc, GetStockObject(NULL_PEN)) };
+        unsafe {
+            Ellipse(
+                hdc,
+                rect.right - radius,
+                rect.bottom - radius,
+                rect.right + radius / 2,
+                rect.bottom + radius / 2,
+            );
+            SelectObject(hdc, old_pen);
+            SelectObject(hdc, old);
+            DeleteObject(brush as HGDIOBJ);
+        }
+    }
+}
+
 unsafe fn rounded_box(hdc: HDC, rect: &RECT, fill: COLORREF, border: COLORREF, radius: i32) {
     let brush = unsafe { CreateSolidBrush(fill) };
     let pen = unsafe { CreatePen(PS_SOLID, 1, border) };
@@ -894,20 +1360,8 @@ unsafe fn elevated_box(hdc: HDC, rect: &RECT, dpi: u32) {
         bottom: rect.bottom + scale(5, dpi),
     };
     unsafe {
-        rounded_box(
-            hdc,
-            &shadow,
-            0x00F4F1ED,
-            0x00F4F1ED,
-            scale(18, dpi),
-        );
-        rounded_box(
-            hdc,
-            rect,
-            COLOR_CARD,
-            COLOR_BORDER,
-            scale(18, dpi),
-        );
+        rounded_box(hdc, &shadow, 0x002B0F09, 0x002B0F09, scale(18, dpi));
+        rounded_box(hdc, rect, COLOR_CARD, COLOR_BORDER, scale(18, dpi));
     }
 }
 
@@ -1010,14 +1464,12 @@ unsafe fn paint_quota_dashboard(hdc: HDC, state: &AppState, m: &LayoutMetrics) {
         .and_then(|value| value.get(11..19))
         .unwrap_or("等待首次刷新");
     let latest_usage = state.usage.as_ref().and_then(|usage| usage.latest.as_ref());
-    let speed_label = if latest_usage
-        .map(|sample| sample.speed_basis.as_str())
-        == Some("generation")
-    {
-        "生成速度"
-    } else {
-        "有效吞吐"
-    };
+    let speed_label =
+        if latest_usage.map(|sample| sample.speed_basis.as_str()) == Some("generation") {
+            "生成速度"
+        } else {
+            "有效吞吐"
+        };
     let summary = [
         ("账号", account_count.to_string()),
         (
@@ -1147,7 +1599,10 @@ unsafe fn paint_quota_dashboard(hdc: HDC, state: &AppState, m: &LayoutMetrics) {
                     latest.ttft_ms as f64 / 1000.0
                 )
             } else {
-                format!("完整调用 {:.1}s（有效吞吐）", latest.latency_ms as f64 / 1000.0)
+                format!(
+                    "完整调用 {:.1}s（有效吞吐）",
+                    latest.latency_ms as f64 / 1000.0
+                )
             };
             format!(
                 "{} · 输出 {} token（推理 {}）· {} · 本地 {} 次平均 {:.1} tok/s / 累计推理 {} · {}{}",
@@ -1378,6 +1833,739 @@ unsafe fn paint_quota_dashboard(hdc: HDC, state: &AppState, m: &LayoutMetrics) {
     }
 }
 
+unsafe fn paint_management_page(hdc: HDC, state: &AppState, m: &LayoutMetrics) {
+    let inset = scale(20, m.dpi);
+    let left = m.main_x + inset;
+    let right = m.main_x + m.left_w - inset;
+    let top = m.content_top + scale(44, m.dpi);
+    let (title, detail) = match state.section {
+        SECTION_PROXY => (
+            "协议转换与本地中继",
+            "OpenAI、Anthropic 与 Gemini 三协议共用一个本机安全网关",
+        ),
+        SECTION_ROUTING => (
+            "调度与模型路由",
+            "选择账号调度策略；保存后点击右侧“修复并重新同步”应用",
+        ),
+        SECTION_CONNECTORS => (
+            "接入更多 Agent",
+            "为 Codex、Claude Code、Grok Build、OpenCode 和通用 SDK 生成本机配置",
+        ),
+        SECTION_ANALYTICS => (
+            "Token 与推理性能",
+            "统计仅保存在本机，不保存提示词、回复正文或工具参数",
+        ),
+        SECTION_SETTINGS => (
+            "界面与后台设置",
+            "液态玻璃、刷新周期、额度预警与网络安全边界",
+        ),
+        _ => ("账号与额度", "所有账号的健康状态与剩余额度"),
+    };
+    unsafe {
+        draw_label(
+            hdc,
+            title,
+            RECT {
+                left,
+                top,
+                right,
+                bottom: top + scale(34, m.dpi),
+            },
+            state.font_title,
+            COLOR_TEXT,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+        );
+        draw_label(
+            hdc,
+            detail,
+            RECT {
+                left,
+                top: top + scale(34, m.dpi),
+                right,
+                bottom: top + scale(62, m.dpi),
+            },
+            state.font,
+            COLOR_MUTED,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+        );
+    }
+    match state.section {
+        SECTION_ACCOUNTS => unsafe { paint_accounts_page(hdc, state, m, top + scale(84, m.dpi)) },
+        SECTION_PROXY => unsafe { paint_proxy_page(hdc, state, m, top + scale(82, m.dpi)) },
+        SECTION_ROUTING => unsafe { paint_routing_page(hdc, state, m, top + scale(142, m.dpi)) },
+        SECTION_CONNECTORS => unsafe {
+            paint_connector_page(hdc, state, m, top + scale(84, m.dpi))
+        },
+        SECTION_ANALYTICS => unsafe { paint_analytics_page(hdc, state, m, top + scale(84, m.dpi)) },
+        SECTION_SETTINGS => unsafe { paint_settings_page(hdc, state, m, top + scale(84, m.dpi)) },
+        _ => {}
+    }
+}
+
+unsafe fn paint_accounts_page(hdc: HDC, state: &AppState, m: &LayoutMetrics, top: i32) {
+    let inset = scale(20, m.dpi);
+    let left = m.main_x + inset;
+    let right = m.main_x + m.left_w - inset;
+    let accounts = state
+        .manager
+        .as_ref()
+        .map(|manager| manager.accounts.as_slice())
+        .unwrap_or(&[]);
+    if accounts.is_empty() {
+        let empty = RECT {
+            left,
+            top,
+            right,
+            bottom: top + scale(72, m.dpi),
+        };
+        unsafe {
+            rounded_box(
+                hdc,
+                &empty,
+                COLOR_SURFACE_INSET,
+                COLOR_BORDER,
+                scale(13, m.dpi),
+            );
+            draw_label(
+                hdc,
+                "尚未发现账号",
+                RECT {
+                    left: left + scale(14, m.dpi),
+                    top,
+                    right: right - scale(14, m.dpi),
+                    bottom: top + scale(34, m.dpi),
+                },
+                state.font_bold,
+                COLOR_TEXT,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+            );
+            draw_label(
+                hdc,
+                "请使用右侧 OAuth 操作登录 Antigravity 或 Grok / xAI",
+                RECT {
+                    left: left + scale(14, m.dpi),
+                    top: top + scale(32, m.dpi),
+                    right: right - scale(14, m.dpi),
+                    bottom: empty.bottom,
+                },
+                state.font,
+                COLOR_MUTED,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+            );
+        }
+    } else {
+        for (index, account) in accounts.iter().take(5).enumerate() {
+            let y = top + index as i32 * scale(58, m.dpi);
+            let row = RECT {
+                left,
+                top: y,
+                right,
+                bottom: y + scale(48, m.dpi),
+            };
+            let provider = if account.provider == "xai" {
+                "Grok / xAI"
+            } else {
+                "Antigravity"
+            };
+            let detail = account
+                .plan
+                .as_deref()
+                .filter(|value| !value.is_empty())
+                .unwrap_or("已登录");
+            unsafe {
+                rounded_box(
+                    hdc,
+                    &row,
+                    COLOR_SURFACE_INSET,
+                    COLOR_BORDER,
+                    scale(12, m.dpi),
+                );
+                draw_label(
+                    hdc,
+                    provider,
+                    RECT {
+                        left: left + scale(12, m.dpi),
+                        top: y,
+                        right: left + scale(145, m.dpi),
+                        bottom: row.bottom,
+                    },
+                    state.font_bold,
+                    COLOR_PRIMARY,
+                    DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+                );
+                draw_label(
+                    hdc,
+                    &account.label,
+                    RECT {
+                        left: left + scale(150, m.dpi),
+                        top: y,
+                        right: right - scale(205, m.dpi),
+                        bottom: row.bottom,
+                    },
+                    state.font_bold,
+                    COLOR_TEXT,
+                    DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+                );
+                draw_label(
+                    hdc,
+                    &format!("{} · {}", detail, account.status),
+                    RECT {
+                        left: right - scale(230, m.dpi),
+                        top: y,
+                        right: right - scale(12, m.dpi),
+                        bottom: row.bottom,
+                    },
+                    state.font,
+                    if account.status == "active" {
+                        COLOR_SUCCESS
+                    } else {
+                        COLOR_WARNING
+                    },
+                    DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+                );
+            }
+        }
+    }
+    if let Some(manager) = state.manager.as_ref() {
+        let available = manager
+            .features
+            .iter()
+            .filter(|feature| feature.available)
+            .map(|feature| format!("{} · {}", feature.name, feature.description))
+            .collect::<Vec<_>>()
+            .join("    ");
+        let y = top + scale((accounts.len().min(5) as i32 * 58 + 16).max(92), m.dpi);
+        unsafe {
+            draw_label(
+                hdc,
+                "当前可用能力",
+                RECT {
+                    left,
+                    top: y,
+                    right,
+                    bottom: y + scale(24, m.dpi),
+                },
+                state.font_bold,
+                COLOR_TEXT,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+            );
+            draw_label(
+                hdc,
+                &available,
+                RECT {
+                    left,
+                    top: y + scale(27, m.dpi),
+                    right,
+                    bottom: y + scale(82, m.dpi),
+                },
+                state.font,
+                COLOR_MUTED,
+                DT_LEFT | DT_TOP | DT_WORDBREAK | DT_END_ELLIPSIS,
+            );
+        }
+    }
+}
+
+unsafe fn paint_proxy_page(hdc: HDC, state: &AppState, m: &LayoutMetrics, top: i32) {
+    let inset = scale(20, m.dpi);
+    let left = m.main_x + inset;
+    let right = m.main_x + m.left_w - inset;
+    let manager = state.manager.as_ref();
+    let protocols = manager
+        .map(|value| value.proxy.protocols.as_slice())
+        .unwrap_or(&[]);
+    let gap = scale(9, m.dpi);
+    let width = (right - left - gap * 2) / 3;
+    for index in 0..3 {
+        let x = left + index as i32 * (width + gap);
+        let card = RECT {
+            left: x,
+            top,
+            right: x + width,
+            bottom: top + scale(112, m.dpi),
+        };
+        unsafe {
+            rounded_box(
+                hdc,
+                &card,
+                COLOR_SURFACE_INSET,
+                COLOR_BORDER,
+                scale(15, m.dpi),
+            )
+        };
+        let fallback = match index {
+            0 => ("OpenAI", "/v1/chat/completions"),
+            1 => ("Anthropic", "/v1/messages"),
+            _ => ("Gemini", "/v1beta/models"),
+        };
+        let name = protocols
+            .get(index)
+            .map(|value| value.name.as_str())
+            .unwrap_or(fallback.0);
+        let path = protocols
+            .get(index)
+            .map(|value| value.path.as_str())
+            .unwrap_or(fallback.1);
+        let description = protocols
+            .get(index)
+            .map(|value| value.description.as_str())
+            .unwrap_or("协议兼容端点");
+        unsafe {
+            draw_label(
+                hdc,
+                name,
+                RECT {
+                    left: x + scale(12, m.dpi),
+                    top: top + scale(9, m.dpi),
+                    right: card.right - scale(10, m.dpi),
+                    bottom: top + scale(34, m.dpi),
+                },
+                state.font_bold,
+                COLOR_TEXT,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+            );
+            draw_label(
+                hdc,
+                description,
+                RECT {
+                    left: x + scale(12, m.dpi),
+                    top: top + scale(35, m.dpi),
+                    right: card.right - scale(10, m.dpi),
+                    bottom: top + scale(61, m.dpi),
+                },
+                state.font,
+                COLOR_MUTED,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+            );
+            draw_label(
+                hdc,
+                path,
+                RECT {
+                    left: x + scale(12, m.dpi),
+                    top: top + scale(69, m.dpi),
+                    right: card.right - scale(10, m.dpi),
+                    bottom: top + scale(99, m.dpi),
+                },
+                state.font,
+                COLOR_PRIMARY,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+            );
+        }
+    }
+    let status = manager
+        .map(|value| {
+            if value.proxy.running {
+                format!(
+                    "● 网关在线 · {}",
+                    value.proxy.base_url.as_deref().unwrap_or("127.0.0.1")
+                )
+            } else {
+                "○ 网关尚未启动".to_string()
+            }
+        })
+        .unwrap_or_else(|| "正在读取网关状态…".to_string());
+    unsafe {
+        draw_label(
+            hdc,
+            &status,
+            RECT {
+                left,
+                top: top + scale(130, m.dpi),
+                right,
+                bottom: top + scale(160, m.dpi),
+            },
+            state.font_bold,
+            if manager.map(|value| value.proxy.running).unwrap_or(false) {
+                COLOR_SUCCESS
+            } else {
+                COLOR_WARNING
+            },
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+        )
+    };
+}
+
+unsafe fn paint_routing_page(hdc: HDC, state: &AppState, m: &LayoutMetrics, top: i32) {
+    let inset = scale(20, m.dpi);
+    let left = m.main_x + inset;
+    let right = m.main_x + m.left_w - inset;
+    let routing = state.manager.as_ref().map(|value| &value.routing);
+    let metrics = [
+        (
+            "当前策略",
+            routing
+                .map(|value| value.strategy.clone())
+                .unwrap_or_else(|| "round-robin".to_string()),
+        ),
+        (
+            "请求重试",
+            format!(
+                "{} 次",
+                routing.map(|value| value.request_retry).unwrap_or(2)
+            ),
+        ),
+        (
+            "凭据轮换",
+            format!(
+                "{} 个",
+                routing.map(|value| value.credential_retry).unwrap_or(2)
+            ),
+        ),
+        (
+            "最大退避",
+            format!(
+                "{} 秒",
+                routing.map(|value| value.retry_interval).unwrap_or(20)
+            ),
+        ),
+    ];
+    let gap = scale(8, m.dpi);
+    let width = (right - left - gap * 3) / 4;
+    for (index, (name, value)) in metrics.iter().enumerate() {
+        let x = left + index as i32 * (width + gap);
+        let card = RECT {
+            left: x,
+            top,
+            right: x + width,
+            bottom: top + scale(70, m.dpi),
+        };
+        unsafe {
+            rounded_box(
+                hdc,
+                &card,
+                COLOR_SURFACE_INSET,
+                COLOR_BORDER,
+                scale(13, m.dpi),
+            );
+            draw_label(
+                hdc,
+                name,
+                RECT {
+                    left: x + scale(10, m.dpi),
+                    top: top + scale(7, m.dpi),
+                    right: card.right - scale(8, m.dpi),
+                    bottom: top + scale(29, m.dpi),
+                },
+                state.font,
+                COLOR_MUTED,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+            );
+            draw_label(
+                hdc,
+                value,
+                RECT {
+                    left: x + scale(10, m.dpi),
+                    top: top + scale(31, m.dpi),
+                    right: card.right - scale(8, m.dpi),
+                    bottom: card.bottom - scale(6, m.dpi),
+                },
+                state.font_bold,
+                if index == 0 {
+                    COLOR_PRIMARY
+                } else {
+                    COLOR_TEXT
+                },
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+            );
+        }
+    }
+    let background = routing
+        .map(|value| value.background_model.as_str())
+        .unwrap_or("gemini-3.6-flash");
+    let affinity = routing
+        .map(|value| value.session_affinity_ttl.as_str())
+        .unwrap_or("2h");
+    unsafe {
+        draw_label(
+            hdc,
+            &format!("Agent 默认模型：{background} · 会话亲和 TTL：{affinity}"),
+            RECT {
+                left,
+                top: top + scale(88, m.dpi),
+                right,
+                bottom: top + scale(118, m.dpi),
+            },
+            state.font,
+            COLOR_MUTED,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+        )
+    };
+}
+
+unsafe fn paint_connector_page(hdc: HDC, state: &AppState, m: &LayoutMetrics, top: i32) {
+    let inset = scale(20, m.dpi);
+    let left = m.main_x + inset;
+    let right = m.main_x + m.left_w - inset;
+    let items = [
+        ("Codex", "Responses API 自定义 Provider"),
+        ("Claude Code", "Anthropic Messages 协议"),
+        ("Grok Build", "OpenAI-compatible 模型地址"),
+        ("OpenCode", "本机 Provider 配置"),
+        ("通用 SDK", "OpenAI / Anthropic 客户端"),
+    ];
+    for (index, (name, detail)) in items.iter().enumerate() {
+        let y = top + index as i32 * scale(55, m.dpi);
+        let row = RECT {
+            left,
+            top: y,
+            right,
+            bottom: y + scale(46, m.dpi),
+        };
+        unsafe {
+            rounded_box(
+                hdc,
+                &row,
+                COLOR_SURFACE_INSET,
+                COLOR_BORDER,
+                scale(12, m.dpi),
+            );
+            draw_label(
+                hdc,
+                name,
+                RECT {
+                    left: left + scale(12, m.dpi),
+                    top: y,
+                    right: left + scale(150, m.dpi),
+                    bottom: row.bottom,
+                },
+                state.font_bold,
+                COLOR_TEXT,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+            );
+            draw_label(
+                hdc,
+                detail,
+                RECT {
+                    left: left + scale(155, m.dpi),
+                    top: y,
+                    right: right - scale(12, m.dpi),
+                    bottom: row.bottom,
+                },
+                state.font,
+                COLOR_MUTED,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+            );
+        }
+    }
+}
+
+unsafe fn paint_analytics_page(hdc: HDC, state: &AppState, m: &LayoutMetrics, top: i32) {
+    let inset = scale(20, m.dpi);
+    let left = m.main_x + inset;
+    let right = m.main_x + m.left_w - inset;
+    let usage = state.usage.as_ref();
+    let summary = [
+        (
+            "请求",
+            usage
+                .map(|value| value.total.requests.to_string())
+                .unwrap_or_else(|| "—".to_string()),
+        ),
+        (
+            "累计输出",
+            usage
+                .map(|value| format!("{} tok", format_integer(value.total.output_tokens)))
+                .unwrap_or_else(|| "—".to_string()),
+        ),
+        (
+            "累计推理",
+            usage
+                .map(|value| format!("{} tok", format_integer(value.total.reasoning_tokens)))
+                .unwrap_or_else(|| "—".to_string()),
+        ),
+        (
+            "平均吞吐",
+            usage
+                .map(|value| format!("{:.1} tok/s", value.total.average_tokens_per_second))
+                .unwrap_or_else(|| "—".to_string()),
+        ),
+    ];
+    let gap = scale(8, m.dpi);
+    let width = (right - left - gap * 3) / 4;
+    for (index, (name, value)) in summary.iter().enumerate() {
+        let x = left + index as i32 * (width + gap);
+        let card = RECT {
+            left: x,
+            top,
+            right: x + width,
+            bottom: top + scale(70, m.dpi),
+        };
+        unsafe {
+            rounded_box(
+                hdc,
+                &card,
+                COLOR_SURFACE_INSET,
+                COLOR_BORDER,
+                scale(13, m.dpi),
+            );
+            draw_label(
+                hdc,
+                name,
+                RECT {
+                    left: x + scale(10, m.dpi),
+                    top: top + scale(7, m.dpi),
+                    right: card.right,
+                    bottom: top + scale(28, m.dpi),
+                },
+                state.font,
+                COLOR_MUTED,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+            );
+            draw_label(
+                hdc,
+                value,
+                RECT {
+                    left: x + scale(10, m.dpi),
+                    top: top + scale(31, m.dpi),
+                    right: card.right - scale(8, m.dpi),
+                    bottom: card.bottom - scale(6, m.dpi),
+                },
+                state.font_bold,
+                if index == 3 {
+                    COLOR_SECONDARY
+                } else {
+                    COLOR_TEXT
+                },
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+            );
+        }
+    }
+    if let Some(usage) = usage {
+        for (index, sample) in usage.recent.iter().rev().take(4).enumerate() {
+            let y = top + scale(86, m.dpi) + index as i32 * scale(48, m.dpi);
+            unsafe {
+                draw_label(
+                    hdc,
+                    &sample.model,
+                    RECT {
+                        left,
+                        top: y,
+                        right: right - scale(230, m.dpi),
+                        bottom: y + scale(24, m.dpi),
+                    },
+                    state.font_bold,
+                    COLOR_TEXT,
+                    DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+                );
+                draw_label(
+                    hdc,
+                    &format!(
+                        "{} tok · {:.1} tok/s · {}",
+                        format_integer(sample.output_tokens),
+                        sample.output_tokens_per_second,
+                        short_iso_time(&sample.timestamp)
+                    ),
+                    RECT {
+                        left: right - scale(310, m.dpi),
+                        top: y,
+                        right,
+                        bottom: y + scale(24, m.dpi),
+                    },
+                    state.font,
+                    COLOR_MUTED,
+                    DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+                );
+            }
+        }
+    }
+}
+
+unsafe fn paint_settings_page(hdc: HDC, state: &AppState, m: &LayoutMetrics, top: i32) {
+    let inset = scale(20, m.dpi);
+    let left = m.main_x + inset;
+    let right = m.main_x + m.left_w - inset;
+    let settings = state.manager.as_ref().map(|value| &value.settings);
+    let rows = [
+        (
+            "液态透明高斯模糊",
+            if settings.map(|value| value.liquid_glass).unwrap_or(true) {
+                "已开启".to_string()
+            } else {
+                "已关闭".to_string()
+            },
+        ),
+        (
+            "额度自动刷新",
+            format!(
+                "每 {} 分钟",
+                settings
+                    .map(|value| value.auto_refresh_minutes)
+                    .unwrap_or(5)
+            ),
+        ),
+        (
+            "额度预警线",
+            format!(
+                "剩余 {}%",
+                settings
+                    .map(|value| value.quota_warning_percent)
+                    .unwrap_or(20)
+            ),
+        ),
+        (
+            "界面主题",
+            settings
+                .map(|value| value.theme.clone())
+                .unwrap_or_else(|| "system".to_string()),
+        ),
+        (
+            "上游代理",
+            settings
+                .map(|value| value.proxy_url.clone())
+                .unwrap_or_else(|| "使用系统网络 / TUN".to_string()),
+        ),
+        ("本机安全边界", "127.0.0.1 · 当前用户密钥".to_string()),
+    ];
+    for (index, (name, value)) in rows.iter().enumerate() {
+        let y = top + index as i32 * scale(58, m.dpi);
+        let row = RECT {
+            left,
+            top: y,
+            right,
+            bottom: y + scale(48, m.dpi),
+        };
+        unsafe {
+            rounded_box(
+                hdc,
+                &row,
+                COLOR_SURFACE_INSET,
+                COLOR_BORDER,
+                scale(12, m.dpi),
+            );
+            draw_label(
+                hdc,
+                name,
+                RECT {
+                    left: left + scale(12, m.dpi),
+                    top: y,
+                    right: right - scale(180, m.dpi),
+                    bottom: row.bottom,
+                },
+                state.font_bold,
+                COLOR_TEXT,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+            );
+            draw_label(
+                hdc,
+                value,
+                RECT {
+                    left: right - scale(210, m.dpi),
+                    top: y,
+                    right: right - scale(12, m.dpi),
+                    bottom: row.bottom,
+                },
+                state.font,
+                if index == 0 {
+                    COLOR_PRIMARY
+                } else {
+                    COLOR_MUTED
+                },
+                DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+            );
+        }
+    }
+}
+
 unsafe fn paint_dashboard(hwnd: HWND) {
     let Some(state_lock) = STATE.get() else {
         return;
@@ -1404,7 +2592,16 @@ unsafe fn paint_dashboard(hwnd: HWND) {
         right: m.width,
         bottom: m.height,
     };
-    unsafe { fill_color(hdc, &client, COLOR_BACKGROUND) };
+    if state
+        .manager
+        .as_ref()
+        .map(|manager| manager.settings.liquid_glass)
+        .unwrap_or(true)
+    {
+        unsafe { paint_liquid_background(hdc, &client, state.dpi) };
+    } else {
+        unsafe { fill_color(hdc, &client, COLOR_BACKGROUND) };
+    }
 
     let toolbar_top = scale(if m.compact { 14 } else { 18 }, m.dpi);
     let toolbar_bottom = scale(if m.compact { 92 } else { 108 }, m.dpi);
@@ -1422,7 +2619,15 @@ unsafe fn paint_dashboard(hwnd: HWND) {
         right: m.main_x + scale(18, m.dpi) + logo_size,
         bottom: toolbar_top + (toolbar_bottom - toolbar_top + logo_size) / 2,
     };
-    unsafe { rounded_box(hdc, &logo, COLOR_PRIMARY, COLOR_PRIMARY_DARK, scale(16, m.dpi)) };
+    unsafe {
+        rounded_box(
+            hdc,
+            &logo,
+            COLOR_PRIMARY,
+            COLOR_PRIMARY_DARK,
+            scale(16, m.dpi),
+        )
+    };
     unsafe {
         draw_label(
             hdc,
@@ -1443,19 +2648,6 @@ unsafe fn paint_dashboard(hwnd: HWND) {
             },
             state.font_title,
             COLOR_TEXT,
-            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
-        );
-        draw_label(
-            hdc,
-            "Native bridge · Local only · 127.0.0.1",
-            RECT {
-                left: logo.right + scale(14, m.dpi),
-                top: toolbar_top + scale(if m.compact { 39 } else { 47 }, m.dpi),
-                right: m.main_x + m.main_w / 2 + scale(120, m.dpi),
-                bottom: toolbar_bottom - scale(10, m.dpi),
-            },
-            state.font,
-            COLOR_TERTIARY,
             DT_LEFT | DT_VCENTER | DT_SINGLELINE,
         );
     }
@@ -1491,19 +2683,6 @@ unsafe fn paint_dashboard(hwnd: HWND) {
             },
             state.font,
             COLOR_MUTED,
-            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
-        );
-        draw_label(
-            hdc,
-            "模型与额度",
-            RECT {
-                left: m.main_x,
-                top: scale(if m.compact { 100 } else { 116 }, m.dpi),
-                right: m.main_x + m.main_w,
-                bottom: scale(if m.compact { 132 } else { 150 }, m.dpi),
-            },
-            state.font_title,
-            COLOR_TEXT,
             DT_LEFT | DT_VCENTER | DT_SINGLELINE,
         );
     }
@@ -1551,10 +2730,15 @@ unsafe fn paint_dashboard(hwnd: HWND) {
         elevated_box(hdc, &action_card, m.dpi);
         draw_label(
             hdc,
-            if state.provider == "xai" {
-                "GROK / XAI USAGE"
-            } else {
-                "ANTIGRAVITY USAGE"
+            match state.section {
+                SECTION_ACCOUNTS => "ACCOUNT MANAGER",
+                SECTION_PROXY => "MULTI-SINK API",
+                SECTION_ROUTING => "MODEL ROUTER",
+                SECTION_CONNECTORS => "AGENT CONNECTORS",
+                SECTION_ANALYTICS => "LOCAL ANALYTICS",
+                SECTION_SETTINGS => "PREFERENCES",
+                _ if state.provider == "xai" => "GROK / XAI USAGE",
+                _ => "ANTIGRAVITY USAGE",
             },
             RECT {
                 left: m.main_x + scale(if m.compact { 16 } else { 20 }, m.dpi),
@@ -1568,7 +2752,15 @@ unsafe fn paint_dashboard(hwnd: HWND) {
         );
         draw_label(
             hdc,
-            "LOCAL ACTIONS",
+            match state.section {
+                SECTION_ACCOUNTS => "OAUTH ACTIONS",
+                SECTION_PROXY => "PROXY CONTROL",
+                SECTION_ROUTING => "APPLY CHANGES",
+                SECTION_CONNECTORS => "COPY CONFIG",
+                SECTION_ANALYTICS => "PRIVACY",
+                SECTION_SETTINGS => "LOCAL ONLY",
+                _ => "LOCAL ACTIONS",
+            },
             RECT {
                 left: m.action_x + scale(if m.compact { 16 } else { 20 }, m.dpi),
                 top: m.content_top + scale(12, m.dpi),
@@ -1579,12 +2771,18 @@ unsafe fn paint_dashboard(hwnd: HWND) {
             COLOR_PRIMARY,
             DT_LEFT | DT_VCENTER | DT_SINGLELINE,
         );
-        paint_quota_dashboard(hdc, &state, &m);
+        if state.section == SECTION_OVERVIEW || state.section == SECTION_ACCOUNTS {
+            paint_quota_dashboard(hdc, &state, &m);
+        } else {
+            paint_management_page(hdc, &state, &m);
+        }
     }
     drop(state);
     if hdc == memory_hdc {
         unsafe {
-            BitBlt(target_hdc, 0, 0, m.width, m.height, memory_hdc, 0, 0, SRCCOPY);
+            BitBlt(
+                target_hdc, 0, 0, m.width, m.height, memory_hdc, 0, 0, SRCCOPY,
+            );
             SelectObject(memory_hdc, old_bitmap);
             DeleteObject(bitmap as HGDIOBJ);
             DeleteDC(memory_hdc);
@@ -1614,6 +2812,36 @@ unsafe fn draw_owner_button(draw: &DRAWITEMSTRUCT) {
                 || (id == ID_PROVIDER_GROK && provider == "xai")
         })
         .unwrap_or(false);
+    let selected_navigation = STATE
+        .get()
+        .map(|state| {
+            let state = state.lock().unwrap();
+            matches!(
+                (id, state.section),
+                (ID_NAV_OVERVIEW, SECTION_OVERVIEW)
+                    | (ID_NAV_ACCOUNTS, SECTION_ACCOUNTS)
+                    | (ID_NAV_PROXY, SECTION_PROXY)
+                    | (ID_NAV_ROUTING, SECTION_ROUTING)
+                    | (ID_NAV_CONNECTORS, SECTION_CONNECTORS)
+                    | (ID_NAV_ANALYTICS, SECTION_ANALYTICS)
+                    | (ID_NAV_SETTINGS, SECTION_SETTINGS)
+            )
+        })
+        .unwrap_or(false);
+    let selected_route = STATE
+        .get()
+        .map(|state| {
+            let state = state.lock().unwrap();
+            let strategy = state
+                .manager
+                .as_ref()
+                .map(|manager| manager.routing.strategy.as_str())
+                .unwrap_or("round-robin");
+            (id == ID_ROUTE_ROUND_ROBIN && strategy == "round-robin")
+                || (id == ID_ROUTE_WEIGHTED && strategy == "weighted-round-robin")
+                || (id == ID_ROUTE_FILL_FIRST && strategy == "fill-first")
+        })
+        .unwrap_or(false);
     let primary = id == ID_SETUP;
     let destructive = id == ID_STOP;
     let (fill, border, text_color) = if disabled {
@@ -1628,7 +2856,17 @@ unsafe fn draw_owner_button(draw: &DRAWITEMSTRUCT) {
             COLOR_PRIMARY,
             COLOR_CARD,
         )
-    } else if provider_selected {
+    } else if selected_navigation {
+        (
+            if pressed {
+                COLOR_PRIMARY_DARK
+            } else {
+                COLOR_PRIMARY
+            },
+            COLOR_PRIMARY,
+            COLOR_CARD,
+        )
+    } else if provider_selected || selected_route {
         (
             if pressed {
                 COLOR_BORDER
@@ -1641,19 +2879,23 @@ unsafe fn draw_owner_button(draw: &DRAWITEMSTRUCT) {
     } else {
         (
             if pressed {
-            COLOR_PRIMARY_SOFT
+                COLOR_PRIMARY_SOFT
             } else {
                 COLOR_SURFACE_INSET
             },
             COLOR_BORDER,
-            if destructive { COLOR_DANGER } else { COLOR_TEXT },
+            if destructive {
+                COLOR_DANGER
+            } else {
+                COLOR_TEXT
+            },
         )
     };
     unsafe { rounded_box(draw.hDC, &draw.rcItem, fill, border, 16) };
     let mut label = [0u16; 256];
     let length = unsafe { GetWindowTextW(draw.hwndItem, label.as_mut_ptr(), label.len() as i32) };
     let text = String::from_utf16_lossy(&label[..length.max(0) as usize]);
-    let font = if primary || provider_selected {
+    let font = if primary || provider_selected || selected_navigation || selected_route {
         STATE
             .get()
             .map(|state| state.lock().unwrap().font_bold)
@@ -1737,9 +2979,17 @@ fn request_refresh(hwnd: HWND, force_quota: bool) {
             return;
         }
         state.refreshing = true;
+        let quota_refresh_interval = Duration::from_secs(
+            state
+                .manager
+                .as_ref()
+                .map(|manager| manager.settings.auto_refresh_minutes.max(1) as u64)
+                .unwrap_or(5)
+                * 60,
+        );
         let quota_due = state
             .last_quota_refresh
-            .map(|last| last.elapsed() >= QUOTA_REFRESH_INTERVAL)
+            .map(|last| last.elapsed() >= quota_refresh_interval)
             .unwrap_or(true);
         (
             state.host.connection.clone(),
@@ -1763,11 +3013,13 @@ fn request_refresh(hwnd: HWND, force_quota: bool) {
             &format!("/api/usage?provider={requested_provider}"),
         );
         let connectors = api_get::<ConnectorResponse>(&connection, "/api/connectors");
+        let manager = api_get::<ManagerReport>(&connection, "/api/manager");
         let update = Box::new(RefreshResult {
             status,
             quota,
             usage,
             connectors,
+            manager,
             requested_provider,
         });
         unsafe {
@@ -1820,6 +3072,7 @@ unsafe fn apply_refresh(update: RefreshResult) {
         quota,
         usage,
         connectors,
+        manager,
         requested_provider,
     } = update;
     let (
@@ -1845,6 +3098,9 @@ unsafe fn apply_refresh(update: RefreshResult) {
         }
         if let Ok(connectors) = &connectors {
             state.connectors_text = connectors_text(connectors);
+        }
+        if let Ok(manager) = &manager {
+            state.manager = Some(manager.clone());
         }
         if let Some(result) = &quota {
             if requested_provider == state.provider {
@@ -1951,7 +3207,10 @@ unsafe fn apply_refresh(update: RefreshResult) {
             );
             set_text(
                 controls.provider_antigravity,
-                &format!("Antigravity · {} 个账号", status.provider_accounts.antigravity),
+                &format!(
+                    "Antigravity · {} 个账号",
+                    status.provider_accounts.antigravity
+                ),
             );
             set_text(
                 controls.provider_grok,
@@ -1979,7 +3238,13 @@ unsafe fn apply_refresh(update: RefreshResult) {
             );
             set_text(
                 controls.quota_title,
-                if provider == "xai" {
+                if STATE
+                    .get()
+                    .map(|state| state.lock().unwrap().section == SECTION_ACCOUNTS)
+                    .unwrap_or(false)
+                {
+                    "账号与额度"
+                } else if provider == "xai" {
                     "Grok 共享额度"
                 } else {
                     "Gemini 模型额度"
@@ -1989,6 +3254,32 @@ unsafe fn apply_refresh(update: RefreshResult) {
         Err(error) => unsafe {
             set_text(controls.subtitle, &format!("状态刷新失败：{error}"))
         },
+    }
+    if let Some(state_lock) = STATE.get() {
+        let (controls, manager) = {
+            let state = state_lock.lock().unwrap();
+            (state.controls, state.manager.clone())
+        };
+        if let Some(manager) = manager {
+            unsafe {
+                set_text(
+                    controls.toggle_affinity,
+                    if manager.routing.session_affinity {
+                        "会话亲和：开启"
+                    } else {
+                        "会话亲和：关闭"
+                    },
+                );
+                set_text(
+                    controls.toggle_glass,
+                    if manager.settings.liquid_glass {
+                        "液态玻璃：开启"
+                    } else {
+                        "液态玻璃：关闭"
+                    },
+                );
+            }
+        }
     }
     update_tray(
         hwnd,
@@ -2000,6 +3291,20 @@ unsafe fn apply_refresh(update: RefreshResult) {
         InvalidateRect(hwnd, null(), 0);
         InvalidateRect(controls.provider_antigravity as HWND, null(), 1);
         InvalidateRect(controls.provider_grok as HWND, null(), 1);
+        for handle in controls.nav {
+            InvalidateRect(handle as HWND, null(), 1);
+        }
+        for handle in [
+            controls.route_round_robin,
+            controls.route_weighted,
+            controls.route_fill_first,
+            controls.toggle_affinity,
+            controls.toggle_glass,
+            controls.refresh_five,
+            controls.refresh_ten,
+        ] {
+            InvalidateRect(handle as HWND, null(), 1);
+        }
     }
     if operation_finished || refresh_again {
         request_refresh(hwnd, true);
@@ -2061,6 +3366,13 @@ unsafe fn set_action_controls(controls: Controls, enabled: bool) {
         controls.open_zcode,
         controls.stop,
         controls.copy_connectors,
+        controls.route_round_robin,
+        controls.route_weighted,
+        controls.route_fill_first,
+        controls.toggle_affinity,
+        controls.toggle_glass,
+        controls.refresh_five,
+        controls.refresh_ten,
     ] {
         unsafe {
             EnableWindow(handle as HWND, i32::from(enabled));
@@ -2076,6 +3388,79 @@ unsafe fn set_action_controls(controls: Controls, enabled: bool) {
                 "处理中，请稍候…"
             },
         );
+    }
+}
+
+fn update_manager_setting(hwnd: HWND, body: serde_json::Value) {
+    let Some(state_lock) = STATE.get() else {
+        return;
+    };
+    let (connection, subtitle) = {
+        let state = state_lock.lock().unwrap();
+        (state.host.connection.clone(), state.controls.subtitle)
+    };
+    unsafe { set_text(subtitle, "正在保存本机设置…") };
+    let hwnd_value = hwnd as isize;
+    thread::spawn(move || {
+        let update = Box::new(OperationPostResult {
+            error: api_post(&connection, "/api/manager/settings", body).err(),
+        });
+        unsafe {
+            let _ = PostMessageW(
+                hwnd_value as HWND,
+                WM_OPERATION_POSTED,
+                0,
+                Box::into_raw(update) as LPARAM,
+            );
+        }
+    });
+}
+
+unsafe fn select_section(hwnd: HWND, section: usize) {
+    let Some(state_lock) = STATE.get() else {
+        return;
+    };
+    let controls = {
+        let mut state = state_lock.lock().unwrap();
+        if state.section == section {
+            return;
+        }
+        state.section = section;
+        state.controls
+    };
+    unsafe {
+        set_text(
+            controls.quota_title,
+            if section == SECTION_ACCOUNTS {
+                "账号与额度"
+            } else {
+                let provider = STATE
+                    .get()
+                    .map(|state| state.lock().unwrap().provider.clone())
+                    .unwrap_or_else(|| "antigravity".to_string());
+                if provider == "xai" {
+                    "Grok 共享额度"
+                } else {
+                    "Gemini 模型额度"
+                }
+            },
+        );
+        set_text(
+            controls.action_header,
+            match section {
+                SECTION_ACCOUNTS => "添加账号",
+                SECTION_PROXY => "代理控制",
+                SECTION_ROUTING => "应用设置",
+                SECTION_CONNECTORS => "配置助手",
+                SECTION_SETTINGS => "快捷设置",
+                _ => "接入控制",
+            },
+        );
+        layout(hwnd);
+        for handle in controls.nav {
+            InvalidateRect(handle as HWND, null(), 1);
+        }
+        InvalidateRect(hwnd, null(), 0);
     }
 }
 
@@ -2245,7 +3630,8 @@ fn quota_window_summary(report: &QuotaReport, kind: &str) -> Option<QuotaWindowS
     for account in &report.accounts {
         for group in account.groups.as_deref().unwrap_or(&[]) {
             for bucket in &group.buckets {
-                let search = format!("{} {} {}", group.name, bucket.name, bucket.window).to_lowercase();
+                let search =
+                    format!("{} {} {}", group.name, bucket.name, bucket.window).to_lowercase();
                 let matches = if kind == "five" {
                     search.contains("5小时")
                         || search.contains("5 小时")
@@ -2375,16 +3761,8 @@ unsafe fn show_tray_menu(hwnd: HWND) {
     if widget.is_null() {
         return;
     }
-    let region = unsafe {
-        CreateRoundRectRgn(
-            0,
-            0,
-            width + 1,
-            height + 1,
-            scale(24, dpi),
-            scale(24, dpi),
-        )
-    };
+    let region =
+        unsafe { CreateRoundRectRgn(0, 0, width + 1, height + 1, scale(24, dpi), scale(24, dpi)) };
     unsafe {
         SetWindowRgn(widget, region, 1);
         ShowWindow(widget, SW_SHOW);
@@ -2412,10 +3790,22 @@ unsafe fn paint_tray_widget(hwnd: HWND) {
             )
         })
         .unwrap_or_default();
-    let provider_name = if provider == "xai" { "Grok / xAI" } else { "Antigravity" };
-    let account_count = if provider == "xai" { accounts.xai } else { accounts.antigravity };
-    let five = quota.as_ref().and_then(|report| quota_window_summary(report, "five"));
-    let week = quota.as_ref().and_then(|report| quota_window_summary(report, "week"));
+    let provider_name = if provider == "xai" {
+        "Grok / xAI"
+    } else {
+        "Antigravity"
+    };
+    let account_count = if provider == "xai" {
+        accounts.xai
+    } else {
+        accounts.antigravity
+    };
+    let five = quota
+        .as_ref()
+        .and_then(|report| quota_window_summary(report, "five"));
+    let week = quota
+        .as_ref()
+        .and_then(|report| quota_window_summary(report, "week"));
     let (font, bold, title) = STATE
         .get()
         .map(|state| {
@@ -2432,12 +3822,30 @@ unsafe fn paint_tray_widget(hwnd: HWND) {
             right: scale(56, dpi),
             bottom: scale(54, dpi),
         };
-        rounded_box(hdc, &logo, COLOR_PRIMARY, COLOR_PRIMARY_DARK, scale(12, dpi));
-        draw_label(hdc, "ZA", logo, bold, COLOR_CARD, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        rounded_box(
+            hdc,
+            &logo,
+            COLOR_PRIMARY,
+            COLOR_PRIMARY_DARK,
+            scale(12, dpi),
+        );
+        draw_label(
+            hdc,
+            "ZA",
+            logo,
+            bold,
+            COLOR_CARD,
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE,
+        );
         draw_label(
             hdc,
             "ZCode Antigravity",
-            RECT { left: scale(68, dpi), top: scale(13, dpi), right: client.right - scale(18, dpi), bottom: scale(39, dpi) },
+            RECT {
+                left: scale(68, dpi),
+                top: scale(13, dpi),
+                right: client.right - scale(18, dpi),
+                bottom: scale(39, dpi),
+            },
             title,
             COLOR_TEXT,
             DT_LEFT | DT_VCENTER | DT_SINGLELINE,
@@ -2445,66 +3853,253 @@ unsafe fn paint_tray_widget(hwnd: HWND) {
         draw_label(
             hdc,
             "额度与 Token 小组件",
-            RECT { left: scale(68, dpi), top: scale(38, dpi), right: client.right - scale(18, dpi), bottom: scale(59, dpi) },
+            RECT {
+                left: scale(68, dpi),
+                top: scale(38, dpi),
+                right: client.right - scale(18, dpi),
+                bottom: scale(59, dpi),
+            },
             font,
             COLOR_TERTIARY,
             DT_LEFT | DT_VCENTER | DT_SINGLELINE,
         );
-        let rail = RECT { left: scale(18, dpi), top: scale(70, dpi), right: client.right - scale(18, dpi), bottom: scale(116, dpi) };
-        rounded_box(hdc, &rail, COLOR_SURFACE_INSET, COLOR_BORDER, scale(14, dpi));
+        let rail = RECT {
+            left: scale(18, dpi),
+            top: scale(70, dpi),
+            right: client.right - scale(18, dpi),
+            bottom: scale(116, dpi),
+        };
+        rounded_box(
+            hdc,
+            &rail,
+            COLOR_SURFACE_INSET,
+            COLOR_BORDER,
+            scale(14, dpi),
+        );
         let mid = (rail.left + rail.right) / 2;
-        let anti = RECT { right: mid - scale(3, dpi), ..rail };
-        let grok = RECT { left: mid + scale(3, dpi), ..rail };
+        let anti = RECT {
+            right: mid - scale(3, dpi),
+            ..rail
+        };
+        let grok = RECT {
+            left: mid + scale(3, dpi),
+            ..rail
+        };
         if provider == "xai" {
             rounded_box(hdc, &grok, COLOR_PRIMARY, COLOR_PRIMARY, scale(12, dpi));
         } else {
             rounded_box(hdc, &anti, COLOR_PRIMARY, COLOR_PRIMARY, scale(12, dpi));
         }
-        draw_label(hdc, "Antigravity", anti, bold, if provider == "xai" { COLOR_MUTED } else { COLOR_CARD }, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-        draw_label(hdc, "Grok / xAI", grok, bold, if provider == "xai" { COLOR_CARD } else { COLOR_MUTED }, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        draw_label(
+            hdc,
+            "Antigravity",
+            anti,
+            bold,
+            if provider == "xai" {
+                COLOR_MUTED
+            } else {
+                COLOR_CARD
+            },
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE,
+        );
+        draw_label(
+            hdc,
+            "Grok / xAI",
+            grok,
+            bold,
+            if provider == "xai" {
+                COLOR_CARD
+            } else {
+                COLOR_MUTED
+            },
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE,
+        );
 
-        let quota_card = RECT { left: scale(18, dpi), top: scale(130, dpi), right: client.right - scale(18, dpi), bottom: scale(276, dpi) };
-        rounded_box(hdc, &quota_card, COLOR_PRIMARY_SOFT, COLOR_PRIMARY, scale(16, dpi));
+        let quota_card = RECT {
+            left: scale(18, dpi),
+            top: scale(130, dpi),
+            right: client.right - scale(18, dpi),
+            bottom: scale(276, dpi),
+        };
+        rounded_box(
+            hdc,
+            &quota_card,
+            COLOR_PRIMARY_SOFT,
+            COLOR_PRIMARY,
+            scale(16, dpi),
+        );
         draw_label(
             hdc,
             &format!("{provider_name}  ·  {account_count} 个账号"),
-            RECT { left: scale(34, dpi), top: scale(139, dpi), right: quota_card.right - scale(70, dpi), bottom: scale(169, dpi) },
+            RECT {
+                left: scale(34, dpi),
+                top: scale(139, dpi),
+                right: quota_card.right - scale(70, dpi),
+                bottom: scale(169, dpi),
+            },
             title,
             COLOR_TEXT,
             DT_LEFT | DT_VCENTER | DT_SINGLELINE,
         );
-        let badge = RECT { left: quota_card.right - scale(70, dpi), top: scale(141, dpi), right: quota_card.right - scale(14, dpi), bottom: scale(167, dpi) };
-        rounded_box(hdc, &badge, if account_count > 0 { 0x00E8F7EA } else { 0x00E6F3FF }, COLOR_BORDER, scale(13, dpi));
-        draw_label(hdc, if account_count > 0 { "可用" } else { "待登录" }, badge, bold, if account_count > 0 { COLOR_SUCCESS } else { COLOR_WARNING }, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        let badge = RECT {
+            left: quota_card.right - scale(70, dpi),
+            top: scale(141, dpi),
+            right: quota_card.right - scale(14, dpi),
+            bottom: scale(167, dpi),
+        };
+        rounded_box(
+            hdc,
+            &badge,
+            if account_count > 0 {
+                0x00E8F7EA
+            } else {
+                0x00E6F3FF
+            },
+            COLOR_BORDER,
+            scale(13, dpi),
+        );
+        draw_label(
+            hdc,
+            if account_count > 0 {
+                "可用"
+            } else {
+                "待登录"
+            },
+            badge,
+            bold,
+            if account_count > 0 {
+                COLOR_SUCCESS
+            } else {
+                COLOR_WARNING
+            },
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE,
+        );
 
         let column_width = (quota_card.right - quota_card.left - scale(32, dpi)) / 3;
         for (index, (label, summary, tint)) in [
             ("5 小时剩余", five.as_ref(), COLOR_PRIMARY),
             ("本周剩余", week.as_ref(), COLOR_SECONDARY),
-        ].iter().enumerate() {
+        ]
+        .iter()
+        .enumerate()
+        {
             let left = quota_card.left + scale(16, dpi) + index as i32 * column_width;
-            draw_label(hdc, label, RECT { left, top: scale(177, dpi), right: left + column_width - scale(12, dpi), bottom: scale(197, dpi) }, font, COLOR_MUTED, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-            draw_label(hdc, &summary.map(|value| format!("{:.0}%", value.remaining)).unwrap_or_else(|| "—".to_string()), RECT { left, top: scale(198, dpi), right: left + column_width - scale(12, dpi), bottom: scale(225, dpi) }, title, COLOR_TEXT, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-            let track = RECT { left, top: scale(230, dpi), right: left + column_width - scale(14, dpi), bottom: scale(237, dpi) };
+            draw_label(
+                hdc,
+                label,
+                RECT {
+                    left,
+                    top: scale(177, dpi),
+                    right: left + column_width - scale(12, dpi),
+                    bottom: scale(197, dpi),
+                },
+                font,
+                COLOR_MUTED,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+            );
+            draw_label(
+                hdc,
+                &summary
+                    .map(|value| format!("{:.0}%", value.remaining))
+                    .unwrap_or_else(|| "—".to_string()),
+                RECT {
+                    left,
+                    top: scale(198, dpi),
+                    right: left + column_width - scale(12, dpi),
+                    bottom: scale(225, dpi),
+                },
+                title,
+                COLOR_TEXT,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+            );
+            let track = RECT {
+                left,
+                top: scale(230, dpi),
+                right: left + column_width - scale(14, dpi),
+                bottom: scale(237, dpi),
+            };
             rounded_box(hdc, &track, COLOR_TRACK, COLOR_TRACK, scale(5, dpi));
             if let Some(value) = summary {
-                let fill_width = ((track.right - track.left) as f64 * value.remaining.clamp(0.0, 100.0) / 100.0) as i32;
+                let fill_width = ((track.right - track.left) as f64
+                    * value.remaining.clamp(0.0, 100.0)
+                    / 100.0) as i32;
                 if fill_width > 0 {
-                    let fill = RECT { right: track.left + fill_width.max(scale(5, dpi)), ..track };
+                    let fill = RECT {
+                        right: track.left + fill_width.max(scale(5, dpi)),
+                        ..track
+                    };
                     rounded_box(hdc, &fill, *tint, *tint, scale(5, dpi));
                 }
-                let reset = value.reset_time.as_deref().map(short_iso_time).unwrap_or_else(|| "等待同步".to_string());
-                draw_label(hdc, &reset, RECT { left, top: scale(241, dpi), right: left + column_width - scale(12, dpi), bottom: scale(261, dpi) }, font, COLOR_TERTIARY, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+                let reset = value
+                    .reset_time
+                    .as_deref()
+                    .map(short_iso_time)
+                    .unwrap_or_else(|| "等待同步".to_string());
+                draw_label(
+                    hdc,
+                    &reset,
+                    RECT {
+                        left,
+                        top: scale(241, dpi),
+                        right: left + column_width - scale(12, dpi),
+                        bottom: scale(261, dpi),
+                    },
+                    font,
+                    COLOR_TERTIARY,
+                    DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+                );
             }
         }
         let token_left = quota_card.left + scale(16, dpi) + 2 * column_width;
-        draw_label(hdc, "最近输出", RECT { left: token_left, top: scale(177, dpi), right: quota_card.right - scale(14, dpi), bottom: scale(197, dpi) }, font, COLOR_MUTED, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-        let (output, speed) = usage.as_ref().and_then(|report| report.latest.as_ref()).map(|latest| (
-            format!("{} tok", format_integer(latest.output_tokens)),
-            format!("{:.1} tok/s", latest.output_tokens_per_second),
-        )).unwrap_or_else(|| ("—".to_string(), "等待首次响应".to_string()));
-        draw_label(hdc, &output, RECT { left: token_left, top: scale(198, dpi), right: quota_card.right - scale(14, dpi), bottom: scale(225, dpi) }, title, COLOR_TEXT, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-        draw_label(hdc, &speed, RECT { left: token_left, top: scale(231, dpi), right: quota_card.right - scale(14, dpi), bottom: scale(257, dpi) }, font, COLOR_TERTIARY, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+        draw_label(
+            hdc,
+            "最近输出",
+            RECT {
+                left: token_left,
+                top: scale(177, dpi),
+                right: quota_card.right - scale(14, dpi),
+                bottom: scale(197, dpi),
+            },
+            font,
+            COLOR_MUTED,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+        );
+        let (output, speed) = usage
+            .as_ref()
+            .and_then(|report| report.latest.as_ref())
+            .map(|latest| {
+                (
+                    format!("{} tok", format_integer(latest.output_tokens)),
+                    format!("{:.1} tok/s", latest.output_tokens_per_second),
+                )
+            })
+            .unwrap_or_else(|| ("—".to_string(), "等待首次响应".to_string()));
+        draw_label(
+            hdc,
+            &output,
+            RECT {
+                left: token_left,
+                top: scale(198, dpi),
+                right: quota_card.right - scale(14, dpi),
+                bottom: scale(225, dpi),
+            },
+            title,
+            COLOR_TEXT,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+        );
+        draw_label(
+            hdc,
+            &speed,
+            RECT {
+                left: token_left,
+                top: scale(231, dpi),
+                right: quota_card.right - scale(14, dpi),
+                bottom: scale(257, dpi),
+            },
+            font,
+            COLOR_TERTIARY,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+        );
 
         let button_top = scale(292, dpi);
         let button_bottom = scale(336, dpi);
@@ -2512,9 +4107,27 @@ unsafe fn paint_tray_widget(hwnd: HWND) {
         let button_width = (client.right - scale(36, dpi) - button_gap * 2) / 3;
         for (index, label) in ["打开主界面", "刷新", "退出"].iter().enumerate() {
             let left = scale(18, dpi) + index as i32 * (button_width + button_gap);
-            let button = RECT { left, top: button_top, right: left + button_width, bottom: button_bottom };
-            rounded_box(hdc, &button, COLOR_SURFACE_INSET, COLOR_BORDER, scale(12, dpi));
-            draw_label(hdc, label, button, font, if index == 2 { COLOR_DANGER } else { COLOR_TEXT }, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            let button = RECT {
+                left,
+                top: button_top,
+                right: left + button_width,
+                bottom: button_bottom,
+            };
+            rounded_box(
+                hdc,
+                &button,
+                COLOR_SURFACE_INSET,
+                COLOR_BORDER,
+                scale(12, dpi),
+            );
+            draw_label(
+                hdc,
+                label,
+                button,
+                font,
+                if index == 2 { COLOR_DANGER } else { COLOR_TEXT },
+                DT_CENTER | DT_VCENTER | DT_SINGLELINE,
+            );
         }
     }
     unsafe { EndPaint(hwnd, &paint) };
@@ -2553,7 +4166,10 @@ unsafe extern "system" fn tray_widget_proc(
             let dpi = unsafe { GetDpiForWindow(hwnd) }.max(96);
             let x = loword(lparam as usize);
             let y = ((lparam as usize >> 16) & 0xffff) as i32;
-            let main_hwnd = STATE.get().map(|state| state.lock().unwrap().hwnd as HWND).unwrap_or(null_mut());
+            let main_hwnd = STATE
+                .get()
+                .map(|state| state.lock().unwrap().hwnd as HWND)
+                .unwrap_or(null_mut());
             if y >= scale(70, dpi) && y <= scale(116, dpi) {
                 if x < scale(215, dpi) {
                     select_provider(main_hwnd, "antigravity");
@@ -2610,6 +4226,7 @@ unsafe extern "system" fn window_proc(
                 state.lock().unwrap().hwnd = hwnd as isize;
             }
             unsafe {
+                enable_liquid_glass(hwnd);
                 create_controls(hwnd);
                 layout(hwnd);
                 add_tray_icon(hwnd);
@@ -2668,12 +4285,58 @@ unsafe extern "system" fn window_proc(
                 ID_PROVIDER_ANTIGRAVITY => select_provider(hwnd, "antigravity"),
                 ID_PROVIDER_GROK => select_provider(hwnd, "xai"),
                 ID_REFRESH => request_refresh(hwnd, true),
+                ID_NAV_OVERVIEW => unsafe { select_section(hwnd, SECTION_OVERVIEW) },
+                ID_NAV_ACCOUNTS => unsafe { select_section(hwnd, SECTION_ACCOUNTS) },
+                ID_NAV_PROXY => unsafe { select_section(hwnd, SECTION_PROXY) },
+                ID_NAV_ROUTING => unsafe { select_section(hwnd, SECTION_ROUTING) },
+                ID_NAV_CONNECTORS => unsafe { select_section(hwnd, SECTION_CONNECTORS) },
+                ID_NAV_ANALYTICS => unsafe { select_section(hwnd, SECTION_ANALYTICS) },
+                ID_NAV_SETTINGS => unsafe { select_section(hwnd, SECTION_SETTINGS) },
                 ID_SETUP => run_operation(hwnd, "setup"),
                 ID_LOGIN_ANTIGRAVITY => run_operation(hwnd, "login"),
                 ID_LOGIN_GROK => run_operation(hwnd, "login-grok"),
                 ID_SYNC => run_operation(hwnd, "sync"),
                 ID_OPEN_ZCODE => run_operation(hwnd, "open-zcode"),
                 ID_STOP => run_operation(hwnd, "stop"),
+                ID_ROUTE_ROUND_ROBIN => {
+                    update_manager_setting(hwnd, json!({"routingStrategy": "round-robin"}))
+                }
+                ID_ROUTE_WEIGHTED => {
+                    update_manager_setting(hwnd, json!({"routingStrategy": "weighted-round-robin"}))
+                }
+                ID_ROUTE_FILL_FIRST => {
+                    update_manager_setting(hwnd, json!({"routingStrategy": "fill-first"}))
+                }
+                ID_TOGGLE_AFFINITY => {
+                    let enabled = STATE
+                        .get()
+                        .and_then(|state| {
+                            state
+                                .lock()
+                                .unwrap()
+                                .manager
+                                .as_ref()
+                                .map(|manager| manager.routing.session_affinity)
+                        })
+                        .unwrap_or(true);
+                    update_manager_setting(hwnd, json!({"sessionAffinity": !enabled}));
+                }
+                ID_TOGGLE_GLASS => {
+                    let enabled = STATE
+                        .get()
+                        .and_then(|state| {
+                            state
+                                .lock()
+                                .unwrap()
+                                .manager
+                                .as_ref()
+                                .map(|manager| manager.settings.liquid_glass)
+                        })
+                        .unwrap_or(true);
+                    update_manager_setting(hwnd, json!({"liquidGlass": !enabled}));
+                }
+                ID_REFRESH_FIVE => update_manager_setting(hwnd, json!({"autoRefreshMinutes": 5})),
+                ID_REFRESH_TEN => update_manager_setting(hwnd, json!({"autoRefreshMinutes": 10})),
                 ID_COPY_CONNECTORS => {
                     let text = STATE
                         .get()
@@ -2825,9 +4488,11 @@ fn show_fatal(message: &str) {
 }
 
 fn main() {
-    let auto_setup = std::env::args_os()
-        .skip(1)
-        .any(|argument| argument.to_string_lossy().eq_ignore_ascii_case("--auto-setup"));
+    let auto_setup = std::env::args_os().skip(1).any(|argument| {
+        argument
+            .to_string_lossy()
+            .eq_ignore_ascii_case("--auto-setup")
+    });
     unsafe {
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
         let controls = INITCOMMONCONTROLSEX {

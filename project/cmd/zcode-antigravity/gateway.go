@@ -44,6 +44,7 @@ type modelsResponse struct {
 }
 
 func (a *app) writeBackendConfig(port int) error {
+	cfg := a.currentSettings()
 	quote := func(value string) string { return strconv.Quote(filepath.ToSlash(value)) }
 	var aliases strings.Builder
 	aliases.WriteString("oauth-model-alias:\n  antigravity:\n")
@@ -83,9 +84,9 @@ usage-statistics-enabled: true
 redis-usage-queue-retention-seconds: 3600
 proxy-url: %s
 passthrough-headers: false
-request-retry: 2
-max-retry-credentials: 2
-max-retry-interval: 20
+request-retry: %d
+max-retry-credentials: %d
+max-retry-interval: %d
 save-cooldown-status: false
 disable-claude-cloak-mode: true
 
@@ -99,15 +100,15 @@ quota-exceeded:
 
 %s
 routing:
-  strategy: "round-robin"
-  session-affinity: true
-  session-affinity-ttl: "2h"
+  strategy: %s
+  session-affinity: %t
+  session-affinity-ttl: %s
 
 plugins:
   enabled: false
   dir: "plugins"
   configs: {}
-`, port, strconv.Quote(a.apiKey), quote(a.paths.AuthDir), strconv.Quote(a.apiKey), strconv.Quote(strings.TrimSpace(a.settings.ProxyURL)), aliases.String())
+`, port, strconv.Quote(a.apiKey), quote(a.paths.AuthDir), strconv.Quote(a.apiKey), strconv.Quote(cfg.ProxyURL), cfg.RequestRetry, cfg.MaxRetryCredentials, cfg.MaxRetryInterval, aliases.String(), strconv.Quote(cfg.RoutingStrategy), cfg.SessionAffinity, strconv.Quote(cfg.SessionAffinityTTL))
 	return writeAtomic(a.paths.Config, []byte(content), 0o600)
 }
 
@@ -225,15 +226,16 @@ func chooseFreePort(start, end int) (int, error) {
 }
 
 func (a *app) chooseGatewayPort() (port int, reuse bool, err error) {
+	cfg := a.currentSettings()
 	current, stateErr := a.loadState()
 	if stateErr != nil {
 		return 0, false, stateErr
 	}
-	candidates := make([]int, 0, a.settings.PortScanEnd-a.settings.PreferredPort+2)
-	if current.Port >= a.settings.PreferredPort && current.Port <= a.settings.PortScanEnd {
+	candidates := make([]int, 0, cfg.PortScanEnd-cfg.PreferredPort+2)
+	if current.Port >= cfg.PreferredPort && current.Port <= cfg.PortScanEnd {
 		candidates = append(candidates, current.Port)
 	}
-	for candidate := a.settings.PreferredPort; candidate <= a.settings.PortScanEnd; candidate++ {
+	for candidate := cfg.PreferredPort; candidate <= cfg.PortScanEnd; candidate++ {
 		candidates = append(candidates, candidate)
 	}
 	seen := make(map[int]bool)
@@ -255,10 +257,11 @@ func (a *app) chooseGatewayPort() (port int, reuse bool, err error) {
 			occupied = append(occupied, fmt.Sprintf("%d (%s)", candidate, describePortOwner(candidate)))
 		}
 	}
-	return 0, false, fmt.Errorf("端口 %d-%d 全部被占用；示例: %s", a.settings.PreferredPort, a.settings.PortScanEnd, strings.Join(occupied, ", "))
+	return 0, false, fmt.Errorf("端口 %d-%d 全部被占用；示例: %s", cfg.PreferredPort, cfg.PortScanEnd, strings.Join(occupied, ", "))
 }
 
 func (a *app) startAndConfigure() (returnErr error) {
+	cfg := a.currentSettings()
 	if _, err := os.Stat(a.paths.Backend); err != nil {
 		return fmt.Errorf("缺少网关程序 %s: %w", a.paths.Backend, err)
 	}
@@ -306,7 +309,7 @@ func (a *app) startAndConfigure() (returnErr error) {
 				time.Sleep(100 * time.Millisecond)
 			}
 			if !isPortFree(port) {
-				port, err = chooseFreePort(a.settings.PreferredPort, a.settings.PortScanEnd)
+				port, err = chooseFreePort(cfg.PreferredPort, cfg.PortScanEnd)
 				if err != nil {
 					return err
 				}
@@ -319,8 +322,8 @@ func (a *app) startAndConfigure() (returnErr error) {
 	if reuse {
 		fmt.Printf("已复用正在运行的本地网关: %s\n", a.gatewayURL(port))
 	} else {
-		if port != a.settings.PreferredPort {
-			fmt.Printf("默认端口 %d 已占用，自动改用 %d。\n", a.settings.PreferredPort, port)
+		if port != cfg.PreferredPort {
+			fmt.Printf("默认端口 %d 已占用，自动改用 %d。\n", cfg.PreferredPort, port)
 		}
 		if err := a.writeBackendConfig(port); err != nil {
 			return fmt.Errorf("写入网关配置: %w", err)
@@ -430,22 +433,23 @@ func (a *app) waitForModels(port int, timeout time.Duration) ([]modelInfo, error
 }
 
 func (a *app) login() error {
+	cfg := a.currentSettings()
 	if _, err := os.Stat(a.paths.Backend); err != nil {
 		return fmt.Errorf("缺少网关程序 %s: %w", a.paths.Backend, err)
 	}
-	port := a.settings.PreferredPort
-	if current, err := a.loadState(); err == nil && current.Port >= a.settings.PreferredPort && current.Port <= a.settings.PortScanEnd {
+	port := cfg.PreferredPort
+	if current, err := a.loadState(); err == nil && current.Port >= cfg.PreferredPort && current.Port <= cfg.PortScanEnd {
 		port = current.Port
 	}
 	if err := a.writeBackendConfig(port); err != nil {
 		return fmt.Errorf("准备登录配置: %w", err)
 	}
-	callbackPort, err := chooseFreePort(a.settings.CallbackPreferredPort, a.settings.CallbackScanEnd)
+	callbackPort, err := chooseFreePort(cfg.CallbackPreferredPort, cfg.CallbackScanEnd)
 	if err != nil {
-		return fmt.Errorf("OAuth 回调端口 %d-%d 全部被占用", a.settings.CallbackPreferredPort, a.settings.CallbackScanEnd)
+		return fmt.Errorf("OAuth 回调端口 %d-%d 全部被占用", cfg.CallbackPreferredPort, cfg.CallbackScanEnd)
 	}
-	if callbackPort != a.settings.CallbackPreferredPort {
-		fmt.Printf("OAuth 默认回调端口 %d 已占用，自动改用 %d。\n", a.settings.CallbackPreferredPort, callbackPort)
+	if callbackPort != cfg.CallbackPreferredPort {
+		fmt.Printf("OAuth 默认回调端口 %d 已占用，自动改用 %d。\n", cfg.CallbackPreferredPort, callbackPort)
 	}
 	fmt.Println("浏览器将打开 Google 登录页。授权完成前请不要关闭此窗口。")
 	started := a.now()
@@ -481,11 +485,12 @@ func (a *app) login() error {
 }
 
 func (a *app) loginGrok() error {
+	cfg := a.currentSettings()
 	if _, err := os.Stat(a.paths.Backend); err != nil {
 		return fmt.Errorf("缺少网关程序 %s: %w", a.paths.Backend, err)
 	}
-	port := a.settings.PreferredPort
-	if current, err := a.loadState(); err == nil && current.Port >= a.settings.PreferredPort && current.Port <= a.settings.PortScanEnd {
+	port := cfg.PreferredPort
+	if current, err := a.loadState(); err == nil && current.Port >= cfg.PreferredPort && current.Port <= cfg.PortScanEnd {
 		port = current.Port
 	}
 	if err := a.writeBackendConfig(port); err != nil {
@@ -766,6 +771,7 @@ func (a *app) smokeModel(model string) error {
 }
 
 func (a *app) doctor() error {
+	cfg := a.currentSettings()
 	problems := make([]string, 0)
 	if info, err := os.Stat(a.paths.Backend); err != nil {
 		problems = append(problems, "缺少 backend/"+filepath.Base(a.paths.Backend))
@@ -784,15 +790,15 @@ func (a *app) doctor() error {
 			fmt.Printf("[OK] ZCode 配置: %s\n", a.paths.ZCodeConfig)
 		}
 	}
-	if a.settings.ProxyURL == "" {
+	if cfg.ProxyURL == "" {
 		fmt.Println("[INFO] 未设置专用代理；会继承当前系统的 HTTP_PROXY/HTTPS_PROXY 环境变量。")
 	} else {
-		fmt.Printf("[OK] 专用代理: %s\n", redactURLUserinfo(a.settings.ProxyURL))
+		fmt.Printf("[OK] 专用代理: %s\n", redactURLUserinfo(cfg.ProxyURL))
 	}
-	if isPortFree(a.settings.PreferredPort) {
-		fmt.Printf("[OK] 默认 API 端口 %d 当前可用\n", a.settings.PreferredPort)
+	if isPortFree(cfg.PreferredPort) {
+		fmt.Printf("[OK] 默认 API 端口 %d 当前可用\n", cfg.PreferredPort)
 	} else {
-		fmt.Printf("[INFO] 默认 API 端口 %d 已占用，启动时会自动换端口 (%s)\n", a.settings.PreferredPort, describePortOwner(a.settings.PreferredPort))
+		fmt.Printf("[INFO] 默认 API 端口 %d 已占用，启动时会自动换端口 (%s)\n", cfg.PreferredPort, describePortOwner(cfg.PreferredPort))
 	}
 	if len(problems) > 0 {
 		for _, problem := range problems {

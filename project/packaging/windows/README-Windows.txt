@@ -6,6 +6,8 @@ Purpose
 This package lets ZCode and other local agents use Antigravity Gemini or xAI Grok text
 models through a loopback-only compatible Provider. The control center switches account,
 model, quota, and connector views together. Image/video generation models are not injected.
+The Rust/Win32 window uses a high-contrast blue/purple liquid-glass design and seven native
+pages: Overview, Accounts, API Proxy, Model Routing, Agent Connectors, Analytics, and Settings.
 
 Important risk
 --------------
@@ -26,14 +28,14 @@ Requirements
 First test
 ----------
 Recommended: fully exit ZCode from the tray, enable v2rayN TUN, and double-click
-ZCode-Antigravity-Setup-v0.4.7-test.exe. This is a native Windows GUI installer: it shows no
+ZCode-Antigravity-Setup-v0.5.0-test.exe. This is a native Windows GUI installer: it shows no
 terminal, verifies the embedded ZIP plus all three executables, installs only for the current
 user, creates Desktop/Start Menu shortcuts, and opens the control center after completion.
 Do not use v0.4.0-test on Windows; its Rust client expected baseUrl while the Go Core correctly
 emitted baseURL, so startup stopped before the control center could open.
 
 For the single-BAT fallback, fully exit ZCode from the tray, enable v2rayN TUN, and double-click
-ZCode-Antigravity-OneClick-v0.4.7-test.bat. It verifies and extracts its embedded package,
+ZCode-Antigravity-OneClick-v0.5.0-test.bat. It verifies and extracts its embedded package,
 then opens the graphical control center without leaving a terminal window. The control center
 opens OAuth when needed, writes the verified ZCode Provider directly, and starts ZCode after
 successful readback.
@@ -107,6 +109,12 @@ Graphical control center and quota
 - Desktop/Start Menu shortcut: ZCode Antigravity 控制中心
 - The control center is a native Rust + Win32 Windows GUI executable. It starts the audited Go
   manager as a CREATE_NO_WINDOW child and never needs Chrome to render the panel.
+- The main window and taskbar quota widget share a liquid-glass visual language. DWM is limited
+  to the system chrome while the client area is rendered with a high-contrast native surface,
+  avoiding washed-out text in the Windows light theme.
+- Seven pages expose redacted account state, OpenAI/Anthropic/Gemini endpoints, routing and
+  session affinity, retry limits, Agent connectors, local Token analytics, refresh cadence,
+  quota warning threshold, and UI settings.
 - It uses Segoe UI Variable, ClearType, Per-Monitor DPI V2, native controls, a bundled icon, and
   responsive layout for mixed DPI and different desktop resolutions.
 - It shows v2rayN TUN, proxy, bridge, ZCode, provider accounts, models, quota, and Agent connectors.
@@ -156,9 +164,9 @@ Available scripts
 
 Installer formats
 -----------------
-- ZCode-Antigravity-Setup-v0.4.7-test.exe: recommended no-terminal current-user installer.
-- ZCode-Antigravity-OneClick-v0.4.7-test.bat: fallback single-file installer.
-- ZCode-Antigravity-Windows-x64-0.4.7-test.zip: manually verifiable expanded package.
+- ZCode-Antigravity-Setup-v0.5.0-test.exe: recommended no-terminal current-user installer.
+- ZCode-Antigravity-OneClick-v0.5.0-test.bat: fallback single-file installer.
+- ZCode-Antigravity-Windows-x64-0.5.0-test.zip: manually verifiable expanded package.
 - The EXE installer is custom-built and unsigned. It does not require administrator rights or
   7-Zip on the target computer; Windows SmartScreen may still require manual confirmation.
 
@@ -233,7 +241,7 @@ cause a clear setup error instead of silently substituting another model.
 
 Build versions
 --------------
-- ZCode Antigravity Bridge: 0.4.7-test
+- ZCode Antigravity Bridge: 0.5.0-test
 - Native control center: Rust 1.96, windows-sys 0.61.2, ureq 3.4.0
 - CLIProxyAPI base: v7.2.132, commit 78f0c4079e3e6273d65d03b5549cffc898703264
 - Local build: 7.2.132-zcode.12

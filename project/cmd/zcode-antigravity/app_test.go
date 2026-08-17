@@ -37,6 +37,7 @@ func testApp(t *testing.T) *app {
 			Secret:       filepath.Join(data, "local-api-key"),
 			Lock:         filepath.Join(data, "manager.lock"),
 			Settings:     filepath.Join(root, "settings.json"),
+			UserSettings: filepath.Join(data, "manager-settings.json"),
 			ZCodeConfig:  filepath.Join(root, ".zcode", "v2", "config.json"),
 			ZCodeBackups: filepath.Join(root, ".zcode", "v2", "backups", "zcode-antigravity"),
 		},

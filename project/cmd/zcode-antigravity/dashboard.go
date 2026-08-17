@@ -114,6 +114,8 @@ func (a *app) runUIHost(autoSetup, launchBrowser bool) error {
 	mux.HandleFunc("/api/usage", runtime.authorized(runtime.serveUsage))
 	mux.HandleFunc("/api/provider", runtime.authorized(runtime.serveProvider))
 	mux.HandleFunc("/api/connectors", runtime.authorized(runtime.serveConnectors))
+	mux.HandleFunc("/api/manager", runtime.authorized(runtime.serveManager))
+	mux.HandleFunc("/api/manager/settings", runtime.authorized(runtime.serveManagerSettings))
 	mux.HandleFunc("/api/action", runtime.authorized(runtime.serveAction))
 	mux.HandleFunc("/api/heartbeat", runtime.authorized(runtime.serveHeartbeat))
 	mux.HandleFunc("/api/close", runtime.authorized(runtime.serveClose))
@@ -299,7 +301,7 @@ func (g *guiRuntime) status() dashboardStatus {
 		status.Gateway = dashboardItem{Label: "网关未启动", Detail: "点击“一键接入 ZCode”启动"}
 	}
 
-	proxyURL := strings.TrimSpace(g.app.settings.ProxyURL)
+	proxyURL := g.app.currentSettings().ProxyURL
 	if runtime.GOOS == "darwin" && proxyURL == "" {
 		status.Proxy = dashboardItem{OK: true, Label: "使用系统网络 / TUN", Detail: "未固定专用代理", Running: true}
 	} else if reachable, detail := proxyEndpointStatus(proxyURL); reachable {

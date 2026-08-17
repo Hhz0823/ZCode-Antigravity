@@ -1,7 +1,7 @@
 Windows acceptance checklist
 ============================
 
-[ ] ZCode-Antigravity-Setup-v0.4.7-test.exe opens a native confirmation dialog without a terminal.
+[ ] ZCode-Antigravity-Setup-v0.5.0-test.exe opens a native confirmation dialog without a terminal.
 [ ] Control-center refresh, login, sync, stop, port inspection, and ZCode launch never flash a console window.
 [ ] The native EXE writes install.ps1 with exactly one EF BB BF UTF-8 BOM before Windows PowerShell 5.1 parses it.
 [ ] The EXE installer --extract-only workflow reproduces every package file and hash exactly.
@@ -14,6 +14,10 @@ Windows acceptance checklist
 [ ] Control center APIs listen only on 127.0.0.1 and reject requests without the per-launch session key.
 [ ] Weekly and five-hour remaining quota show exact percentages, reset times, and native progress state.
 [ ] A single left-click on the taskbar icon opens a menu showing the selected provider, account count, five-hour quota, weekly quota, reset times, latest output tokens, and token/s.
+[ ] Overview, Accounts, API Proxy, Model Routing, Agent Connectors, Analytics, and Settings switch in place without opening a browser or console.
+[ ] In light and dark Windows themes, the liquid-glass background keeps headings, metrics, buttons, and progress bars legible.
+[ ] Account labels and stable IDs are redacted; the manager API contains no OAuth token, API key, prompt, or reply.
+[ ] Routing, session affinity, liquid glass, and 5/10 minute refresh settings persist to manager-settings.json and survive restart.
 [ ] After one successful model response, the main panel shows protocol-reported output/reasoning tokens and generation token/s; it never derives tokens from text length.
 [ ] Switching Antigravity/Grok shows a switching state, keeps provider-specific cached quota and Token data, and ignores stale results from the previous provider.
 [ ] Keep the panel open for at least 15 seconds; connection state may update but quota fetchedAt must not change before the five-minute interval.

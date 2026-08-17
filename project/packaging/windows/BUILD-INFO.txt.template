@@ -1,20 +1,20 @@
 ZCode Antigravity Bridge build information
 ===========================================
 
-Package: ZCode-Antigravity-Windows-x64-0.4.7-test
+Package: ZCode-Antigravity-Windows-x64-0.5.0-test
 Build date (UTC): 2026-08-17
 Target: Windows x64 (PE32+ Go console Core and Rust/Win32 GUI control center)
 
 Manager
 -------
-Version: 0.4.7-test
+Version: 0.5.0-test
 Go: 1.26.4
 CGO: disabled
 SHA-256: __MANAGER_SHA256__
 
 Control center
 --------------
-Version: 0.4.7-test
+Version: 0.5.0-test
 Language: Rust 2024 Edition
 Bindings: windows-sys 0.61.2
 Subsystem: Windows GUI (no console window)
@@ -64,7 +64,7 @@ Local backend patches
 
 Verification evidence
 ---------------------
-Current v0.4.7-test build-host checks:
+Current v0.5.0-test build-host checks:
 - Manager go test ./... and Windows x64 build: passed
 - Manager go test -race: passed on the macOS build host
 - CLIProxyAPI go mod verify, go test ./..., and Windows x64 build: passed
@@ -78,10 +78,11 @@ Current v0.4.7-test build-host checks:
 - Windows child-process CREATE_NO_WINDOW test and Windows x64 test-binary cross-compile: passed
 - Provider/model selection, Grok billing proxy, tray state, and five Agent connector tests: passed
 - Native SwiftUI macOS main executable and native Rust Windows main executable build checks: passed
-- v0.4.7-test target Windows 11 real-account quota cards, codexU-style taskbar widget, and 144-DPI full-window capture: passed
+- v0.5.0-test target Windows 11 real-account quota cards, seven-page liquid-glass dashboard, taskbar widget, and 144-DPI full-window capture: passed
 - 5-second connection/Token poll left quota fetchedAt/cache write time unchanged; five-minute quota cadence is isolated: passed
 - Real response usage sample (45 output Token, 31.1 generation Token/s) and sanitized local persistence: passed
 - Taskbar single-click menu (5-hour 100%, week 98%, reset times, latest Token/s): passed
+- Settings navigation, text contrast, manager settings API, and one-click gateway startup: passed
 - Antigravity -> Grok -> Antigravity switch isolation and immediate cached restoration: passed
 - v0.4.5 stale backend-path upgrade recovery plus installer-triggered automatic setup: passed
 

@@ -2,8 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "0.4.7-test"
-private let quotaRefreshInterval: TimeInterval = 5 * 60
+private let appVersion = "0.5.0-test"
 
 private extension Notification.Name {
     static let selectBridgeProvider = Notification.Name("ZCodeSelectBridgeProvider")
@@ -91,7 +90,8 @@ struct CreditInfo: Decodable {
     let upstreamLabel: String
 }
 
-struct UsageSample: Decodable {
+struct UsageSample: Decodable, Identifiable {
+    var id: String { timestamp + model }
     let timestamp: String
     let provider: String
     let model: String
@@ -119,6 +119,7 @@ struct UsageReport: Decodable {
     let available: Bool
     let latest: UsageSample?
     let total: UsageAggregate
+    let recent: [UsageSample]
     let warning: String?
 }
 
@@ -135,6 +136,89 @@ struct AgentConnector: Decodable, Identifiable {
     let description: String
     let model: String
     let snippets: [String: String]
+}
+
+struct ManagerReport: Decodable {
+    let version: String
+    let accounts: [ManagerAccount]
+    let proxy: ManagerProxy
+    let routing: ManagerRouting
+    let settings: ManagerSettings
+    let features: [ManagerFeature]
+}
+
+struct ManagerAccount: Decodable, Identifiable {
+    let id: String
+    let provider: String
+    let label: String
+    let plan: String?
+    let status: String
+    let updatedAt: String
+}
+
+struct ManagerProxy: Decodable {
+    let running: Bool
+    let baseURL: String?
+    let port: Int?
+    let protocols: [ManagerProtocol]
+}
+
+struct ManagerProtocol: Decodable, Identifiable {
+    var id: String { name + path }
+    let name: String
+    let path: String
+    let description: String
+}
+
+struct ManagerRouting: Decodable {
+    let strategy: String
+    let sessionAffinity: Bool
+    let sessionAffinityTTL: String
+    let requestRetry: Int
+    let credentialRetry: Int
+    let retryInterval: Int
+    let backgroundModel: String
+}
+
+struct ManagerSettings: Decodable {
+    let autoRefreshMinutes: Int
+    let quotaWarningPercent: Int
+    let proxyURL: String
+    let theme: String
+    let liquidGlass: Bool
+    let settingsPath: String
+}
+
+struct ManagerFeature: Decodable, Identifiable {
+    let id: String
+    let name: String
+    let description: String
+    let available: Bool
+}
+
+struct ManagerSettingsUpdate: Encodable {
+    var routingStrategy: String?
+    var sessionAffinity: Bool?
+    var autoRefreshMinutes: Int?
+    var quotaWarningPercent: Int?
+    var theme: String?
+    var liquidGlass: Bool?
+
+    init(
+        routingStrategy: String? = nil,
+        sessionAffinity: Bool? = nil,
+        autoRefreshMinutes: Int? = nil,
+        quotaWarningPercent: Int? = nil,
+        theme: String? = nil,
+        liquidGlass: Bool? = nil
+    ) {
+        self.routingStrategy = routingStrategy
+        self.sessionAffinity = sessionAffinity
+        self.autoRefreshMinutes = autoRefreshMinutes
+        self.quotaWarningPercent = quotaWarningPercent
+        self.theme = theme
+        self.liquidGlass = liquidGlass
+    }
 }
 
 struct APIError: Decodable {
@@ -268,6 +352,7 @@ final class BridgeModel: ObservableObject {
     @Published var quota: QuotaReport?
     @Published var connectors: ConnectorResponse?
     @Published var usage: UsageReport?
+    @Published var manager: ManagerReport?
     @Published var provider = "antigravity"
     @Published var providerSwitching = false
     @Published var loading = true
@@ -336,6 +421,7 @@ final class BridgeModel: ObservableObject {
             if !providerSwitching { provider = latest.selectedProvider }
             errorMessage = nil
             connectors = await optionalRequest(path: "/api/connectors")
+            manager = await optionalRequest(path: "/api/manager")
             let usageProvider = provider
             if let latestUsage: UsageReport = await optionalRequest(path: "/api/usage?provider=\(usageProvider)") {
                 usageCache[usageProvider] = latestUsage
@@ -343,7 +429,8 @@ final class BridgeModel: ObservableObject {
             }
             let providerChanged = previousProvider != provider
             let operationFinished = operationWasRunning && !latest.operation.running
-            let quotaDue = lastQuotaRefreshAttempt.map { Date().timeIntervalSince($0) >= quotaRefreshInterval } ?? true
+            let refreshInterval = TimeInterval(manager?.settings.autoRefreshMinutes ?? 5) * 60
+            let quotaDue = lastQuotaRefreshAttempt.map { Date().timeIntervalSince($0) >= refreshInterval } ?? true
             if !latest.operation.running && (forceQuota || providerChanged || operationFinished || quotaDue) {
                 lastQuotaRefreshAttempt = Date()
                 do {
@@ -406,6 +493,17 @@ final class BridgeModel: ObservableObject {
         }
     }
 
+    func updateManagerSettings(_ update: ManagerSettingsUpdate) async {
+        do {
+            let latest: ManagerReport = try await request(path: "/api/manager/settings", method: "POST", encodableBody: update)
+            manager = latest
+            errorMessage = nil
+            message = "设置已保存；路由设置将在下次重新同步时生效"
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     private func actionMessage(_ action: String) -> String {
         switch action {
         case "setup": return "正在接入所选提供商…"
@@ -446,12 +544,36 @@ final class BridgeModel: ObservableObject {
         }
         return try JSONDecoder().decode(T.self, from: data)
     }
+
+    private func request<T: Decodable, Body: Encodable>(path: String, method: String, encodableBody: Body) async throws -> T {
+        guard let connection, let url = URL(string: connection.baseURL + path) else {
+            throw BridgeError.message("本地核心尚未连接")
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 40
+        request.setValue(connection.session, forHTTPHeaderField: "X-ZCAB-Session")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(encodableBody)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw BridgeError.message("本地核心返回了无效响应")
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            if let apiError = try? JSONDecoder().decode(APIError.self, from: data) {
+                throw BridgeError.message(apiError.error)
+            }
+            throw BridgeError.message("本地请求失败（HTTP \(http.statusCode)）")
+        }
+        return try JSONDecoder().decode(T.self, from: data)
+    }
 }
 
 @MainActor
 final class NavigationModel: ObservableObject {
     static let shared = NavigationModel()
-    @Published var section = "usage"
+    @Published var section = "overview"
 }
 
 @MainActor
@@ -688,6 +810,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         StatusBarController.shared.install()
+        DispatchQueue.main.async {
+            for window in NSApp.windows {
+                window.isOpaque = false
+                window.backgroundColor = .clear
+                window.titlebarAppearsTransparent = true
+                window.styleMask.insert(.fullSizeContentView)
+            }
+        }
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -733,7 +863,60 @@ private enum CodexUPalette {
     static let secondary = Color(red: 139 / 255, green: 109 / 255, blue: 255 / 255)
     static let tertiary = Color(red: 255 / 255, green: 159 / 255, blue: 10 / 255)
     static let border = Color(red: 148 / 255, green: 163 / 255, blue: 184 / 255).opacity(0.32)
-    static let pageBackground = Color(nsColor: .windowBackgroundColor)
+    static let pageBackground = Color.clear
+    static let glassStroke = LinearGradient(
+        colors: [.white.opacity(0.72), accentLight.opacity(0.36), secondary.opacity(0.28)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+}
+
+private struct NativeBlurBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .underWindowBackground
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.state = .active
+    }
+}
+
+private struct LiquidGlassBackground: View {
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        ZStack {
+            NativeBlurBackground()
+            LinearGradient(
+                colors: scheme == .dark
+                    ? [Color(red: 0.04, green: 0.08, blue: 0.20).opacity(0.84), CodexUPalette.secondary.opacity(0.25)]
+                    : [Color.white.opacity(0.40), CodexUPalette.accentLight.opacity(0.20), CodexUPalette.secondary.opacity(0.18)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            Circle()
+                .fill(CodexUPalette.accent.opacity(scheme == .dark ? 0.30 : 0.22))
+                .frame(width: 520, height: 520)
+                .blur(radius: 90)
+                .offset(x: -350, y: -270)
+            Circle()
+                .fill(CodexUPalette.secondary.opacity(scheme == .dark ? 0.30 : 0.20))
+                .frame(width: 580, height: 580)
+                .blur(radius: 110)
+                .offset(x: 420, y: 250)
+            Ellipse()
+                .fill(Color.cyan.opacity(scheme == .dark ? 0.16 : 0.12))
+                .frame(width: 700, height: 300)
+                .blur(radius: 100)
+                .rotationEffect(.degrees(-18))
+                .offset(x: 120, y: -300)
+        }
+        .ignoresSafeArea()
+    }
 }
 
 private struct ThemeModeButton: View {
@@ -759,18 +942,24 @@ struct DashboardView: View {
     @AppStorage("zcode.theme") private var theme = "system"
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                topToolbar
-                contextRow
-                providerTabs
-                statusStrip
-                if navigation.section == "connectors" { connectorPanel } else { usageAndActions }
+        ZStack {
+            if model.manager?.settings.liquidGlass != false {
+                LiquidGlassBackground()
+            } else {
+                Color(nsColor: .windowBackgroundColor).ignoresSafeArea()
             }
-            .padding(22)
-            .frame(maxWidth: 1280, alignment: .leading)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    topToolbar
+                    contextRow
+                    navigationTabs
+                    providerTabs
+                    sectionContent
+                }
+                .padding(22)
+                .frame(maxWidth: 1280, alignment: .leading)
+            }
         }
-        .background(CodexUPalette.pageBackground.ignoresSafeArea())
         .preferredColorScheme(theme == "light" ? .light : (theme == "dark" ? .dark : nil))
         .animation(.easeInOut(duration: 0.18), value: model.provider)
         .animation(.easeInOut(duration: 0.18), value: navigation.section)
@@ -814,9 +1003,9 @@ struct DashboardView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(CodexUPalette.border))
-        .shadow(color: .black.opacity(0.07), radius: 18, y: 8)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
+        .overlay(RoundedRectangle(cornerRadius: 24).stroke(CodexUPalette.glassStroke, lineWidth: 1))
+        .shadow(color: CodexUPalette.secondary.opacity(0.16), radius: 24, y: 10)
     }
 
     private var contextRow: some View {
@@ -843,39 +1032,62 @@ struct DashboardView: View {
         .padding(.horizontal, 6)
     }
 
+    private var navigationTabs: some View {
+        HStack(spacing: 4) {
+            navigationButton("总览", icon: "square.grid.2x2.fill", section: "overview")
+            navigationButton("账号", icon: "person.2.fill", section: "accounts")
+            navigationButton("API 代理", icon: "point.3.connected.trianglepath.dotted", section: "proxy")
+            navigationButton("模型路由", icon: "arrow.triangle.branch", section: "routing")
+            navigationButton("Agent 接入", icon: "terminal.fill", section: "connectors")
+            navigationButton("用量统计", icon: "chart.xyaxis.line", section: "analytics")
+            navigationButton("设置", icon: "gearshape.fill", section: "settings")
+            Spacer(minLength: 8)
+            Text("Antigravity Tools 核心功能")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
+        .padding(5)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(CodexUPalette.glassStroke))
+    }
+
+    private func navigationButton(_ title: String, icon: String, section: String) -> some View {
+        Button { navigation.section = section } label: {
+            Label(title, systemImage: icon)
+                .font(.callout.weight(.medium))
+                .padding(.horizontal, 13)
+                .frame(minHeight: 38)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(navigation.section == section ? Color.white : Color.secondary)
+        .background(
+            navigation.section == section
+                ? LinearGradient(colors: [CodexUPalette.accent, CodexUPalette.secondary], startPoint: .leading, endPoint: .trailing)
+                : LinearGradient(colors: [.clear, .clear], startPoint: .leading, endPoint: .trailing),
+            in: RoundedRectangle(cornerRadius: 13)
+        )
+    }
+
     private var providerTabs: some View {
         HStack(spacing: 7) {
             ProviderChoiceButton(
                 title: "Antigravity",
                 subtitle: "Google · Gemini",
                 count: model.status?.providerAccounts.antigravity ?? 0,
-                selected: model.provider != "xai" && navigation.section == "usage",
+                selected: model.provider != "xai",
                 switching: model.providerSwitching && model.provider != "xai"
             ) {
-                navigation.section = "usage"
                 Task { await model.selectProvider("antigravity") }
             }
             ProviderChoiceButton(
                 title: "Grok / xAI",
                 subtitle: "Grok Build",
                 count: model.status?.providerAccounts.xai ?? 0,
-                selected: model.provider == "xai" && navigation.section == "usage",
+                selected: model.provider == "xai",
                 switching: model.providerSwitching && model.provider == "xai"
             ) {
-                navigation.section = "usage"
                 Task { await model.selectProvider("xai") }
             }
-            Button {
-                navigation.section = "connectors"
-            } label: {
-                Label("Agent 接入", systemImage: "point.3.connected.trianglepath.dotted")
-                    .font(.callout.weight(.medium))
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 42)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(navigation.section == "connectors" ? Color.white : Color.secondary)
-            .background(navigation.section == "connectors" ? CodexUPalette.accent : Color.clear, in: RoundedRectangle(cornerRadius: 13))
             Spacer()
             if let error = model.errorMessage {
                 Label(error, systemImage: "exclamationmark.triangle.fill").font(.caption)
@@ -886,9 +1098,24 @@ struct DashboardView: View {
             }
         }
         .padding(5)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(CodexUPalette.border))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(CodexUPalette.glassStroke))
         .disabled(model.providerSwitching)
+    }
+
+    @ViewBuilder
+    private var sectionContent: some View {
+        switch navigation.section {
+        case "accounts": accountsPanel
+        case "proxy": proxyPanel
+        case "routing": routingPanel
+        case "connectors": connectorPanel
+        case "analytics": analyticsPanel
+        case "settings": settingsPanel
+        default:
+            statusStrip
+            usageAndActions
+        }
     }
 
     private var selectedProviderCount: Int {
@@ -935,6 +1162,236 @@ struct DashboardView: View {
             }
             .frame(width: 330)
         }
+    }
+
+    private var accountsPanel: some View {
+        HStack(alignment: .top, spacing: 18) {
+            NativeCard {
+                VStack(alignment: .leading, spacing: 16) {
+                    CardTitle(kicker: "ACCOUNT MANAGER", title: "账号与额度", icon: "person.2.badge.gearshape.fill")
+                    HStack(spacing: 10) {
+                        QuotaSummaryTile(title: "Antigravity", value: "\(model.status?.providerAccounts.antigravity ?? 0)", icon: "sparkles", tint: CodexUPalette.accent)
+                        QuotaSummaryTile(title: "Grok / xAI", value: "\(model.status?.providerAccounts.xai ?? 0)", icon: "xmark.circle.fill", tint: CodexUPalette.secondary)
+                        QuotaSummaryTile(title: "健康账号", value: "\(model.manager?.accounts.filter { $0.status == "active" }.count ?? 0)", icon: "checkmark.shield.fill", tint: .green)
+                    }
+                    quotaContent
+                }
+            }
+            .frame(maxWidth: .infinity)
+            NativeCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    CardTitle(kicker: "OAUTH", title: "添加账号", icon: "key.fill")
+                    ActionButton(title: "登录 Antigravity", subtitle: "Google OAuth 2.0") { await model.runAction("login") }
+                    ActionButton(title: "登录 Grok / xAI", subtitle: "xAI 官方设备授权") { await model.runAction("login-grok") }
+                    ActionButton(title: "刷新全部额度", subtitle: "重新读取所有账号") { await model.refreshAll() }
+                    Text("凭据保存在当前用户目录；界面只显示脱敏账号信息，不显示 Token。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 330)
+        }
+    }
+
+    private var proxyPanel: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 10) {
+                StatusTile(name: "LOCAL GATEWAY", item: model.status?.gateway)
+                StatusTile(name: "UPSTREAM PROXY", item: model.status?.proxy)
+                StatusTile(name: "ZCODE PROVIDER", item: model.status?.zcode)
+            }
+            NativeCard {
+                VStack(alignment: .leading, spacing: 16) {
+                    CardTitle(kicker: "MULTI-SINK API", title: "协议转换与本地中继", icon: "network")
+                    HStack(spacing: 12) {
+                        ForEach(model.manager?.proxy.protocols ?? []) { item in
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text(item.name).font(.headline)
+                                    Spacer()
+                                    Image(systemName: "checkmark.seal.fill").foregroundStyle(.green)
+                                }
+                                Text(item.description).font(.caption).foregroundStyle(.secondary)
+                                Text((model.manager?.proxy.baseURL ?? "http://127.0.0.1:—") + item.path)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .lineLimit(2)
+                                    .textSelection(.enabled)
+                            }
+                            .padding(16)
+                            .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+                            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(CodexUPalette.glassStroke))
+                        }
+                    }
+                    HStack {
+                        Label("仅监听 127.0.0.1", systemImage: "lock.shield.fill").foregroundStyle(.green)
+                        Spacer()
+                        Text("401 / 429 自动重试 · 凭据轮换 · 会话亲和")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    HStack(spacing: 10) {
+                        ActionButton(title: "启动并同步", subtitle: "应用当前代理与路由设置", primary: true) { await model.runAction("sync") }
+                        ActionButton(title: "停止网关", subtitle: "保留账号和配置", destructive: true) { await model.runAction("stop") }
+                    }
+                }
+            }
+        }
+    }
+
+    private var routingPanel: some View {
+        NativeCard {
+            VStack(alignment: .leading, spacing: 18) {
+                CardTitle(kicker: "MODEL ROUTER", title: "调度与模型路由", icon: "arrow.triangle.branch")
+                Text("选择账号调度策略。保存后点击“应用并重新同步”，新请求会使用新策略。")
+                    .font(.callout).foregroundStyle(.secondary)
+                HStack(spacing: 12) {
+                    routingChoice("均衡轮询", detail: "账号间平均分配", value: "round-robin", icon: "arrow.triangle.2.circlepath")
+                    routingChoice("加权轮询", detail: "依据可用能力调度", value: "weighted-round-robin", icon: "scalemass.fill")
+                    routingChoice("填满优先", detail: "减少账号频繁切换", value: "fill-first", icon: "square.stack.3d.up.fill")
+                }
+                HStack(spacing: 12) {
+                    SettingsMetric(title: "请求重试", value: "\(model.manager?.routing.requestRetry ?? 2) 次", icon: "arrow.clockwise")
+                    SettingsMetric(title: "凭据轮换", value: "\(model.manager?.routing.credentialRetry ?? 2) 个", icon: "person.2.arrow.trianglehead.counterclockwise")
+                    SettingsMetric(title: "最大退避", value: "\(model.manager?.routing.retryInterval ?? 20) 秒", icon: "timer")
+                    SettingsMetric(title: "Agent 默认模型", value: model.manager?.routing.backgroundModel ?? "gemini-3.6-flash", icon: "bolt.fill")
+                }
+                Toggle(isOn: Binding(
+                    get: { model.manager?.routing.sessionAffinity ?? true },
+                    set: { value in Task { await model.updateManagerSettings(.init(sessionAffinity: value)) } }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("会话亲和").font(.headline)
+                        Text("同一会话尽量固定同一账号，减少上下文漂移；TTL \(model.manager?.routing.sessionAffinityTTL ?? "2h")")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.switch)
+                HStack {
+                    Spacer()
+                    ActionButton(title: "应用并重新同步", subtitle: "重启本地网关并更新 ZCode", primary: true) { await model.runAction("sync") }
+                        .frame(width: 320)
+                }
+            }
+        }
+    }
+
+    private func routingChoice(_ title: String, detail: String, value: String, icon: String) -> some View {
+        let selected = model.manager?.routing.strategy == value
+        return Button {
+            Task { await model.updateManagerSettings(.init(routingStrategy: value)) }
+        } label: {
+            VStack(alignment: .leading, spacing: 9) {
+                Image(systemName: icon).font(.title2)
+                Text(title).font(.headline)
+                Text(detail).font(.caption).opacity(0.72)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 118, alignment: .topLeading)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(selected ? Color.white : Color.primary)
+        .background(
+            selected
+                ? LinearGradient(colors: [CodexUPalette.accent, CodexUPalette.secondary], startPoint: .topLeading, endPoint: .bottomTrailing)
+                : LinearGradient(colors: [.clear, .clear], startPoint: .topLeading, endPoint: .bottomTrailing),
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(selected ? Color.white.opacity(0.5) : CodexUPalette.border))
+    }
+
+    private var analyticsPanel: some View {
+        NativeCard {
+            VStack(alignment: .leading, spacing: 18) {
+                CardTitle(kicker: "LOCAL ANALYTICS", title: "Token 与推理性能", icon: "chart.xyaxis.line")
+                performanceSummary
+                Divider().opacity(0.35)
+                HStack {
+                    Text("最近调用").font(.headline)
+                    Spacer()
+                    Text("只保存聚合元数据，不保存提示词和回复").font(.caption).foregroundStyle(.secondary)
+                }
+                ForEach(Array((model.usage?.recent ?? []).reversed())) { sample in
+                    HStack(spacing: 12) {
+                        Image(systemName: "waveform.path.ecg")
+                            .foregroundStyle(CodexUPalette.accent)
+                            .frame(width: 32, height: 32)
+                            .background(CodexUPalette.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(sample.model).font(.callout.weight(.semibold))
+                            Text(sample.timestamp.replacingOccurrences(of: "T", with: " ").prefix(19))
+                                .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text("\(formatToken(sample.outputTokens)) tok").font(.callout.monospacedDigit())
+                        Text(String(format: "%.1f tok/s", sample.outputTokensPerSecond))
+                            .font(.callout.monospacedDigit().weight(.semibold)).foregroundStyle(CodexUPalette.secondary)
+                    }
+                    .padding(11)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                }
+                if model.usage?.recent.isEmpty != false {
+                    ContentUnavailableViewCompat(title: "等待首次模型调用", detail: "完成一次响应后，这里会出现 Token、耗时与 tok/s。")
+                }
+            }
+        }
+    }
+
+    private var settingsPanel: some View {
+        NativeCard {
+            VStack(alignment: .leading, spacing: 18) {
+                CardTitle(kicker: "PREFERENCES", title: "界面与后台刷新", icon: "gearshape.fill")
+                settingsRow(title: "液态透明高斯模糊", detail: "使用原生窗口材质、半透明玻璃卡片与模糊色团") {
+                    Toggle("", isOn: Binding(
+                        get: { model.manager?.settings.liquidGlass ?? true },
+                        set: { value in Task { await model.updateManagerSettings(.init(liquidGlass: value)) } }
+                    )).labelsHidden()
+                }
+                settingsRow(title: "额度自动刷新", detail: "后台自动读取所有账号额度") {
+                    Picker("", selection: Binding(
+                        get: { model.manager?.settings.autoRefreshMinutes ?? 5 },
+                        set: { value in Task { await model.updateManagerSettings(.init(autoRefreshMinutes: value)) } }
+                    )) {
+                        Text("1 分钟").tag(1)
+                        Text("5 分钟").tag(5)
+                        Text("10 分钟").tag(10)
+                        Text("30 分钟").tag(30)
+                    }
+                    .frame(width: 130)
+                }
+                settingsRow(title: "额度预警线", detail: "低于该剩余百分比时使用警示色") {
+                    Picker("", selection: Binding(
+                        get: { model.manager?.settings.quotaWarningPercent ?? 20 },
+                        set: { value in Task { await model.updateManagerSettings(.init(quotaWarningPercent: value)) } }
+                    )) {
+                        Text("10%").tag(10)
+                        Text("20%").tag(20)
+                        Text("30%").tag(30)
+                        Text("50%").tag(50)
+                    }
+                    .frame(width: 110)
+                }
+                settingsRow(title: "本机安全边界", detail: "管理端口和模型网关均只监听 127.0.0.1") {
+                    Label("已启用", systemImage: "checkmark.shield.fill").foregroundStyle(.green)
+                }
+                Text("设置文件：\(model.manager?.settings.settingsPath ?? "等待本地核心")")
+                    .font(.caption2.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+            }
+        }
+    }
+
+    private func settingsRow<Content: View>(title: String, detail: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.headline)
+                Text(detail).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            content()
+        }
+        .padding(16)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 15))
+        .overlay(RoundedRectangle(cornerRadius: 15).stroke(CodexUPalette.glassStroke))
     }
 
     private var performanceSummary: some View {
@@ -1193,9 +1650,9 @@ struct StatusTile: View {
         }
         .padding(13)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(CodexUPalette.border))
-        .shadow(color: .black.opacity(0.045), radius: 12, y: 5)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(CodexUPalette.glassStroke))
+        .shadow(color: CodexUPalette.accent.opacity(0.10), radius: 16, y: 7)
     }
 }
 
@@ -1204,9 +1661,9 @@ struct NativeCard<Content: View>: View {
     var body: some View {
         content()
             .padding(20)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
-            .overlay(RoundedRectangle(cornerRadius: 18).stroke(CodexUPalette.border))
-            .shadow(color: .black.opacity(0.06), radius: 18, y: 8)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
+            .overlay(RoundedRectangle(cornerRadius: 24).stroke(CodexUPalette.glassStroke, lineWidth: 1))
+            .shadow(color: CodexUPalette.secondary.opacity(0.15), radius: 24, y: 10)
     }
 }
 
@@ -1253,6 +1710,27 @@ struct QuotaSummaryTile: View {
         .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 13))
         .overlay(RoundedRectangle(cornerRadius: 13).stroke(CodexUPalette.border))
+    }
+}
+
+struct SettingsMetric: View {
+    let title: String
+    let value: String
+    let icon: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: icon)
+                .foregroundStyle(CodexUPalette.accent)
+                .frame(width: 30, height: 30)
+                .background(CodexUPalette.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text(value).font(.callout.monospacedDigit().weight(.semibold)).lineLimit(1)
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, minHeight: 100, alignment: .topLeading)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(CodexUPalette.glassStroke))
     }
 }
 
