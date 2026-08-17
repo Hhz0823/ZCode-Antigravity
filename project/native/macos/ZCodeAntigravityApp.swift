@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "0.5.0-test"
+private let appVersion = "0.5.1-test"
 
 private extension Notification.Name {
     static let selectBridgeProvider = Notification.Name("ZCodeSelectBridgeProvider")
@@ -757,6 +757,7 @@ final class StatusBarController: NSObject {
 
     @objc private func togglePopover() {
         guard let button = statusItem?.button else { return }
+        bringMainWindowForward()
         if popover.isShown {
             popover.performClose(nil)
         } else {
@@ -799,10 +800,26 @@ final class StatusBarController: NSObject {
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 
+    private func mainWindow() -> NSWindow? {
+        NSApp.windows.first(where: {
+            $0.canBecomeKey && $0.title.contains("ZCode · Antigravity 控制中心")
+        }) ?? NSApp.windows.first(where: { $0.canBecomeKey && !($0 is NSPanel) })
+    }
+
+    private func bringMainWindowForward() {
+        NSApp.unhide(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        guard let window = mainWindow() else { return }
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+    }
+
     func openWindow() {
         popover.performClose(nil)
-        NSApp.activate(ignoringOtherApps: true)
-        NSApp.windows.first(where: { $0.canBecomeKey })?.makeKeyAndOrderFront(nil)
+        bringMainWindowForward()
     }
 }
 
@@ -828,9 +845,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag {
-            sender.windows.first(where: { $0.canBecomeKey })?.makeKeyAndOrderFront(nil)
-        }
+        StatusBarController.shared.openWindow()
         return true
     }
 }

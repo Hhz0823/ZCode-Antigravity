@@ -28,14 +28,14 @@ Requirements
 First test
 ----------
 Recommended: fully exit ZCode from the tray, enable v2rayN TUN, and double-click
-ZCode-Antigravity-Setup-v0.5.0-test.exe. This is a native Windows GUI installer: it shows no
+ZCode-Antigravity-Setup-v0.5.1-test.exe. This is a native Windows GUI installer: it shows no
 terminal, verifies the embedded ZIP plus all three executables, installs only for the current
 user, creates Desktop/Start Menu shortcuts, and opens the control center after completion.
 Do not use v0.4.0-test on Windows; its Rust client expected baseUrl while the Go Core correctly
 emitted baseURL, so startup stopped before the control center could open.
 
 For the single-BAT fallback, fully exit ZCode from the tray, enable v2rayN TUN, and double-click
-ZCode-Antigravity-OneClick-v0.5.0-test.bat. It verifies and extracts its embedded package,
+ZCode-Antigravity-OneClick-v0.5.1-test.bat. It verifies and extracts its embedded package,
 then opens the graphical control center without leaving a terminal window. The control center
 opens OAuth when needed, writes the verified ZCode Provider directly, and starts ZCode after
 successful readback.
@@ -164,9 +164,9 @@ Available scripts
 
 Installer formats
 -----------------
-- ZCode-Antigravity-Setup-v0.5.0-test.exe: recommended no-terminal current-user installer.
-- ZCode-Antigravity-OneClick-v0.5.0-test.bat: fallback single-file installer.
-- ZCode-Antigravity-Windows-x64-0.5.0-test.zip: manually verifiable expanded package.
+- ZCode-Antigravity-Setup-v0.5.1-test.exe: recommended no-terminal current-user installer.
+- ZCode-Antigravity-OneClick-v0.5.1-test.bat: fallback single-file installer.
+- ZCode-Antigravity-Windows-x64-0.5.1-test.zip: manually verifiable expanded package.
 - The EXE installer is custom-built and unsigned. It does not require administrator rights or
   7-Zip on the target computer; Windows SmartScreen may still require manual confirmation.
 
@@ -241,7 +241,7 @@ cause a clear setup error instead of silently substituting another model.
 
 Build versions
 --------------
-- ZCode Antigravity Bridge: 0.5.0-test
+- ZCode Antigravity Bridge: 0.5.1-test
 - Native control center: Rust 1.96, windows-sys 0.61.2, ureq 3.4.0
 - CLIProxyAPI base: v7.2.132, commit 78f0c4079e3e6273d65d03b5549cffc898703264
 - Local build: 7.2.132-zcode.12

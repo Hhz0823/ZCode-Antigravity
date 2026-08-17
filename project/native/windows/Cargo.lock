@@ -533,7 +533,7 @@ dependencies = [
 
 [[package]]
 name = "zcode-antigravity-native"
-version = "0.5.0-test"
+version = "0.5.1-test"
 dependencies = [
  "serde",
  "serde_json",

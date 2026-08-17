@@ -2,6 +2,19 @@
 
 最新验证日期：2026-08-17（Asia/Shanghai）
 
+## v0.5.1-test 状态栏与托盘唤醒修复
+
+- macOS 状态栏左键单击现在先取消隐藏或恢复最小化的主窗口，激活应用并把控制中心置于最前层，
+  随后显示额度小组件；Dock 重新打开也复用同一唤醒路径。
+- macOS 自动化实测先把应用设为完全隐藏，再点击 `ZCode 额度` 状态项，结果进程恢复为
+  `visible=true`、`frontmost=true`，控制中心窗口重新出现。
+- Windows 任务栏通知区域左键单击现在恢复并置顶主窗口，同时显示额度小组件；双击以及小组件内
+  “打开控制中心”使用同一恢复函数。
+- Windows 11 目标机实测先用 `SW_HIDE` 隐藏主窗口，再发送托盘左键回调；结果
+  `MainVisibleAfterClick=True` 且 `MainMinimizedAfterClick=False`。
+- Swift arm64 / x86_64 类型检查、Rust Windows x64 离线检查与 Release 交叉编译、Go 单测、
+  race detector 和 vet 均通过；测试机临时进程、计划任务、脚本和压缩包已清理。
+
 ## v0.4.4-test Windows 一键接入反馈与额度刷新修复
 
 - 点击“一键接入 ZCode”后立即显示处理中状态、禁用重复操作，并以 800ms 间隔刷新后台状态。

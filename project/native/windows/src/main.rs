@@ -27,7 +27,7 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-const VERSION: &str = "0.5.0-test";
+const VERSION: &str = "0.5.1-test";
 const SS_LEFT: u32 = 0;
 const CF_UNICODETEXT_VALUE: u32 = 13;
 const WM_REFRESH_READY: u32 = WM_APP + 1;
@@ -3707,6 +3707,34 @@ unsafe fn remove_tray_icon(hwnd: HWND) {
     unsafe { Shell_NotifyIconW(NIM_DELETE, &data) };
 }
 
+unsafe fn bring_main_window_to_front(hwnd: HWND) {
+    if hwnd.is_null() {
+        return;
+    }
+    unsafe {
+        ShowWindow(
+            hwnd,
+            if IsIconic(hwnd) != 0 {
+                SW_RESTORE
+            } else {
+                SW_SHOW
+            },
+        );
+        SetWindowPos(
+            hwnd,
+            HWND_TOP,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+        );
+        SetForegroundWindow(hwnd);
+        SetActiveWindow(hwnd);
+        SetFocus(hwnd);
+    }
+}
+
 unsafe fn show_tray_menu(hwnd: HWND) {
     let class_name = wide("ZCodeAntigravityTrayWidget");
     static REGISTERED: OnceLock<()> = OnceLock::new();
@@ -4179,10 +4207,7 @@ unsafe extern "system" fn tray_widget_proc(
                 unsafe { DestroyWindow(hwnd) };
             } else if y >= scale(292, dpi) && y <= scale(336, dpi) {
                 if x < scale(151, dpi) {
-                    unsafe {
-                        ShowWindow(main_hwnd, SW_RESTORE);
-                        SetForegroundWindow(main_hwnd);
-                    }
+                    unsafe { bring_main_window_to_front(main_hwnd) };
                 } else if x < scale(287, dpi) {
                     request_refresh(main_hwnd, true);
                 } else {
@@ -4422,11 +4447,11 @@ unsafe extern "system" fn window_proc(
         }
         WM_TRAY => {
             match lparam as u32 {
-                WM_LBUTTONUP => unsafe { show_tray_menu(hwnd) },
-                WM_LBUTTONDBLCLK => unsafe {
-                    ShowWindow(hwnd, SW_RESTORE);
-                    SetForegroundWindow(hwnd);
+                WM_LBUTTONUP => unsafe {
+                    bring_main_window_to_front(hwnd);
+                    show_tray_menu(hwnd);
                 },
+                WM_LBUTTONDBLCLK => unsafe { bring_main_window_to_front(hwnd) },
                 WM_RBUTTONUP => unsafe { show_tray_menu(hwnd) },
                 _ => {}
             }
