@@ -49,16 +49,32 @@ func TestDashboardTokenComparisonIsExact(t *testing.T) {
 	}
 }
 
-func TestDashboardThemeIncludesBlueMotionAndReducedMotionFallback(t *testing.T) {
+func TestDashboardThemeIncludesCrispResponsiveMotion(t *testing.T) {
 	for _, expected := range []string{
 		"--accent: #0b63f6",
-		"@keyframes quotaCardIn",
+		"Segoe UI Variable Text",
+		"SF Pro Text",
+		"font-synthesis: none",
+		"@media (max-width: 520px)",
+		"@media (min-width: 1800px)",
+		"@keyframes buttonSheen",
+		"@keyframes ambientDrift",
 		"drawPath(w, base+5",
+		"Math.min(Math.max(devicePixelRatio || 1, 1), 4)",
 		"prefers-reduced-motion: reduce",
 		"animation: none !important",
 	} {
 		if !strings.Contains(dashboardHTML, expected) {
 			t.Fatalf("dashboard is missing %q", expected)
+		}
+	}
+	for _, forbidden := range []string{
+		"font-weight: 730",
+		"font-weight: 620",
+		"letter-spacing: -.01em",
+	} {
+		if strings.Contains(dashboardHTML, forbidden) {
+			t.Fatalf("dashboard still contains jagged-text trigger %q", forbidden)
 		}
 	}
 }

@@ -12,6 +12,8 @@ import (
 	"syscall"
 )
 
+func prepareChildProcess(_ *exec.Cmd) {}
+
 func launchDetached(binary string, args []string, workDir, logPath string) (int, error) {
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {

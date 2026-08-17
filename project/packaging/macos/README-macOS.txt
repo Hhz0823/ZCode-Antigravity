@@ -1,7 +1,7 @@
 ZCode Antigravity Bridge - macOS Universal test build
 ====================================================
 
-版本：0.2.7-test
+版本：0.2.9-test
 架构：Apple Silicon (arm64) + Intel (x86_64)
 最低系统：macOS 12
 
@@ -17,15 +17,17 @@ API 权限或封禁账号。请只使用专门的测试账号，不要使用主 
 首次使用
 --------
 1. 完整解压 ZIP，不要直接在压缩包预览中运行。
-2. 双击 Verify-Package.command，确认所有文件均为 OK。
+2. 如需先校验文件，打开“Terminal Tools”后双击 Verify-Package.command，确认均为 OK。
 3. 完全退出 ZCode；仅关闭窗口不一定会退出应用。
 4. 首次打开时，按住 Control 点击“ZCode Antigravity.app”，选择“打开”。
    当前 App 使用临时签名，没有 Apple Developer ID，也没有公证。
-5. 双击 Setup-and-Start.command，或打开 App 后点击首次设置。
+5. 双击“ZCode Antigravity.app”，在无终端控制面板中点击“一键接入 ZCode”。
 6. 浏览器完成 Google OAuth；成功后重新打开 ZCode。
 7. 在 ZCode 中选择 Antigravity (Local Bridge)，先发送一条短消息验收。
 
-如果已把 App 拖入 /Applications，外层 .command 脚本仍会自动找到它。
+普通使用只需打开 App，不会弹出 Terminal。“Terminal Tools”中的 .command 是
+维护和诊断入口，双击它们时 macOS 会按设计显示终端窗口。如果已把 App 拖入
+/Applications，这些脚本仍会自动找到它。
 
 网络与代理
 ----------
@@ -57,8 +59,10 @@ proxyURL。支持 http、https 和 socks5，且应只指向可信的本机代理
 运行 Build-Universal.sh 时通过同名环境变量把配置注入二进制；脚本不会把它写入
 源码树或打包成明文配置文件。
 
-常用脚本
---------
+终端诊断脚本
+------------
+以下脚本位于“Terminal Tools”，运行时会显示终端，仅用于维护或排错：
+
 - Setup-and-Start.command：首次登录、启动并写入 ZCode Provider
 - Login-Antigravity.command：添加或刷新账号
 - Start-ZCode-Antigravity.command：启动网关并同步模型

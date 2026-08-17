@@ -3,7 +3,7 @@
 > 让 ZCode 通过本机 Anthropic-compatible Provider 调用 Antigravity 中的
 > Gemini 3.7 Flash 与 Gemini 3.6 Flash。
 
-**当前版本：** macOS `v0.2.7-test` / Windows `v0.2.8-test`
+**当前版本：** macOS / Windows `v0.2.9-test`
 **适用系统：** macOS 12+（Apple Silicon / Intel）、Windows 10 / 11 x64
 **项目状态：** 测试版
 
@@ -13,9 +13,10 @@
 - 只向 ZCode 写入 `gemini-3.7-flash` 和 `gemini-3.6-flash`。
 - 支持 Low / Medium / High 思考等级，并转换为 Gemini `thinkingLevel`。
 - 支持文本、图片、音频和视频输入转换；当前 Gemini 3.7 Flash 声明输出仅为文本。
-- 提供无终端 Windows GUI 安装器，按当前用户安装，无需管理员权限。
-- 提供 macOS Universal `.app`，同一下载包兼容 Apple Silicon 与 Intel。
+- 提供无终端 Windows GUI 安装器与全链路隐藏子进程，按当前用户安装，无需管理员权限。
+- 提供无终端 macOS Universal `.app`，同一下载包兼容 Apple Silicon 与 Intel；诊断脚本单独放在 `Terminal Tools`。
 - 蓝白控制中心统一显示代理、桥接、ZCode、账号、AI Credits 与额度状态。
+- 控制中心使用 Win/mac 原生字体、最高 4× DPR Canvas、宽屏/低分辨率/高缩放响应式布局和可降级动效。
 - 提供 v2rayN TUN / 代理预检、ZCode 配置备份、安全停止与同版本重装保护。
 - 本地密钥随机生成；Windows 使用 DPAPI、macOS 使用登录钥匙串主密钥保护凭据；API 与 OAuth 回调仅监听 loopback。
 
@@ -25,11 +26,11 @@
 
 | 文件 | 用途 | 建议 |
 | --- | --- | --- |
-| `ZCode-Antigravity-macOS-Universal-v0.2.7-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
-| `ZCode-Antigravity-Setup-v0.2.8-test.exe` | Windows 图形化安装器 | **普通用户首选** |
-| `ZCode-Antigravity-OneClick-v0.2.8-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
-| `ZCode-Antigravity-Windows-x64-0.2.8-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
-| `ZCode-Antigravity-Source-v0.2.8-test.zip` | 当前版本的干净源码快照 | 审计 / 构建 |
+| `ZCode-Antigravity-macOS-Universal-v0.2.9-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
+| `ZCode-Antigravity-Setup-v0.2.9-test.exe` | Windows 图形化安装器 | **普通用户首选** |
+| `ZCode-Antigravity-OneClick-v0.2.9-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
+| `ZCode-Antigravity-Windows-x64-0.2.9-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
+| `ZCode-Antigravity-Source-v0.2.9-test.zip` | 当前版本的干净源码快照 | 审计 / 构建 |
 
 ## macOS 快速安装
 
@@ -41,9 +42,9 @@
 
 ### 安装步骤
 
-1. 完整解压 macOS Universal ZIP，双击 `Verify-Package.command` 校验包内文件。
+1. 完整解压 macOS Universal ZIP；如需校验，打开 `Terminal Tools` 后双击 `Verify-Package.command`。
 2. 完全退出 ZCode。当前 App 使用临时签名且尚未公证；首次运行请按住 Control 点击 `ZCode Antigravity.app`，选择“打开”。
-3. 双击 `Setup-and-Start.command`，在控制中心完成 Google OAuth、启动网关并同步 Provider。
+3. 双击 `ZCode Antigravity.app`，在无终端控制面板中点击“一键接入 ZCode”，完成 Google OAuth、启动网关并同步 Provider。
 4. 重新打开 ZCode，选择 `Antigravity (Local Bridge)`，发送一条短消息验收。
 
 Mac 运行数据位于 `~/Library/Application Support/ZCodeAntigravity`。Google token 使用
@@ -64,7 +65,7 @@ AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切�
 
 1. 从 Windows 系统托盘完全退出 ZCode。仅关闭窗口可能仍会留下 `ZCode.exe` 进程。
 2. 确认 v2rayN 已开启 TUN，且本地代理端口与配置一致。
-3. 下载 `ZCode-Antigravity-Setup-v0.2.8-test.exe`，并先校验 SHA-256。请勿继续使用会在中文 Windows 上触发脚本解析错误的 `v0.2.6-test` EXE。
+3. 下载 `ZCode-Antigravity-Setup-v0.2.9-test.exe`，并先校验 SHA-256。请勿继续使用会在中文 Windows 上触发脚本解析错误的 `v0.2.6-test` EXE。
 4. 双击安装器。程序会校验内嵌 ZIP 和三个 EXE，然后安装到当前用户目录。
 5. 在控制中心中完成 Google OAuth，等待状态检查通过。
 6. 重新打开 ZCode，选择 Provider `Antigravity (Local Bridge)`。
@@ -93,7 +94,7 @@ $env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
 
 ## 已验证范围
 
-Windows 基线与 `v0.2.8-test` 新增的构建主机测试记录包括：
+Windows 基线与 `v0.2.9-test` 新增的构建主机测试记录包括：
 
 - 管理器与 CLIProxyAPI 的 Go 测试、Windows x64 构建和静态检查通过。
 - OAuth PKCE / callback、DPAPI 凭据存储、原子替换和 loopback 约束通过。
@@ -102,9 +103,12 @@ Windows 基线与 `v0.2.8-test` 新增的构建主机测试记录包括：
 - 单 BAT 自解包、载荷和三 EXE 哈希校验、同版本重装通过。
 - 原生 EXE 安装器的隔离安装、再安装与无终端 GUI 行为通过。
 - EXE 内嵌 PowerShell 脚本现在由构建器和运行时双重保证 UTF-8 BOM，并加入中文脚本编码回归测试，修复 Windows PowerShell 5.1 的 `ParserError: UnexpectedToken`。
-- 已在构建主机复现中文代码页 936 会产生 `UnexpectedToken`，并确认新 EXE 只内嵌一个 `EF BB BF + param(` 脚本头；`v0.2.8-test` 仍需在目标 Windows 10/11 上完成最终双击回归。
+- 已在构建主机复现中文代码页 936 会产生 `UnexpectedToken`，并确认新 EXE 只内嵌一个 `EF BB BF + param(` 脚本头。
+- Windows 全部 GUI 子进程使用 `CREATE_NO_WINDOW`；Windows x64 测试程序交叉编译通过。
+- 控制面板在 1920×1080、1366×768、1024×768 与 520×900 视口通过 Playwright 截图和横向溢出检查。
+- `v0.2.9-test` 仍需在目标 Windows 10/11 的多 DPI 显示器上完成最终双击回归。
 
-`v0.2.7-test` 的 macOS 新增验证包括：
+`v0.2.9-test` 的 macOS 验证包括：
 
 - 管理器、Keychain 凭据加密与后端相关测试通过。
 - 管理器和后端均为真正的 `x86_64 + arm64` Universal Mach-O。

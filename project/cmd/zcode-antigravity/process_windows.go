@@ -16,7 +16,16 @@ import (
 const (
 	createNewProcessGroup = 0x00000200
 	detachedProcess       = 0x00000008
+	createNoWindow        = 0x08000000
 )
+
+func hiddenWindowsProcessAttributes() *syscall.SysProcAttr {
+	return &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNoWindow}
+}
+
+func prepareChildProcess(cmd *exec.Cmd) {
+	cmd.SysProcAttr = hiddenWindowsProcessAttributes()
+}
 
 func launchDetached(binary string, args []string, workDir, logPath string) (int, error) {
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
@@ -59,6 +68,7 @@ func terminateOwnedProcess(pid int, expectedPath string) error {
 		return fmt.Errorf("PID %d 指向 %s，不是本程序的 %s；已拒绝停止", pid, actualAbs, expectedAbs)
 	}
 	cmd := exec.Command("taskkill.exe", "/PID", strconv.Itoa(pid), "/T", "/F")
+	prepareChildProcess(cmd)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("taskkill 失败: %w (%s)", err, strings.TrimSpace(string(output)))
@@ -69,6 +79,7 @@ func terminateOwnedProcess(pid int, expectedPath string) error {
 func windowsProcessPath(pid int) (string, error) {
 	script := fmt.Sprintf("$p = Get-CimInstance Win32_Process -Filter 'ProcessId = %d' -ErrorAction Stop; if ($null -eq $p -or [string]::IsNullOrWhiteSpace($p.ExecutablePath)) { exit 3 }; [Console]::Out.Write($p.ExecutablePath)", pid)
 	cmd := exec.Command("powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script)
+	prepareChildProcess(cmd)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -82,6 +93,7 @@ func windowsProcessPath(pid int) (string, error) {
 
 func describePortOwner(port int) string {
 	cmd := exec.Command("netstat.exe", "-ano", "-p", "tcp")
+	prepareChildProcess(cmd)
 	output, err := cmd.Output()
 	if err != nil {
 		return "占用进程未知"
@@ -104,6 +116,7 @@ func describePortOwner(port int) string {
 
 func windowsTaskName(pid string) string {
 	cmd := exec.Command("tasklist.exe", "/FI", "PID eq "+pid, "/FO", "CSV", "/NH")
+	prepareChildProcess(cmd)
 	output, err := cmd.Output()
 	if err != nil {
 		return ""
@@ -121,6 +134,7 @@ func windowsTaskName(pid string) string {
 
 func isZCodeRunning() bool {
 	cmd := exec.Command("tasklist.exe", "/FI", "IMAGENAME eq ZCode.exe", "/FO", "CSV", "/NH")
+	prepareChildProcess(cmd)
 	output, err := cmd.Output()
 	if err != nil {
 		return false
@@ -162,7 +176,7 @@ func launchDashboardWindow(rawURL string) error {
 	} else {
 		cmd = exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", rawURL)
 	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	prepareChildProcess(cmd)
 	if err := cmd.Start(); err != nil {
 		return err
 	}
@@ -183,7 +197,7 @@ func openZCodeApplication() error {
 			continue
 		}
 		cmd := exec.Command(candidate)
-		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+		prepareChildProcess(cmd)
 		if err := cmd.Start(); err != nil {
 			return err
 		}
@@ -195,7 +209,7 @@ func openZCodeApplication() error {
 func detectTunAdapter() (string, bool) {
 	script := `$pattern='(?i)tun|wintun|v2ray|xray|sing.?box'; $adapter=Get-NetAdapter -IncludeHidden -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' -and (($_.Name+' '+$_.InterfaceDescription) -match $pattern) } | Select-Object -First 1; if($null -eq $adapter){exit 3}; [Console]::Out.Write($adapter.Name)`
 	cmd := exec.Command("powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	prepareChildProcess(cmd)
 	output, err := cmd.Output()
 	name := strings.TrimSpace(string(output))
 	return name, err == nil && name != ""

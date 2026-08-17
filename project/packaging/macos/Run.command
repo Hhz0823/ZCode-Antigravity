@@ -1,7 +1,11 @@
 #!/bin/zsh
 set -euo pipefail
 
-package_root=${0:A:h}
+script_dir=${0:A:h}
+package_root=$script_dir
+if [[ ! -d "$package_root/ZCode Antigravity.app" && -d "${script_dir:h}/ZCode Antigravity.app" ]]; then
+  package_root=${script_dir:h}
+fi
 app_binary="$package_root/ZCode Antigravity.app/Contents/MacOS/ZCode-Antigravity"
 if [[ ! -x "$app_binary" ]]; then
   app_binary="/Applications/ZCode Antigravity.app/Contents/MacOS/ZCode-Antigravity"

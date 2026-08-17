@@ -447,6 +447,7 @@ func (a *app) login() error {
 	var captured bytes.Buffer
 	cmd := exec.Command(a.paths.Backend, "-config", a.paths.Config, "-antigravity-login", "-oauth-callback-port", strconv.Itoa(callbackPort))
 	cmd.Dir = a.paths.Data
+	prepareChildProcess(cmd)
 	if browserPath := preferredBrowserExecutable(); browserPath != "" {
 		cmd.Env = append(os.Environ(), "CLIPROXY_BROWSER="+browserPath)
 	}
@@ -797,5 +798,7 @@ func (a *app) stop() error {
 
 // Used by tests to ensure long-running child commands can be cancelled cleanly.
 func commandContext(ctx context.Context, name string, args ...string) *exec.Cmd {
-	return exec.CommandContext(ctx, name, args...)
+	cmd := exec.CommandContext(ctx, name, args...)
+	prepareChildProcess(cmd)
+	return cmd
 }

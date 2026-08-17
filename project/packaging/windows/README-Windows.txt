@@ -26,12 +26,12 @@ Requirements
 First test
 ----------
 Recommended: fully exit ZCode from the tray, enable v2rayN TUN, and double-click
-ZCode-Antigravity-Setup-v0.2.8-test.exe. This is a native Windows GUI installer: it shows no
+ZCode-Antigravity-Setup-v0.2.9-test.exe. This is a native Windows GUI installer: it shows no
 terminal, verifies the embedded ZIP plus all three executables, installs only for the current
 user, creates Desktop/Start Menu shortcuts, and opens the control center after completion.
 
 For the single-BAT fallback, fully exit ZCode from the tray, enable v2rayN TUN, and double-click
-ZCode-Antigravity-OneClick-v0.2.8-test.bat. It verifies and extracts its embedded package,
+ZCode-Antigravity-OneClick-v0.2.9-test.bat. It verifies and extracts its embedded package,
 then opens the graphical control center without leaving a terminal window. The control center
 opens OAuth when needed, writes the verified ZCode Provider directly, and starts ZCode after
 successful readback.
@@ -127,9 +127,9 @@ Available scripts
 
 Installer formats
 -----------------
-- ZCode-Antigravity-Setup-v0.2.8-test.exe: recommended no-terminal current-user installer.
-- ZCode-Antigravity-OneClick-v0.2.8-test.bat: fallback single-file installer.
-- ZCode-Antigravity-Windows-x64-0.2.8-test.zip: manually verifiable expanded package.
+- ZCode-Antigravity-Setup-v0.2.9-test.exe: recommended no-terminal current-user installer.
+- ZCode-Antigravity-OneClick-v0.2.9-test.bat: fallback single-file installer.
+- ZCode-Antigravity-Windows-x64-0.2.9-test.zip: manually verifiable expanded package.
 - The EXE installer is custom-built and unsigned. It does not require administrator rights or
   7-Zip on the target computer; Windows SmartScreen may still require manual confirmation.
 
@@ -200,8 +200,8 @@ either mapped model is absent. Extra Gemini, Claude, GPT, or agent models are no
 
 Build versions
 --------------
-- ZCode Antigravity Bridge: 0.2.8-test
+- ZCode Antigravity Bridge: 0.2.9-test
 - CLIProxyAPI base: v7.2.132, commit 78f0c4079e3e6273d65d03b5549cffc898703264
-- Local build: 7.2.132-zcode.10
+- Local build: 7.2.132-zcode.11
 
 Read THIRD-PARTY-NOTICES.txt and LICENSE-CLIProxyAPI.txt for upstream details.

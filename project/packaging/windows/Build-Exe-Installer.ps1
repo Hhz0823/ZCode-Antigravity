@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$PackageDir,
     [Parameter(Mandatory = $true)][string]$OutputFile,
-    [string]$PackageVersion = '0.2.8-test'
+    [string]$PackageVersion = '0.2.9-test'
 )
 
 $ErrorActionPreference = 'Stop'
