@@ -1,7 +1,7 @@
 ZCode Antigravity Bridge - macOS Universal test build
 ====================================================
 
-版本：0.5.1-test
+版本：0.5.2-test
 架构：Apple Silicon (arm64) + Intel (x86_64)
 最低系统：macOS 12
 
@@ -10,7 +10,7 @@ ZCode Antigravity Bridge - macOS Universal test build
 本程序使用原生 SwiftUI + AppKit 控制中心，让 macOS 版 ZCode 和其他 Agent
 通过只监听本机的兼容 Provider 调用 Antigravity Gemini 与 xAI Grok 文本模型。
 App 会在程序坞显示图标，并在菜单栏持续显示所选账号额度。
-主窗口使用蓝紫液态透明高斯材质，并提供总览、账号、API 代理、模型路由、
+主窗口使用透明 NSWindow 与 behindWindow NSVisualEffectView 的系统高斯材质，并提供总览、账号、API 代理、模型路由、
 Agent 接入、用量统计和设置七个原生页面。
 额度卡片按账号和时间窗口显示彩色进度条、重置时间与最低余量；程序每 5 分钟
 自动刷新一次额度，手动刷新、切换提供商和接入完成后会立即刷新。

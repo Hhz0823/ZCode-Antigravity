@@ -1,6 +1,6 @@
 # Antigravity Manager 参考说明
 
-ZCode Antigravity `v0.5.1-test` 的核心管理闭环参考了
+ZCode Antigravity `v0.5.2-test` 的核心管理闭环参考了
 [lbjlaq/Antigravity-Manager](https://github.com/lbjlaq/Antigravity-Manager)（当前产品名 Antigravity Tools）
 公开展示的产品思路，包括账号摘要、分组额度、彩色进度条、重置时间、后台周期刷新、
 多协议代理、账号路由和失败重试。

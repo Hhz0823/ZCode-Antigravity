@@ -1,6 +1,6 @@
 # codexU 参考说明
 
-ZCode Antigravity `v0.5.1-test` 的主窗口、任务栏 / 菜单栏小组件、额度信息层级与
+ZCode Antigravity `v0.5.2-test` 的主窗口、任务栏 / 菜单栏小组件、额度信息层级与
 推理性能口径参考了 [shanggqm/codexU](https://github.com/shanggqm/codexU) 的公开界面和产品说明：
 以蓝紫液态玻璃作为主视觉，使用系统高斯材质、柔光色块、半透明感圆角卡片、顶部胶囊导航、
 高对比数据色和分层指标结构；常驻小组件直接显示 5 小时 / 7 天额度、重置时间、输出 Token 与 Token/s。

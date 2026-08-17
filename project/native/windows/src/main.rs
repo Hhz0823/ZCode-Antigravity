@@ -27,7 +27,7 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::*;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-const VERSION: &str = "0.5.1-test";
+const VERSION: &str = "0.5.2-test";
 const SS_LEFT: u32 = 0;
 const CF_UNICODETEXT_VALUE: u32 = 13;
 const WM_REFRESH_READY: u32 = WM_APP + 1;
@@ -381,6 +381,12 @@ struct Controls {
     footer: isize,
 }
 
+struct GlassCapture {
+    width: i32,
+    height: i32,
+    pixels: Vec<u32>,
+}
+
 struct AppState {
     host: NativeHost,
     hwnd: isize,
@@ -405,6 +411,7 @@ struct AppState {
     manager: Option<ManagerReport>,
     section: usize,
     last_quota_refresh: Option<Instant>,
+    glass_capture: Option<GlassCapture>,
 }
 
 impl AppState {
@@ -433,6 +440,7 @@ impl AppState {
             manager: None,
             section: SECTION_OVERVIEW,
             last_quota_refresh: None,
+            glass_capture: None,
         }
     }
 }
@@ -1197,6 +1205,184 @@ unsafe fn fill_color(hdc: HDC, rect: &RECT, color: COLORREF) {
     }
 }
 
+fn box_blur_horizontal(
+    source: &[u32],
+    target: &mut [u32],
+    width: usize,
+    height: usize,
+    radius: usize,
+) {
+    let mut prefix_blue = vec![0u32; width + 1];
+    let mut prefix_green = vec![0u32; width + 1];
+    let mut prefix_red = vec![0u32; width + 1];
+    for y in 0..height {
+        prefix_blue[0] = 0;
+        prefix_green[0] = 0;
+        prefix_red[0] = 0;
+        let row = y * width;
+        for x in 0..width {
+            let pixel = source[row + x];
+            prefix_blue[x + 1] = prefix_blue[x] + (pixel & 0xff);
+            prefix_green[x + 1] = prefix_green[x] + ((pixel >> 8) & 0xff);
+            prefix_red[x + 1] = prefix_red[x] + ((pixel >> 16) & 0xff);
+        }
+        for x in 0..width {
+            let start = x.saturating_sub(radius);
+            let end = (x + radius + 1).min(width);
+            let count = (end - start) as u32;
+            let blue = (prefix_blue[end] - prefix_blue[start]) / count;
+            let green = (prefix_green[end] - prefix_green[start]) / count;
+            let red = (prefix_red[end] - prefix_red[start]) / count;
+            target[row + x] = blue | (green << 8) | (red << 16);
+        }
+    }
+}
+
+fn box_blur_vertical(
+    source: &[u32],
+    target: &mut [u32],
+    width: usize,
+    height: usize,
+    radius: usize,
+) {
+    let mut prefix_blue = vec![0u32; height + 1];
+    let mut prefix_green = vec![0u32; height + 1];
+    let mut prefix_red = vec![0u32; height + 1];
+    for x in 0..width {
+        prefix_blue[0] = 0;
+        prefix_green[0] = 0;
+        prefix_red[0] = 0;
+        for y in 0..height {
+            let pixel = source[y * width + x];
+            prefix_blue[y + 1] = prefix_blue[y] + (pixel & 0xff);
+            prefix_green[y + 1] = prefix_green[y] + ((pixel >> 8) & 0xff);
+            prefix_red[y + 1] = prefix_red[y] + ((pixel >> 16) & 0xff);
+        }
+        for y in 0..height {
+            let start = y.saturating_sub(radius);
+            let end = (y + radius + 1).min(height);
+            let count = (end - start) as u32;
+            let blue = (prefix_blue[end] - prefix_blue[start]) / count;
+            let green = (prefix_green[end] - prefix_green[start]) / count;
+            let red = (prefix_red[end] - prefix_red[start]) / count;
+            target[y * width + x] = blue | (green << 8) | (red << 16);
+        }
+    }
+}
+
+fn gaussian_glass(mut pixels: Vec<u32>, width: usize, height: usize) -> Vec<u32> {
+    let mut scratch = vec![0u32; pixels.len()];
+    let radius = ((width.min(height) / 55).clamp(10, 22)) as usize;
+    for _ in 0..3 {
+        box_blur_horizontal(&pixels, &mut scratch, width, height, radius);
+        box_blur_vertical(&scratch, &mut pixels, width, height, radius);
+    }
+    for pixel in &mut pixels {
+        let blue = (*pixel & 0xff) as u32;
+        let green = ((*pixel >> 8) & 0xff) as u32;
+        let red = ((*pixel >> 16) & 0xff) as u32;
+        let tint = |channel: u32, glass: u32| (channel * 38 + glass * 62) / 100;
+        *pixel = tint(blue, 72) | (tint(green, 32) << 8) | (tint(red, 20) << 16);
+    }
+    pixels
+}
+
+unsafe fn capture_blurred_background(hwnd: HWND) {
+    let mut client = RECT::default();
+    unsafe { GetClientRect(hwnd, &mut client) };
+    let width = client.right - client.left;
+    let height = client.bottom - client.top;
+    if width <= 0 || height <= 0 {
+        return;
+    }
+    let mut origin = POINT { x: 0, y: 0 };
+    unsafe { ClientToScreen(hwnd, &mut origin) };
+    let screen_hdc = unsafe { GetDC(null_mut()) };
+    if screen_hdc.is_null() {
+        return;
+    }
+    let memory_hdc = unsafe { CreateCompatibleDC(screen_hdc) };
+    let mut info = BITMAPINFO::default();
+    info.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+    info.bmiHeader.biWidth = width;
+    info.bmiHeader.biHeight = -height;
+    info.bmiHeader.biPlanes = 1;
+    info.bmiHeader.biBitCount = 32;
+    info.bmiHeader.biCompression = BI_RGB;
+    let mut bits: *mut c_void = null_mut();
+    let bitmap =
+        unsafe { CreateDIBSection(screen_hdc, &info, DIB_RGB_COLORS, &mut bits, null_mut(), 0) };
+    if memory_hdc.is_null() || bitmap.is_null() || bits.is_null() {
+        unsafe {
+            if !bitmap.is_null() {
+                DeleteObject(bitmap as HGDIOBJ);
+            }
+            if !memory_hdc.is_null() {
+                DeleteDC(memory_hdc);
+            }
+            ReleaseDC(null_mut(), screen_hdc);
+        }
+        return;
+    }
+    let old = unsafe { SelectObject(memory_hdc, bitmap as HGDIOBJ) };
+    unsafe {
+        BitBlt(
+            memory_hdc,
+            0,
+            0,
+            width,
+            height,
+            screen_hdc,
+            origin.x,
+            origin.y,
+            SRCCOPY | CAPTUREBLT,
+        );
+    }
+    let pixels = unsafe {
+        std::slice::from_raw_parts(bits as *const u32, width as usize * height as usize).to_vec()
+    };
+    unsafe {
+        SelectObject(memory_hdc, old);
+        DeleteObject(bitmap as HGDIOBJ);
+        DeleteDC(memory_hdc);
+        ReleaseDC(null_mut(), screen_hdc);
+    }
+    let capture = GlassCapture {
+        width,
+        height,
+        pixels: gaussian_glass(pixels, width as usize, height as usize),
+    };
+    if let Some(state) = STATE.get() {
+        state.lock().unwrap().glass_capture = Some(capture);
+    }
+}
+
+unsafe fn paint_glass_capture(hdc: HDC, capture: &GlassCapture) {
+    let mut info = BITMAPINFO::default();
+    info.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+    info.bmiHeader.biWidth = capture.width;
+    info.bmiHeader.biHeight = -capture.height;
+    info.bmiHeader.biPlanes = 1;
+    info.bmiHeader.biBitCount = 32;
+    info.bmiHeader.biCompression = BI_RGB;
+    unsafe {
+        SetDIBitsToDevice(
+            hdc,
+            0,
+            0,
+            capture.width as u32,
+            capture.height as u32,
+            0,
+            0,
+            0,
+            capture.height as u32,
+            capture.pixels.as_ptr() as *const c_void,
+            &info,
+            DIB_RGB_COLORS,
+        );
+    }
+}
+
 unsafe fn enable_liquid_glass(hwnd: HWND) {
     let backdrop = DWMSBT_TRANSIENTWINDOW;
     let corners = DWMWCP_ROUND;
@@ -1241,92 +1427,6 @@ unsafe fn enable_liquid_glass(hwnd: HWND) {
             &caption_text_color as *const _ as *const c_void,
             std::mem::size_of_val(&caption_text_color) as u32,
         );
-    }
-}
-
-fn blend_color(background: COLORREF, accent: COLORREF, amount: f64) -> COLORREF {
-    let amount = amount.clamp(0.0, 1.0);
-    let channel = |shift: u32| {
-        let base = ((background >> shift) & 0xff) as f64;
-        let value = ((accent >> shift) & 0xff) as f64;
-        (base + (value - base) * amount).round() as u32
-    };
-    channel(0) | (channel(8) << 8) | (channel(16) << 16)
-}
-
-unsafe fn paint_liquid_background(hdc: HDC, rect: &RECT, dpi: u32) {
-    let base = 0x0050271B;
-    let mut vertices = [
-        TRIVERTEX {
-            x: rect.left,
-            y: rect.top,
-            Red: 0x1400,
-            Green: 0x2C00,
-            Blue: 0x6A00,
-            Alpha: 0,
-        },
-        TRIVERTEX {
-            x: rect.right,
-            y: rect.bottom,
-            Red: 0x3700,
-            Green: 0x2700,
-            Blue: 0x5E00,
-            Alpha: 0,
-        },
-    ];
-    let mesh = GRADIENT_RECT {
-        UpperLeft: 0,
-        LowerRight: 1,
-    };
-    unsafe {
-        GradientFill(
-            hdc,
-            vertices.as_mut_ptr(),
-            vertices.len() as u32,
-            &mesh as *const _ as *const c_void,
-            1,
-            GRADIENT_FILL_RECT_H,
-        );
-    }
-    for index in (1..=12).rev() {
-        let radius = scale(42 + index * 26, dpi);
-        let amount = 0.025 + (13 - index) as f64 * 0.012;
-        let color = blend_color(base, COLOR_PRIMARY, amount);
-        let brush = unsafe { CreateSolidBrush(color) };
-        let old = unsafe { SelectObject(hdc, brush as HGDIOBJ) };
-        let old_pen = unsafe { SelectObject(hdc, GetStockObject(NULL_PEN)) };
-        unsafe {
-            Ellipse(
-                hdc,
-                -radius / 2,
-                -radius / 2,
-                radius * 3 / 2,
-                radius * 3 / 2,
-            );
-            SelectObject(hdc, old_pen);
-            SelectObject(hdc, old);
-            DeleteObject(brush as HGDIOBJ);
-        }
-    }
-    for index in (1..=11).rev() {
-        let radius = scale(48 + index * 30, dpi);
-        let amount = 0.02 + (12 - index) as f64 * 0.012;
-        let color = blend_color(base, COLOR_SECONDARY, amount);
-        let brush = unsafe { CreateSolidBrush(color) };
-        let old = unsafe { SelectObject(hdc, brush as HGDIOBJ) };
-        let old_pen = unsafe { SelectObject(hdc, GetStockObject(NULL_PEN)) };
-        unsafe {
-            Ellipse(
-                hdc,
-                rect.right - radius,
-                rect.bottom - radius,
-                rect.right + radius / 2,
-                rect.bottom + radius / 2,
-            );
-            SelectObject(hdc, old_pen);
-            SelectObject(hdc, old);
-            DeleteObject(brush as HGDIOBJ);
-        }
     }
 }
 
@@ -2574,6 +2674,11 @@ unsafe fn paint_dashboard(hwnd: HWND) {
     let target_hdc = unsafe { BeginPaint(hwnd, &mut paint) };
     let state = state_lock.lock().unwrap();
     let m = unsafe { layout_metrics(hwnd, state.dpi) };
+    let liquid_glass = state
+        .manager
+        .as_ref()
+        .map(|manager| manager.settings.liquid_glass)
+        .unwrap_or(true);
     let memory_hdc = unsafe { CreateCompatibleDC(target_hdc) };
     let bitmap = unsafe { CreateCompatibleBitmap(target_hdc, m.width, m.height) };
     let old_bitmap = if !memory_hdc.is_null() && !bitmap.is_null() {
@@ -2592,13 +2697,16 @@ unsafe fn paint_dashboard(hwnd: HWND) {
         right: m.width,
         bottom: m.height,
     };
-    if state
-        .manager
-        .as_ref()
-        .map(|manager| manager.settings.liquid_glass)
-        .unwrap_or(true)
-    {
-        unsafe { paint_liquid_background(hdc, &client, state.dpi) };
+    if liquid_glass {
+        if let Some(capture) = state
+            .glass_capture
+            .as_ref()
+            .filter(|capture| capture.width == m.width && capture.height == m.height)
+        {
+            unsafe { paint_glass_capture(hdc, capture) };
+        } else {
+            unsafe { fill_color(hdc, &client, COLOR_BACKGROUND) };
+        }
     } else {
         unsafe { fill_color(hdc, &client, COLOR_BACKGROUND) };
     }
@@ -4251,7 +4359,6 @@ unsafe extern "system" fn window_proc(
                 state.lock().unwrap().hwnd = hwnd as isize;
             }
             unsafe {
-                enable_liquid_glass(hwnd);
                 create_controls(hwnd);
                 layout(hwnd);
                 add_tray_icon(hwnd);
@@ -4260,10 +4367,27 @@ unsafe extern "system" fn window_proc(
             request_refresh(hwnd, true);
             0
         }
+        WM_DWMCOMPOSITIONCHANGED => {
+            unsafe {
+                enable_liquid_glass(hwnd);
+            }
+            0
+        }
         WM_SIZE => {
             unsafe {
                 layout(hwnd);
                 InvalidateRect(hwnd, null(), 0);
+            }
+            0
+        }
+        WM_EXITSIZEMOVE => {
+            unsafe {
+                ShowWindow(hwnd, SW_HIDE);
+                thread::sleep(Duration::from_millis(45));
+                capture_blurred_background(hwnd);
+                ShowWindow(hwnd, SW_SHOW);
+                bring_main_window_to_front(hwnd);
+                InvalidateRect(hwnd, null(), 1);
             }
             0
         }
@@ -4602,7 +4726,6 @@ fn main() {
         let window_height = (desired.bottom - desired.top)
             .min(available_height)
             .max(minimum_height);
-        ShowWindow(hwnd, SW_SHOW);
         SetWindowPos(
             hwnd,
             null_mut(),
@@ -4612,7 +4735,11 @@ fn main() {
             window_height,
             SWP_NOZORDER | SWP_NOACTIVATE,
         );
+        capture_blurred_background(hwnd);
+        ShowWindow(hwnd, SW_SHOW);
         UpdateWindow(hwnd);
+        enable_liquid_glass(hwnd);
+        bring_main_window_to_front(hwnd);
         if auto_setup {
             PostMessageW(hwnd, WM_COMMAND, ID_SETUP as WPARAM, 0);
         }

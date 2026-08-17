@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "0.5.1-test"
+private let appVersion = "0.5.2-test"
 
 private extension Notification.Name {
     static let selectBridgeProvider = Notification.Name("ZCodeSelectBridgeProvider")
@@ -829,10 +829,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         StatusBarController.shared.install()
         DispatchQueue.main.async {
             for window in NSApp.windows {
-                window.isOpaque = false
-                window.backgroundColor = .clear
-                window.titlebarAppearsTransparent = true
-                window.styleMask.insert(.fullSizeContentView)
+                configureTransparentWindow(window)
             }
         }
         NSApp.activate(ignoringOtherApps: true)
@@ -847,6 +844,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         StatusBarController.shared.openWindow()
         return true
+    }
+}
+
+@MainActor
+private func configureTransparentWindow(_ window: NSWindow) {
+    window.isOpaque = false
+    window.backgroundColor = .clear
+    window.titlebarAppearsTransparent = true
+    window.styleMask.insert(.fullSizeContentView)
+    window.hasShadow = true
+    window.contentView?.wantsLayer = true
+    window.contentView?.layer?.backgroundColor = NSColor.clear.cgColor
+}
+
+private final class TransparentWindowHostView: NSView {
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard let window else { return }
+        Task { @MainActor in configureTransparentWindow(window) }
+    }
+}
+
+private struct TransparentWindowConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { TransparentWindowHostView() }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        guard let window = nsView.window else { return }
+        configureTransparentWindow(window)
     }
 }
 
@@ -892,11 +916,15 @@ private struct NativeBlurBackground: NSViewRepresentable {
         view.material = .underWindowBackground
         view.blendingMode = .behindWindow
         view.state = .active
+        view.isEmphasized = true
         return view
     }
 
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
         nsView.state = .active
+        nsView.blendingMode = .behindWindow
+        nsView.material = .underWindowBackground
+        nsView.isEmphasized = true
     }
 }
 
@@ -908,23 +936,23 @@ private struct LiquidGlassBackground: View {
             NativeBlurBackground()
             LinearGradient(
                 colors: scheme == .dark
-                    ? [Color(red: 0.04, green: 0.08, blue: 0.20).opacity(0.84), CodexUPalette.secondary.opacity(0.25)]
-                    : [Color.white.opacity(0.40), CodexUPalette.accentLight.opacity(0.20), CodexUPalette.secondary.opacity(0.18)],
+                    ? [Color(red: 0.04, green: 0.08, blue: 0.20).opacity(0.26), CodexUPalette.secondary.opacity(0.10)]
+                    : [Color.white.opacity(0.14), CodexUPalette.accentLight.opacity(0.09), CodexUPalette.secondary.opacity(0.07)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             Circle()
-                .fill(CodexUPalette.accent.opacity(scheme == .dark ? 0.30 : 0.22))
+                .fill(CodexUPalette.accent.opacity(scheme == .dark ? 0.16 : 0.11))
                 .frame(width: 520, height: 520)
                 .blur(radius: 90)
                 .offset(x: -350, y: -270)
             Circle()
-                .fill(CodexUPalette.secondary.opacity(scheme == .dark ? 0.30 : 0.20))
+                .fill(CodexUPalette.secondary.opacity(scheme == .dark ? 0.15 : 0.10))
                 .frame(width: 580, height: 580)
                 .blur(radius: 110)
                 .offset(x: 420, y: 250)
             Ellipse()
-                .fill(Color.cyan.opacity(scheme == .dark ? 0.16 : 0.12))
+                .fill(Color.cyan.opacity(scheme == .dark ? 0.10 : 0.07))
                 .frame(width: 700, height: 300)
                 .blur(radius: 100)
                 .rotationEffect(.degrees(-18))
@@ -974,6 +1002,9 @@ struct DashboardView: View {
                 .padding(22)
                 .frame(maxWidth: 1280, alignment: .leading)
             }
+            TransparentWindowConfigurator()
+                .frame(width: 0, height: 0)
+                .accessibilityHidden(true)
         }
         .preferredColorScheme(theme == "light" ? .light : (theme == "dark" ? .dark : nil))
         .animation(.easeInOut(duration: 0.18), value: model.provider)
