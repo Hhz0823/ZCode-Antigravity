@@ -2,7 +2,8 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "0.4.2-test"
+private let appVersion = "0.4.5-test"
+private let quotaRefreshInterval: TimeInterval = 5 * 60
 
 private extension Notification.Name {
     static let selectBridgeProvider = Notification.Name("ZCodeSelectBridgeProvider")
@@ -47,6 +48,7 @@ struct DashboardStatus: Decodable {
 }
 
 struct QuotaReport: Decodable {
+    let fetchedAt: String?
     let provider: String
     let source: String
     let stale: Bool
@@ -238,9 +240,12 @@ final class BridgeModel: ObservableObject {
     @Published var loading = true
     @Published var message = "正在启动本地安全核心…"
     @Published var errorMessage: String?
+    @Published var quotaError: String?
+    @Published var lastQuotaRefresh: Date?
 
     private var connection: NativeConnection?
     private var pollingTask: Task<Void, Never>?
+    private var lastQuotaRefreshAttempt: Date?
     private var notificationTokens: [NSObjectProtocol] = []
 
     init() {
@@ -269,7 +274,7 @@ final class BridgeModel: ObservableObject {
                 pollingTask = Task { [weak self] in
                     while !Task.isCancelled {
                         try? await Task.sleep(nanoseconds: 15_000_000_000)
-                        await self?.refreshAll(showLoading: false)
+                        await self?.refreshAll(showLoading: false, forceQuota: false)
                     }
                 }
             } catch {
@@ -285,24 +290,37 @@ final class BridgeModel: ObservableObject {
         NativeHost.shared.stop()
     }
 
-    func refreshAll(showLoading: Bool = true) async {
+    func refreshAll(showLoading: Bool = true, forceQuota: Bool = true) async {
         guard connection != nil else { return }
         if showLoading { loading = true }
         do {
+            let previousProvider = provider
+            let operationWasRunning = status?.operation.running == true
             let latest: DashboardStatus = try await request(path: "/api/status")
             status = latest
             provider = latest.selectedProvider
             errorMessage = nil
-            async let quotaResult: QuotaReport? = optionalRequest(path: "/api/quota?provider=\(provider)")
-            async let connectorResult: ConnectorResponse? = optionalRequest(path: "/api/connectors")
-            quota = await quotaResult
-            connectors = await connectorResult
+            connectors = await optionalRequest(path: "/api/connectors")
+            let providerChanged = previousProvider != provider
+            let operationFinished = operationWasRunning && !latest.operation.running
+            let quotaDue = lastQuotaRefreshAttempt.map { Date().timeIntervalSince($0) >= quotaRefreshInterval } ?? true
+            if !latest.operation.running && (forceQuota || providerChanged || operationFinished || quotaDue) {
+                lastQuotaRefreshAttempt = Date()
+                do {
+                    let latestQuota: QuotaReport = try await request(path: "/api/quota?provider=\(provider)")
+                    quota = latestQuota
+                    quotaError = nil
+                    lastQuotaRefresh = Date()
+                } catch {
+                    quotaError = error.localizedDescription
+                }
+            }
             message = latest.operation.message ?? (latest.gateway.ok ? "网关在线" : "等待接入")
             StatusBarController.shared.update(provider: provider, quota: quota, status: latest)
         } catch {
             errorMessage = error.localizedDescription
             message = "状态刷新失败"
-            StatusBarController.shared.update(provider: provider, quota: nil, status: status)
+            StatusBarController.shared.update(provider: provider, quota: quota, status: status)
         }
         loading = false
     }
@@ -313,8 +331,11 @@ final class BridgeModel: ObservableObject {
         do {
             let _: [String: String] = try await request(path: "/api/provider", method: "POST", body: ["provider": normalized])
             quota = nil
+            quotaError = nil
+            lastQuotaRefresh = nil
+            lastQuotaRefreshAttempt = nil
             connectors = nil
-            await refreshAll(showLoading: false)
+            await refreshAll(showLoading: false, forceQuota: true)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -325,7 +346,7 @@ final class BridgeModel: ObservableObject {
             let _: [String: String] = try await request(path: "/api/action", method: "POST", body: ["action": action])
             message = actionMessage(action)
             errorMessage = nil
-            await refreshAll(showLoading: false)
+            await refreshAll(showLoading: false, forceQuota: false)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -570,6 +591,12 @@ struct DashboardView: View {
                 }
                 Spacer()
                 if model.loading { ProgressView().controlSize(.small) }
+                Label("每 5 分钟自动刷新", systemImage: "clock.arrow.circlepath")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color(nsColor: .controlBackgroundColor), in: Capsule())
                 Button { Task { await model.refreshAll() } } label: {
                     Label("刷新", systemImage: "arrow.clockwise")
                 }
@@ -629,6 +656,32 @@ struct DashboardView: View {
     @ViewBuilder
     private var quotaContent: some View {
         if let report = model.quota, !report.accounts.isEmpty {
+            HStack(spacing: 10) {
+                QuotaSummaryTile(
+                    title: "账号",
+                    value: "\(report.accounts.count)",
+                    icon: "person.2.fill",
+                    tint: .blue
+                )
+                QuotaSummaryTile(
+                    title: "最低剩余",
+                    value: lowestQuota(in: report).map { String(format: "%.0f%%", $0) } ?? "—",
+                    icon: "gauge.with.dots.needle.33percent",
+                    tint: quotaColor(lowestQuota(in: report))
+                )
+                QuotaSummaryTile(
+                    title: "最近刷新",
+                    value: refreshTimeText,
+                    icon: "clock.fill",
+                    tint: .indigo
+                )
+            }
+            if let quotaError = model.quotaError {
+                Label("本次刷新失败，继续显示上次成功数据：\(quotaError)", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .textSelection(.enabled)
+            }
             ForEach(report.accounts) { account in
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
@@ -637,6 +690,12 @@ struct DashboardView: View {
                             Text(account.plan ?? account.status).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
+                        Text(account.status)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(account.status == "active" ? Color.green : Color.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background((account.status == "active" ? Color.green : Color.secondary).opacity(0.1), in: Capsule())
                         if let credits = account.credits, credits.available {
                             Text(String(format: "$%.2f %@", credits.amount, credits.creditType))
                                 .font(.caption.monospacedDigit()).padding(.horizontal, 8).padding(.vertical, 4)
@@ -648,7 +707,12 @@ struct DashboardView: View {
                     }
                     ForEach(account.groups ?? []) { group in
                         VStack(alignment: .leading, spacing: 9) {
-                            Text(group.name).font(.subheadline.weight(.medium))
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(group.name).font(.subheadline.weight(.semibold))
+                                if let description = group.description, !description.isEmpty {
+                                    Text(description).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                                }
+                            }
                             ForEach(group.buckets) { bucket in QuotaRow(bucket: bucket) }
                         }
                     }
@@ -656,9 +720,42 @@ struct DashboardView: View {
                 .padding(14)
                 .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
             }
+            HStack {
+                Label(report.stale ? "缓存数据" : "实时接口", systemImage: report.stale ? "clock.badge.exclamationmark" : "bolt.horizontal.circle")
+                Spacer()
+                Text("额度将在 5 分钟内自动更新，也可随时手动刷新")
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
         } else {
-            ContentUnavailableViewCompat(title: model.status?.gateway.ok == true ? "额度暂不可用" : "等待启动网关", detail: "登录所选提供商并完成一次接入后，这里会显示真实剩余额度。")
+            ContentUnavailableViewCompat(
+                title: model.status?.gateway.ok == true ? "额度暂不可用" : "等待启动网关",
+                detail: model.quotaError ?? "登录所选提供商并完成一次接入后，这里会显示真实剩余额度。"
+            )
         }
+    }
+
+    private func lowestQuota(in report: QuotaReport) -> Double? {
+        report.accounts
+            .flatMap { $0.groups ?? [] }
+            .flatMap(\.buckets)
+            .compactMap(\.remainingPercent)
+            .min()
+    }
+
+    private func quotaColor(_ remaining: Double?) -> Color {
+        guard let remaining else { return .secondary }
+        if remaining < 20 { return .red }
+        if remaining < 50 { return .orange }
+        return .green
+    }
+
+    private var refreshTimeText: String {
+        guard let date = model.lastQuotaRefresh else { return "等待首次刷新" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: date)
     }
 
     private var connectorPanel: some View {
@@ -743,22 +840,73 @@ struct CardTitle: View {
     }
 }
 
+struct QuotaSummaryTile: View {
+    let title: String
+    let value: String
+    let icon: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(tint)
+                .frame(width: 34, height: 34)
+                .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.caption2).foregroundStyle(.secondary)
+                Text(value).font(.headline.monospacedDigit()).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(11)
+        .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.06)))
+    }
+}
+
 struct QuotaRow: View {
     let bucket: QuotaBucket
+
+    private var quotaTint: Color {
+        guard let remaining = bucket.remainingPercent else { return .secondary }
+        if remaining < 20 { return .red }
+        if remaining < 50 { return .orange }
+        return .green
+    }
+
+    private var resetText: String? {
+        guard let raw = bucket.resetTime else { return nil }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = iso.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
+        guard let date else { return raw }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "MM-dd HH:mm"
+        return formatter.string(from: date)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(bucket.name).font(.callout)
                 Spacer()
+                if let reset = resetText {
+                    Text("重置 \(reset)").font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                }
                 if let remaining = bucket.remainingPercent {
-                    Text(String(format: "%.0f%%", remaining)).font(.callout.monospacedDigit().weight(.semibold))
+                    Text(String(format: "%.0f%%", remaining))
+                        .font(.callout.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(quotaTint)
                 } else { Text("—").foregroundStyle(.secondary) }
             }
             ProgressView(value: max(0, min(100, bucket.remainingPercent ?? 0)), total: 100)
-                .tint((bucket.remainingPercent ?? 100) <= 15 ? .red : .accentColor)
+                .tint(quotaTint)
                 .animation(.easeInOut(duration: 0.35), value: bucket.remainingPercent)
-            if let reset = bucket.resetTime {
-                Text("重置：\(reset)").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            if let description = bucket.description, !description.isEmpty {
+                Text(description).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
             }
         }
     }

@@ -29,6 +29,16 @@ The v0.4 native control center is written in Rust and uses Microsoft windows-sys
 ureq, serde, and their transitive dependencies. The exact dependency list is in
 RUST-DEPENDENCIES.txt; unmodified upstream license files are under rust-licenses/.
 
+Interface behavior reference
+============================
+
+The v0.4.5 quota card behavior and information hierarchy were independently implemented after
+reviewing lbjlaq/Antigravity-Manager (snapshot a2e3c45), licensed CC BY-NC-SA 4.0:
+https://github.com/lbjlaq/Antigravity-Manager
+
+No Tauri, React, or source files from that project are included. See
+project/docs/ANTIGRAVITY-MANAGER-REFERENCE.md in the source distribution.
+
 System tray
 ===========
 

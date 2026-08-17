@@ -1,7 +1,7 @@
 Windows acceptance checklist
 ============================
 
-[ ] ZCode-Antigravity-Setup-v0.4.4-test.exe opens a native confirmation dialog without a terminal.
+[ ] ZCode-Antigravity-Setup-v0.4.5-test.exe opens a native confirmation dialog without a terminal.
 [ ] Control-center refresh, login, sync, stop, port inspection, and ZCode launch never flash a console window.
 [ ] The native EXE writes install.ps1 with exactly one EF BB BF UTF-8 BOM before Windows PowerShell 5.1 parses it.
 [ ] The EXE installer --extract-only workflow reproduces every package file and hash exactly.
@@ -13,6 +13,8 @@ Windows acceptance checklist
 [ ] The control center shortcut is created on the Desktop and in the current-user Start Menu.
 [ ] Control center APIs listen only on 127.0.0.1 and reject requests without the per-launch session key.
 [ ] Weekly and five-hour remaining quota show exact percentages, reset times, and native progress state.
+[ ] Keep the panel open for at least 15 seconds; connection state may update but quota fetchedAt must not change before the five-minute interval.
+[ ] At 150% display scaling, all four status cards, the quota card, and the full action column remain inside the window.
 [ ] Segoe UI Variable text stays crisp at 100%, 125%, 150%, 200%, and a mixed-DPI monitor move.
 [ ] WM_DPICHANGED relayout keeps every status tile, action, quota row, and connector control visible.
 [ ] Cached quota contains no complete email, project ID, access token, or refresh token.

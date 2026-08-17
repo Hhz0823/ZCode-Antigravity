@@ -3,7 +3,7 @@
 > 在 Windows 与 macOS 上统一接入 Antigravity Gemini 和 xAI Grok，
 > 并把本机安全网关提供给 ZCode、Grok Build、Codex、Claude Code 与 OpenCode。
 
-**当前版本：** Windows `v0.4.4-test`、macOS `v0.4.2-test`
+**当前版本：** Windows / macOS `v0.4.5-test`
 **适用系统：** macOS 12+（Apple Silicon / Intel）、Windows 10 / 11 x64
 **项目状态：** 测试版
 
@@ -16,6 +16,8 @@
 - 支持文本、图片、音频和视频输入转换；当前 Gemini 3.7 Flash 声明输出仅为文本。
 - Windows 任务栏与 macOS 菜单栏提供常驻额度小组件；可切换 Antigravity / Grok、刷新额度、打开面板或退出。
 - Antigravity 显示每周 / 5 小时余量；Grok 显示官方 Grok Build billing 返回的共享周/月余量、重置时间和 Extra Usage Credits。
+- 额度面板每 5 分钟自动刷新；手动刷新、切换提供商和接入完成会立即刷新。刷新失败时保留上次成功数据。
+- 账号摘要、分组进度条、重置时间与色彩阈值参考 [Antigravity-Manager](https://github.com/lbjlaq/Antigravity-Manager) 的产品思路，并以原生 Rust / Swift 独立实现。
 - Antigravity 额度请求支持 sandbox / daily / production 端点、HTTP 403 无项目字段重试和逐模型额度降级。
 - 内置 Grok Build、OpenAI Codex、Claude Code、OpenCode、通用 OpenAI / Anthropic 客户端配置卡，可一键复制，不会擅自覆盖外部 Agent 配置文件。
 - Windows 控制中心使用 **Rust + Win32** 原生开发，子进程全部隐藏；支持 Per-Monitor DPI V2、ClearType、系统托盘与原生任务栏图标。
@@ -31,11 +33,11 @@
 
 | 文件 | 用途 | 建议 |
 | --- | --- | --- |
-| `ZCode-Antigravity-macOS-Universal-v0.4.2-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
-| `ZCode-Antigravity-Setup-v0.4.4-test.exe` | Windows 图形化安装器 | **普通用户首选** |
-| `ZCode-Antigravity-OneClick-v0.4.4-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
-| `ZCode-Antigravity-Windows-x64-0.4.4-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
-| `ZCode-Antigravity-Source-v0.4.4-test.zip` | 当前源码快照 | 审计 / 构建 |
+| `ZCode-Antigravity-macOS-Universal-v0.4.5-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
+| `ZCode-Antigravity-Setup-v0.4.5-test.exe` | Windows 图形化安装器 | **普通用户首选** |
+| `ZCode-Antigravity-OneClick-v0.4.5-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
+| `ZCode-Antigravity-Windows-x64-0.4.5-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
+| `ZCode-Antigravity-Source-v0.4.5-test.zip` | 当前源码快照 | 审计 / 构建 |
 
 ## macOS 快速安装
 
@@ -70,7 +72,7 @@ AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切�
 
 1. 从 Windows 系统托盘完全退出 ZCode。仅关闭窗口可能仍会留下 `ZCode.exe` 进程。
 2. 确认 v2rayN 已开启 TUN，且本地代理端口与配置一致。
-3. 下载 `ZCode-Antigravity-Setup-v0.4.4-test.exe`，并先校验 SHA-256。Windows 请勿使用点击操作缺少反馈且 OAuth 过期后额度刷新失败的 `v0.4.3-test`、界面退化且高 DPI 字体异常的 `v0.4.2-test`，也不要继续使用更早测试版。
+3. 下载 `ZCode-Antigravity-Setup-v0.4.5-test.exe`，并先校验 SHA-256。Windows 请勿使用点击操作缺少反馈且 OAuth 过期后额度刷新失败的 `v0.4.3-test`、界面退化且高 DPI 字体异常的 `v0.4.2-test`，也不要继续使用更早测试版。
 4. 双击安装器。程序会校验内嵌 ZIP 和三个 EXE，然后安装到当前用户目录。
 5. 在控制中心选择 Antigravity 或 Grok，完成对应授权并等待状态检查通过。
 6. 重新打开 ZCode，选择 Provider `Antigravity + Grok (Local Bridge)`；控制中心会作为任务栏额度小组件继续驻留。
@@ -99,7 +101,7 @@ $env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
 
 ## 已验证范围
 
-Windows 基线与 `v0.4.4-test` 新增的构建及实机测试记录包括：
+Windows 基线与 `v0.4.5-test` 新增的构建及实机测试记录包括：
 
 - 管理器与 CLIProxyAPI 的 Go 测试、Windows x64 构建和静态检查通过。
 - OAuth PKCE / callback、DPAPI 凭据存储、原子替换和 loopback 约束通过。
@@ -116,14 +118,16 @@ Windows 基线与 `v0.4.4-test` 新增的构建及实机测试记录包括：
 - Antigravity 额度 HTTP 403 去项目字段重试和 `fetchAvailableModels` 降级路径均有回归测试。
 - 旧版网页控制面板仍保留为诊断回退入口；正式客户端已改为原生 SwiftUI / Win32。
 - 已在 Windows 11 x64、144 DPI（150%）实机完成真实 Google AI Pro 额度刷新、完整窗口截图和响应性回归；四个状态卡与全部操作按钮均在窗口内可见。
+- `v0.4.5-test` 在同一实机显示账号摘要、最低 98%、3 条分组额度进度条和重置时间；20 秒观测期间 15 秒状态轮询未改写额度缓存，额度请求保持独立的 5 分钟周期。
 
-`v0.4.2-test` 的 macOS 验证包括：
+`v0.4.5-test` 的 macOS 验证包括：
 
 - 管理器、Keychain 凭据加密与后端相关测试通过。
 - SwiftUI 主程序、Go Core 和后端均为真正的 `x86_64 + arm64` Universal Mach-O。
 - App 临时签名、包内逐文件哈希、ZIP 完整性和隔离 `doctor` 检查通过。
 - Info.plist 已启用普通 App 激活策略（`LSUIElement=false`），Dock 图标、原生菜单栏组件、关闭窗口驻留和退出清理通过。
 - 本机已识别 `/Applications/ZCode.app` 及运行中的 `ZCode` 进程；未修改用户现有配置。
+- `v0.4.5-test` SwiftUI 原生界面已实机启动，5 分钟刷新标识、提供商切换、状态卡和响应式额度卡布局显示正常。
 
 注意：上游模型目录、账号资格、风控和额度都可能随时变化。列表中看到模型并不代表当前账号一定可用。
 

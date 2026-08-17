@@ -25,7 +25,7 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-const VERSION: &str = "0.4.4-test";
+const VERSION: &str = "0.4.5-test";
 const SS_LEFT: u32 = 0;
 const CF_UNICODETEXT_VALUE: u32 = 13;
 const WM_REFRESH_READY: u32 = WM_APP + 1;
@@ -33,6 +33,8 @@ const WM_OPERATION_POSTED: u32 = WM_APP + 2;
 const WM_TRAY: u32 = WM_APP + 20;
 const TIMER_REFRESH: usize = 1;
 const TIMER_OPERATION_POLL: usize = 2;
+const STATUS_REFRESH_MS: u32 = 15_000;
+const QUOTA_REFRESH_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 const COLOR_SIDEBAR: COLORREF = 0x00442308;
 const COLOR_SIDEBAR_ACTIVE: COLORREF = 0x008C4A16;
@@ -46,6 +48,10 @@ const COLOR_PRIMARY_SOFT: COLORREF = 0x00FFF2E9;
 const COLOR_TEXT: COLORREF = 0x00422A16;
 const COLOR_MUTED: COLORREF = 0x00907762;
 const COLOR_LIGHT_TEXT: COLORREF = 0x00F8E9DC;
+const COLOR_SUCCESS: COLORREF = 0x0062A024;
+const COLOR_WARNING: COLORREF = 0x001E91DC;
+const COLOR_DANGER: COLORREF = 0x005A41DA;
+const COLOR_TRACK: COLORREF = 0x00F4EDE6;
 
 const ID_PROVIDER_ANTIGRAVITY: i32 = 100;
 const ID_PROVIDER_GROK: i32 = 101;
@@ -162,7 +168,11 @@ struct DashboardStatus {
 }
 
 #[derive(Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct QuotaReport {
+    fetched_at: Option<String>,
+    source: String,
+    stale: bool,
     accounts: Vec<QuotaAccount>,
     warning: Option<String>,
 }
@@ -203,7 +213,7 @@ struct CreditInfo {
 
 struct RefreshResult {
     status: Result<DashboardStatus, String>,
-    quota: Result<QuotaReport, String>,
+    quota: Option<Result<QuotaReport, String>>,
     connectors: Result<ConnectorResponse, String>,
 }
 
@@ -249,6 +259,9 @@ struct AppState {
     quitting: bool,
     provider: String,
     connectors_text: String,
+    quota: Option<QuotaReport>,
+    quota_error: Option<String>,
+    last_quota_refresh: Option<Instant>,
 }
 
 impl AppState {
@@ -266,6 +279,9 @@ impl AppState {
             quitting: false,
             provider: "antigravity".to_string(),
             connectors_text: String::new(),
+            quota: None,
+            quota_error: None,
+            last_quota_refresh: None,
         }
     }
 }
@@ -409,6 +425,10 @@ unsafe fn create_controls(hwnd: HWND) {
     c.quota_progress =
         unsafe { create_control(hwnd, "msctls_progress32", "", PBS_SMOOTH, 0, font) };
     unsafe { SendMessageW(c.quota_progress as HWND, PBM_SETRANGE32, 0, 100) };
+    unsafe {
+        ShowWindow(c.quota_body as HWND, SW_HIDE);
+        ShowWindow(c.quota_progress as HWND, SW_HIDE);
+    }
     c.models =
         unsafe { create_control(hwnd, "STATIC", "模型：等待网关同步", SS_LEFT, 0, font) };
     c.action_header =
@@ -545,6 +565,7 @@ struct LayoutMetrics {
     action_w: i32,
     button_h: i32,
     button_gap: i32,
+    compact: bool,
 }
 
 unsafe fn layout_metrics(hwnd: HWND, dpi: u32) -> LayoutMetrics {
@@ -552,19 +573,20 @@ unsafe fn layout_metrics(hwnd: HWND, dpi: u32) -> LayoutMetrics {
     unsafe { GetClientRect(hwnd, &mut rect) };
     let width = rect.right.max(1);
     let height = rect.bottom.max(1);
-    let sidebar_w = scale(210, dpi).min(width / 3);
-    let margin = scale(26, dpi);
+    let compact = height < scale(680, dpi) || width < scale(1000, dpi);
+    let sidebar_w = scale(if compact { 190 } else { 210 }, dpi).min(width / 3);
+    let margin = scale(if compact { 16 } else { 26 }, dpi);
     let gap = scale(12, dpi);
     let main_x = sidebar_w + margin;
-    let main_w = (width - sidebar_w - margin * 2).max(scale(640, dpi));
-    let provider_y = scale(76, dpi);
-    let provider_w = scale(150, dpi);
-    let provider_h = scale(38, dpi);
-    let status_y = scale(126, dpi);
-    let status_h = scale(76, dpi);
+    let main_w = (width - sidebar_w - margin * 2).max(1);
+    let provider_y = scale(if compact { 64 } else { 76 }, dpi);
+    let provider_w = scale(if compact { 138 } else { 150 }, dpi);
+    let provider_h = scale(if compact { 32 } else { 38 }, dpi);
+    let status_y = scale(if compact { 106 } else { 126 }, dpi);
+    let status_h = scale(if compact { 62 } else { 76 }, dpi);
     let status_w = (main_w - gap * 3) / 4;
-    let content_top = scale(222, dpi);
-    let content_bottom = height - scale(24, dpi);
+    let content_top = scale(if compact { 180 } else { 222 }, dpi);
+    let content_bottom = height - scale(if compact { 14 } else { 24 }, dpi);
     let action_w = scale(284, dpi).min(main_w * 36 / 100);
     let action_x = main_x + main_w - action_w;
     let left_w = action_x - gap - main_x;
@@ -587,8 +609,9 @@ unsafe fn layout_metrics(hwnd: HWND, dpi: u32) -> LayoutMetrics {
         left_w,
         action_x,
         action_w,
-        button_h: scale(40, dpi),
-        button_gap: scale(9, dpi),
+        button_h: scale(if compact { 30 } else { 40 }, dpi),
+        button_gap: scale(if compact { 4 } else { 9 }, dpi),
+        compact,
     }
 }
 
@@ -603,8 +626,7 @@ unsafe fn layout(hwnd: HWND) {
     let m = unsafe { layout_metrics(hwnd, dpi) };
     let inset = scale(20, m.dpi);
     let models_h = scale(76, m.dpi);
-    let models_y = (m.content_bottom - inset - models_h).max(m.content_top + scale(250, m.dpi));
-    let quota_body_y = m.content_top + scale(92, m.dpi);
+    let models_y = m.content_bottom - inset - models_h;
 
     let move_control = |handle: isize, x: i32, y: i32, w: i32, h: i32| unsafe {
         if handle != 0 {
@@ -666,26 +688,18 @@ unsafe fn layout(hwnd: HWND) {
         scale(34, m.dpi),
     );
     move_control(
-        controls.quota_progress,
-        m.main_x + inset,
-        m.content_top + scale(62, m.dpi),
-        m.left_w - inset * 2,
-        scale(10, m.dpi),
-    );
-    move_control(
-        controls.quota_body,
-        m.main_x + inset,
-        quota_body_y,
-        m.left_w - inset * 2,
-        models_y - quota_body_y - scale(12, m.dpi),
-    );
-    move_control(
         controls.models,
         m.main_x + inset,
         models_y,
         m.left_w - inset * 2,
         models_h,
     );
+    unsafe {
+        ShowWindow(
+            controls.models as HWND,
+            if m.compact { SW_HIDE } else { SW_SHOW },
+        )
+    };
     move_control(
         controls.action_header,
         m.action_x + inset,
@@ -708,7 +722,9 @@ unsafe fn layout(hwnd: HWND) {
         move_control(
             *handle,
             m.action_x + inset,
-            m.content_top + scale(62, m.dpi) + index as i32 * (m.button_h + m.button_gap),
+            m.content_top
+                + scale(if m.compact { 54 } else { 62 }, m.dpi)
+                + index as i32 * (m.button_h + m.button_gap),
             m.action_w - inset * 2,
             m.button_h,
         );
@@ -834,6 +850,330 @@ unsafe fn draw_label(
         SetTextColor(hdc, color);
         DrawTextW(hdc, text.as_ptr(), -1, &mut rect, format);
         SelectObject(hdc, old_font);
+    }
+}
+
+fn short_iso_time(value: &str) -> String {
+    if value.len() >= 19 && value.as_bytes().get(10) == Some(&b'T') {
+        format!("{}-{} {}", &value[5..7], &value[8..10], &value[11..16])
+    } else {
+        value.to_string()
+    }
+}
+
+fn quota_percent_color(percent: f64) -> COLORREF {
+    if percent < 20.0 {
+        COLOR_DANGER
+    } else if percent < 50.0 {
+        COLOR_WARNING
+    } else {
+        COLOR_SUCCESS
+    }
+}
+
+fn quota_lowest(report: &QuotaReport) -> Option<f64> {
+    report
+        .accounts
+        .iter()
+        .flat_map(|account| account.groups.as_deref().unwrap_or(&[]))
+        .flat_map(|group| &group.buckets)
+        .filter_map(|bucket| bucket.remaining_percent)
+        .reduce(f64::min)
+}
+
+unsafe fn paint_quota_dashboard(hdc: HDC, state: &AppState, m: &LayoutMetrics) {
+    let inset = scale(20, m.dpi);
+    let content_left = m.main_x + inset;
+    let content_right = m.main_x + m.left_w - inset;
+    let summary_top = m.content_top + scale(60, m.dpi);
+    let summary_height = scale(if m.compact { 48 } else { 58 }, m.dpi);
+    let summary_gap = scale(8, m.dpi);
+    let summary_width = (content_right - content_left - summary_gap * 2) / 3;
+    let report = state.quota.as_ref();
+    let account_count = report.map(|value| value.accounts.len()).unwrap_or(0);
+    let lowest = report.and_then(quota_lowest);
+    let refresh_text = report
+        .and_then(|value| value.fetched_at.as_deref())
+        .and_then(|value| value.get(11..19))
+        .unwrap_or("等待首次刷新");
+    let summary = [
+        ("账号", account_count.to_string()),
+        (
+            "最低剩余",
+            lowest
+                .map(|value| format!("{value:.0}%"))
+                .unwrap_or_else(|| "—".to_string()),
+        ),
+        ("自动刷新", "每 5 分钟".to_string()),
+    ];
+    for (index, (label, value)) in summary.iter().enumerate() {
+        let left = content_left + index as i32 * (summary_width + summary_gap);
+        let card = RECT {
+            left,
+            top: summary_top,
+            right: left + summary_width,
+            bottom: summary_top + summary_height,
+        };
+        unsafe {
+            rounded_box(hdc, &card, COLOR_BACKGROUND, COLOR_BORDER, scale(5, m.dpi));
+            draw_label(
+                hdc,
+                label,
+                RECT {
+                    left: left + scale(11, m.dpi),
+                    top: summary_top + scale(7, m.dpi),
+                    right: card.right - scale(8, m.dpi),
+                    bottom: summary_top + scale(25, m.dpi),
+                },
+                state.font,
+                COLOR_MUTED,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+            );
+            draw_label(
+                hdc,
+                value,
+                RECT {
+                    left: left + scale(11, m.dpi),
+                    top: summary_top + scale(25, m.dpi),
+                    right: card.right - scale(8, m.dpi),
+                    bottom: card.bottom - scale(5, m.dpi),
+                },
+                state.font_bold,
+                if index == 1 {
+                    lowest.map(quota_percent_color).unwrap_or(COLOR_TEXT)
+                } else {
+                    COLOR_TEXT
+                },
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+            );
+        }
+    }
+
+    let meta_top = summary_top + summary_height + scale(9, m.dpi);
+    let source = if state.quota_error.is_some() {
+        "刷新失败，保留上次数据"
+    } else {
+        report
+            .map(|value| {
+                if value.stale {
+                    "缓存数据"
+                } else if value.source.is_empty() {
+                    "实时接口"
+                } else {
+                    "实时接口"
+                }
+            })
+            .unwrap_or("等待数据")
+    };
+    let meta = format!("{source} · 最近刷新 {refresh_text} · 下次自动刷新不超过 5 分钟");
+    unsafe {
+        draw_label(
+            hdc,
+            &meta,
+            RECT {
+                left: content_left,
+                top: meta_top,
+                right: content_right,
+                bottom: meta_top + scale(22, m.dpi),
+            },
+            state.font,
+            COLOR_MUTED,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+        );
+    }
+
+    let models_y = m.content_bottom - inset - scale(76, m.dpi);
+    let rows_bottom = if m.compact {
+        m.content_bottom - inset
+    } else {
+        models_y - scale(8, m.dpi)
+    };
+    let mut row_top = meta_top + scale(28, m.dpi);
+    let row_height = scale(if m.compact { 42 } else { 55 }, m.dpi);
+    let mut rows_drawn = 0usize;
+    if let Some(report) = report {
+        'accounts: for account in &report.accounts {
+            let plan = account.plan.as_deref().unwrap_or(&account.status);
+            let account_badge = account
+                .credits
+                .as_ref()
+                .filter(|credits| credits.available)
+                .map(|credits| format!("{plan} · {:.2} {}", credits.amount, credits.credit_type))
+                .unwrap_or_else(|| plan.to_string());
+            if row_top + scale(27, m.dpi) >= rows_bottom {
+                break;
+            }
+            unsafe {
+                draw_label(
+                    hdc,
+                    &account.account,
+                    RECT {
+                        left: content_left,
+                        top: row_top,
+                        right: content_right - scale(120, m.dpi),
+                        bottom: row_top + scale(24, m.dpi),
+                    },
+                    state.font_bold,
+                    COLOR_TEXT,
+                    DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+                );
+                draw_label(
+                    hdc,
+                    &account_badge,
+                    RECT {
+                        left: content_right - scale(120, m.dpi),
+                        top: row_top,
+                        right: content_right,
+                        bottom: row_top + scale(24, m.dpi),
+                    },
+                    state.font,
+                    COLOR_MUTED,
+                    DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+                );
+            }
+            row_top += scale(27, m.dpi);
+            for group in account.groups.as_deref().unwrap_or(&[]) {
+                for bucket in &group.buckets {
+                    if row_top + row_height > rows_bottom {
+                        break 'accounts;
+                    }
+                    let percent = bucket.remaining_percent.unwrap_or(0.0).clamp(0.0, 100.0);
+                    let reset = bucket
+                        .reset_time
+                        .as_deref()
+                        .map(short_iso_time)
+                        .map(|value| format!("重置 {value}"))
+                        .unwrap_or_else(|| "重置时间待同步".to_string());
+                    let label = if group.name.is_empty() {
+                        bucket.name.clone()
+                    } else {
+                        format!("{} · {}", group.name, bucket.name)
+                    };
+                    unsafe {
+                        draw_label(
+                            hdc,
+                            &label,
+                            RECT {
+                                left: content_left,
+                                top: row_top,
+                                right: content_right - scale(160, m.dpi),
+                                bottom: row_top + scale(22, m.dpi),
+                            },
+                            state.font,
+                            COLOR_TEXT,
+                            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+                        );
+                        draw_label(
+                            hdc,
+                            &reset,
+                            RECT {
+                                left: content_right - scale(230, m.dpi),
+                                top: row_top,
+                                right: content_right - scale(48, m.dpi),
+                                bottom: row_top + scale(22, m.dpi),
+                            },
+                            state.font,
+                            COLOR_MUTED,
+                            DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+                        );
+                        draw_label(
+                            hdc,
+                            &format!("{percent:.0}%"),
+                            RECT {
+                                left: content_right - scale(46, m.dpi),
+                                top: row_top,
+                                right: content_right,
+                                bottom: row_top + scale(22, m.dpi),
+                            },
+                            state.font_bold,
+                            quota_percent_color(percent),
+                            DT_RIGHT | DT_VCENTER | DT_SINGLELINE,
+                        );
+                        let track = RECT {
+                            left: content_left,
+                            top: row_top + scale(29, m.dpi),
+                            right: content_right,
+                            bottom: row_top + scale(if m.compact { 36 } else { 38 }, m.dpi),
+                        };
+                        rounded_box(hdc, &track, COLOR_TRACK, COLOR_TRACK, scale(5, m.dpi));
+                        let fill_width =
+                            ((track.right - track.left) as f64 * percent / 100.0).round() as i32;
+                        if fill_width > 0 {
+                            let fill = RECT {
+                                right: track.left + fill_width.max(scale(5, m.dpi)),
+                                ..track
+                            };
+                            rounded_box(
+                                hdc,
+                                &fill,
+                                quota_percent_color(percent),
+                                quota_percent_color(percent),
+                                scale(5, m.dpi),
+                            );
+                        }
+                    }
+                    rows_drawn += 1;
+                    row_top += row_height;
+                }
+            }
+        }
+    }
+    if rows_drawn == 0 {
+        let detail = state
+            .quota_error
+            .as_deref()
+            .or_else(|| {
+                report.and_then(|value| {
+                    value.accounts.iter().find_map(|account| {
+                        account
+                            .error
+                            .as_deref()
+                            .or(account.status_message.as_deref())
+                    })
+                })
+            })
+            .or_else(|| report.and_then(|value| value.warning.as_deref()))
+            .unwrap_or("登录所选提供商并完成接入后，这里会显示真实剩余额度。");
+        unsafe {
+            rounded_box(
+                hdc,
+                &RECT {
+                    left: content_left,
+                    top: row_top,
+                    right: content_right,
+                    bottom: (row_top + scale(78, m.dpi)).min(rows_bottom),
+                },
+                COLOR_BACKGROUND,
+                COLOR_BORDER,
+                scale(6, m.dpi),
+            );
+            draw_label(
+                hdc,
+                "等待额度数据",
+                RECT {
+                    left: content_left + scale(14, m.dpi),
+                    top: row_top + scale(10, m.dpi),
+                    right: content_right - scale(14, m.dpi),
+                    bottom: row_top + scale(35, m.dpi),
+                },
+                state.font_bold,
+                COLOR_TEXT,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+            );
+            draw_label(
+                hdc,
+                detail,
+                RECT {
+                    left: content_left + scale(14, m.dpi),
+                    top: row_top + scale(35, m.dpi),
+                    right: content_right - scale(14, m.dpi),
+                    bottom: (row_top + scale(68, m.dpi)).min(rows_bottom),
+                },
+                state.font,
+                COLOR_MUTED,
+                DT_LEFT | DT_TOP | DT_WORDBREAK | DT_END_ELLIPSIS,
+            );
+        }
     }
 }
 
@@ -1043,6 +1383,7 @@ unsafe fn paint_dashboard(hwnd: HWND) {
     unsafe {
         rounded_box(hdc, &quota_card, COLOR_CARD, COLOR_BORDER, scale(7, m.dpi));
         rounded_box(hdc, &action_card, COLOR_CARD, COLOR_BORDER, scale(7, m.dpi));
+        paint_quota_dashboard(hdc, &state, &m);
     }
     drop(state);
     unsafe { EndPaint(hwnd, &paint) };
@@ -1169,20 +1510,24 @@ fn api_post(
     Ok(())
 }
 
-fn request_refresh(hwnd: HWND) {
+fn request_refresh(hwnd: HWND, force_quota: bool) {
     let Some(state_lock) = STATE.get() else {
         return;
     };
-    let (connection, hwnd_value, skip_quota) = {
+    let (connection, hwnd_value, fetch_quota) = {
         let mut state = state_lock.lock().unwrap();
         if state.refreshing {
             return;
         }
         state.refreshing = true;
+        let quota_due = state
+            .last_quota_refresh
+            .map(|last| last.elapsed() >= QUOTA_REFRESH_INTERVAL)
+            .unwrap_or(true);
         (
             state.host.connection.clone(),
             hwnd as isize,
-            state.operation_pending,
+            !state.operation_pending && (force_quota || quota_due),
         )
     };
     thread::spawn(move || {
@@ -1191,10 +1536,13 @@ fn request_refresh(hwnd: HWND) {
             .as_ref()
             .map(|value| value.selected_provider.as_str())
             .unwrap_or("antigravity");
-        let quota = if skip_quota {
-            Err("本地操作完成后自动刷新额度".to_string())
+        let quota = if fetch_quota {
+            Some(api_get::<QuotaReport>(
+                &connection,
+                &format!("/api/quota?provider={provider}"),
+            ))
         } else {
-            api_get::<QuotaReport>(&connection, &format!("/api/quota?provider={provider}"))
+            None
         };
         let connectors = api_get::<ConnectorResponse>(&connection, "/api/connectors");
         let update = Box::new(RefreshResult {
@@ -1226,56 +1574,6 @@ fn format_item(name: &str, item: &DashboardItem) -> String {
     )
 }
 
-fn quota_text(report: &QuotaReport) -> (String, i32) {
-    let mut lines = Vec::new();
-    let mut lowest = 100.0_f64;
-    let mut has_value = false;
-    for account in &report.accounts {
-        let plan = account.plan.as_deref().unwrap_or(&account.status);
-        lines.push(format!("{}  ·  {}", account.account, plan));
-        if let Some(error) = &account.error {
-            lines.push(format!("  ⚠ {error}"));
-        }
-        for group in account.groups.as_deref().unwrap_or(&[]) {
-            lines.push(format!("  {}", group.name));
-            for bucket in &group.buckets {
-                let value = bucket.remaining_percent.unwrap_or(0.0);
-                if bucket.remaining_percent.is_some() {
-                    lowest = lowest.min(value);
-                    has_value = true;
-                }
-                let reset = bucket.reset_time.as_deref().unwrap_or("");
-                lines.push(format!("    {}：{:.0}%  {}", bucket.name, value, reset));
-            }
-        }
-        if let Some(credits) = &account.credits
-            && credits.available
-        {
-            lines.push(format!(
-                "  Credits：{:.2} {}",
-                credits.amount, credits.credit_type
-            ));
-        }
-        if let Some(message) = &account.status_message
-            && !message.is_empty()
-        {
-            lines.push(format!("  {message}"));
-        }
-    }
-    if let Some(warning) = &report.warning
-        && !warning.is_empty()
-    {
-        lines.push(format!("提示：{warning}"));
-    }
-    if lines.is_empty() {
-        lines.push("额度暂不可用，请先登录并启动网关。".to_string());
-    }
-    (
-        lines.join("\r\n"),
-        if has_value { lowest.round() as i32 } else { 0 },
-    )
-}
-
 fn connectors_text(connectors: &ConnectorResponse) -> String {
     let mut output = format!(
         "ZCode Local Bridge\r\nModel: {}\r\nBase URL: {}\r\n",
@@ -1302,7 +1600,15 @@ unsafe fn apply_refresh(update: RefreshResult) {
         quota,
         connectors,
     } = update;
-    let (controls, hwnd, provider, operation_running, operation_finished) = {
+    let (
+        controls,
+        hwnd,
+        provider,
+        operation_running,
+        operation_finished,
+        quota_attempted,
+        quota_for_tray,
+    ) = {
         let mut state = state_lock.lock().unwrap();
         state.refreshing = false;
         let was_pending = state.operation_pending;
@@ -1313,12 +1619,25 @@ unsafe fn apply_refresh(update: RefreshResult) {
         if let Ok(connectors) = &connectors {
             state.connectors_text = connectors_text(connectors);
         }
+        let quota_attempted = quota.is_some();
+        if let Some(result) = &quota {
+            state.last_quota_refresh = Some(Instant::now());
+            match result {
+                Ok(report) => {
+                    state.quota = Some(report.clone());
+                    state.quota_error = None;
+                }
+                Err(error) => state.quota_error = Some(error.clone()),
+            }
+        }
         (
             state.controls,
             state.hwnd as HWND,
             state.provider.clone(),
             state.operation_pending,
             was_pending && !state.operation_pending,
+            quota_attempted,
+            state.quota.clone(),
         )
     };
     unsafe {
@@ -1406,24 +1725,12 @@ unsafe fn apply_refresh(update: RefreshResult) {
             set_text(controls.subtitle, &format!("状态刷新失败：{error}"))
         },
     }
-    match quota {
-        Ok(quota) => {
-            let (text, percent) = quota_text(&quota);
-            unsafe {
-                set_text(controls.quota_body, &text);
-                SendMessageW(
-                    controls.quota_progress as HWND,
-                    PBM_SETPOS,
-                    percent as WPARAM,
-                    0,
-                );
-            }
-            update_tray(hwnd, &provider, Some(percent));
-        }
-        Err(error) => {
-            unsafe { set_text(controls.quota_body, &format!("额度暂不可用\r\n{error}")) };
-            update_tray(hwnd, &provider, None);
-        }
+    if quota_attempted {
+        let percent = quota_for_tray
+            .as_ref()
+            .and_then(quota_lowest)
+            .map(|value| value.round() as i32);
+        update_tray(hwnd, &provider, percent);
     }
     unsafe {
         InvalidateRect(hwnd, null(), 0);
@@ -1431,7 +1738,7 @@ unsafe fn apply_refresh(update: RefreshResult) {
         InvalidateRect(controls.provider_grok as HWND, null(), 1);
     }
     if operation_finished {
-        request_refresh(hwnd);
+        request_refresh(hwnd, true);
     }
 }
 
@@ -1515,6 +1822,9 @@ fn select_provider(hwnd: HWND, provider: &'static str) {
     let (connection, antigravity, grok) = {
         let mut state = state_lock.lock().unwrap();
         state.provider = provider.to_string();
+        state.quota = None;
+        state.quota_error = None;
+        state.last_quota_refresh = None;
         (
             state.host.connection.clone(),
             state.controls.provider_antigravity as HWND,
@@ -1660,7 +1970,7 @@ unsafe fn show_tray_menu(hwnd: HWND) {
                 ShowWindow(hwnd, SW_RESTORE);
                 SetForegroundWindow(hwnd);
             }
-            ID_TRAY_REFRESH => request_refresh(hwnd),
+            ID_TRAY_REFRESH => request_refresh(hwnd, true),
             ID_TRAY_ANTIGRAVITY => select_provider(hwnd, "antigravity"),
             ID_TRAY_GROK => select_provider(hwnd, "xai"),
             ID_TRAY_QUIT => {
@@ -1704,9 +2014,9 @@ unsafe extern "system" fn window_proc(
                 create_controls(hwnd);
                 layout(hwnd);
                 add_tray_icon(hwnd);
-                SetTimer(hwnd, TIMER_REFRESH, 15_000, None);
+                SetTimer(hwnd, TIMER_REFRESH, STATUS_REFRESH_MS, None);
             }
-            request_refresh(hwnd);
+            request_refresh(hwnd, true);
             0
         }
         WM_SIZE => {
@@ -1748,8 +2058,8 @@ unsafe extern "system" fn window_proc(
             let info = lparam as *mut MINMAXINFO;
             if !info.is_null() {
                 unsafe {
-                    (*info).ptMinTrackSize.x = scale(900, dpi);
-                    (*info).ptMinTrackSize.y = scale(670, dpi);
+                    (*info).ptMinTrackSize.x = scale(760, dpi);
+                    (*info).ptMinTrackSize.y = scale(500, dpi);
                 }
             }
             0
@@ -1758,7 +2068,7 @@ unsafe extern "system" fn window_proc(
             match loword(wparam) {
                 ID_PROVIDER_ANTIGRAVITY => select_provider(hwnd, "antigravity"),
                 ID_PROVIDER_GROK => select_provider(hwnd, "xai"),
-                ID_REFRESH => request_refresh(hwnd),
+                ID_REFRESH => request_refresh(hwnd, true),
                 ID_SETUP => run_operation(hwnd, "setup"),
                 ID_LOGIN_ANTIGRAVITY => run_operation(hwnd, "login"),
                 ID_LOGIN_GROK => run_operation(hwnd, "login-grok"),
@@ -1803,7 +2113,7 @@ unsafe extern "system" fn window_proc(
             0
         }
         WM_TIMER => {
-            request_refresh(hwnd);
+            request_refresh(hwnd, false);
             0
         }
         WM_OPERATION_POSTED => {
@@ -1829,7 +2139,7 @@ unsafe extern "system" fn window_proc(
                         );
                     }
                 } else {
-                    request_refresh(hwnd);
+                    request_refresh(hwnd, false);
                 }
             }
             0
