@@ -1,20 +1,20 @@
 ZCode Antigravity Bridge build information
 ===========================================
 
-Package: ZCode-Antigravity-Windows-x64-0.6.0-test
+Package: ZCode-Antigravity-Windows-x64-0.6.1-test
 Build date (UTC): 2026-08-18
 Target: Windows x64 (PE32+ Go console Core and Tauri 2 GUI control center)
 
 Manager
 -------
-Version: 0.6.0-test
+Version: 0.6.1-test
 Go: 1.26.4
 CGO: disabled
 SHA-256: __MANAGER_SHA256__
 
 Control center
 --------------
-Version: 0.6.0-test
+Version: 0.6.1-test
 UI: Tauri 2.11.5, React 19.2.8, Tailwind CSS 4.3.3, shadcn-style components
 Native shell: Rust 2024 Edition, windows-sys 0.61.2
 Subsystem: Windows GUI (no console window)
@@ -66,7 +66,7 @@ Local backend patches
 
 Verification evidence
 ---------------------
-Current v0.6.0-test build-host checks:
+Current v0.6.1-test build-host checks:
 - Manager go test ./... and Windows x64 build: passed
 - Manager go test -race: passed on the macOS build host
 - CLIProxyAPI go mod verify, go test ./..., and Windows x64 build: passed
@@ -80,7 +80,7 @@ Current v0.6.0-test build-host checks:
 - Windows child-process CREATE_NO_WINDOW test and Windows x64 test-binary cross-compile: passed
 - Provider/model selection, Grok billing proxy, tray state, and five Agent connector tests: passed
 - Native SwiftUI macOS main executable and Tauri 2 Windows main executable build checks: passed
-- v0.6.0-test target Windows 11 real-account quota cards, seven-page liquid-glass dashboard, taskbar widget, and native Acrylic: passed
+- v0.6.1-test target Windows 11 real-account quota cards, seven-page liquid-glass dashboard, taskbar widget, and native Acrylic: passed
 - Seven-second Windows drag recording (198 frames): no white/black frame, tearing, or frozen desktop sample: passed
 - 5-second connection/Token poll left quota fetchedAt/cache write time unchanged; five-minute quota cadence is isolated: passed
 - Real response usage sample (45 output Token, 31.1 generation Token/s) and sanitized local persistence: passed
@@ -89,7 +89,7 @@ Current v0.6.0-test build-host checks:
 - Antigravity -> Grok -> Antigravity switch isolation and immediate cached restoration: passed
 - v0.4.5 stale backend-path upgrade recovery plus installer-triggered automatic setup: passed
 - Release build without OAuth configuration: rejected before compilation; verified credential-bearing backend: accepted
-- Target Windows stale/dead gateway state: automatically replaced with the v0.6.0-test backend
+- Target Windows stale/dead gateway state: automatically replaced with the v0.6.1-test backend
 - Forced gateway crash: new PID online within the recovery window; 32 ZCode connections re-established
 - Non-interactive OAuth preflight: login flow waiting for callback, no missing-client configuration error
 - Real target-account gemini-3.7-flash request: exact ZCODE_SMOKE_OK

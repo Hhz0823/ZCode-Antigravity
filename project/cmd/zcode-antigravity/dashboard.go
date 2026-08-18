@@ -41,12 +41,13 @@ type guiRuntime struct {
 }
 
 type guiOperation struct {
-	Running     bool      `json:"running"`
-	Name        string    `json:"name,omitempty"`
-	Message     string    `json:"message,omitempty"`
-	Error       string    `json:"error,omitempty"`
-	StartedAt   time.Time `json:"startedAt,omitempty"`
-	CompletedAt time.Time `json:"completedAt,omitempty"`
+	Running             bool                    `json:"running"`
+	Name                string                  `json:"name,omitempty"`
+	Message             string                  `json:"message,omitempty"`
+	Error               string                  `json:"error,omitempty"`
+	DeviceAuthorization *xaiDeviceAuthorization `json:"deviceAuthorization,omitempty"`
+	StartedAt           time.Time               `json:"startedAt,omitempty"`
+	CompletedAt         time.Time               `json:"completedAt,omitempty"`
 }
 
 type dashboardStatus struct {
@@ -483,7 +484,7 @@ func (g *guiRuntime) runOperation(action string) {
 				if errCounts != nil {
 					errOperation = errCounts
 				} else if counts.XAI == 0 {
-					errOperation = g.app.loginGrok()
+					errOperation = g.app.loginGrokWithDeviceStatus(g.updateXAIDeviceAuthorization)
 				}
 				if errOperation == nil {
 					errOperation = g.app.startAndConfigure()
@@ -500,7 +501,7 @@ func (g *guiRuntime) runOperation(action string) {
 				g.setProvider("antigravity")
 			}
 		case "login-grok":
-			errOperation = g.app.loginGrok()
+			errOperation = g.app.loginGrokWithDeviceStatus(g.updateXAIDeviceAuthorization)
 			if errOperation == nil {
 				g.setProvider("xai")
 			}
@@ -522,6 +523,17 @@ func (g *guiRuntime) runOperation(action string) {
 		g.operation.Message = operationSuccessMessage(action)
 	}
 	g.operationMu.Unlock()
+}
+
+func (g *guiRuntime) updateXAIDeviceAuthorization(authorization xaiDeviceAuthorization) {
+	g.operationMu.Lock()
+	defer g.operationMu.Unlock()
+	if !g.operation.Running || (g.operation.Name != "login-grok" && g.operation.Name != "setup") {
+		return
+	}
+	copy := authorization
+	g.operation.DeviceAuthorization = &copy
+	g.operation.Message = "请在 xAI 授权页输入软件显示的验证码…"
 }
 
 func operationStartMessage(action string) string {

@@ -159,6 +159,25 @@ button { font: inherit; }
 .empty-state > svg { width: 27px; height: 27px; margin-bottom: 10px; opacity: .75; }
 .empty-state h3 { color: #9aabc0; font-size: 12px; font-weight: 600; }
 .empty-state p { margin-top: 4px; font-size: 10px; }
+.auth-overlay { position: absolute; inset: 42px 0 0; z-index: 90; display: grid; place-items: center; padding: 24px; background: rgba(0,7,18,.52); backdrop-filter: blur(18px) saturate(125%); -webkit-backdrop-filter: blur(18px) saturate(125%); animation: auth-overlay-in .24s ease both; }
+.auth-dialog { width: min(520px, 100%); overflow: hidden; border: 1px solid rgba(125,211,252,.24); border-radius: 24px; padding: 29px; text-align: center; background: linear-gradient(145deg, rgba(16,39,68,.92), rgba(5,18,37,.88)); box-shadow: inset 0 1px rgba(255,255,255,.12), 0 34px 90px rgba(0,0,0,.5); animation: auth-dialog-in .28s cubic-bezier(.2,.8,.2,1) both; }
+.auth-glow { position: absolute; top: -120px; left: 50%; width: 300px; height: 210px; border-radius: 50%; background: rgba(34,158,255,.2); filter: blur(48px); transform: translateX(-50%); pointer-events: none; }
+.auth-icon { position: relative; display: grid; width: 52px; height: 52px; margin: 0 auto 15px; place-items: center; border: 1px solid rgba(125,211,252,.28); border-radius: 16px; color: #b9eaff; background: linear-gradient(145deg, rgba(56,189,248,.24), rgba(37,99,235,.13)); box-shadow: inset 0 1px rgba(255,255,255,.14), 0 14px 35px rgba(14,165,233,.14); }
+.auth-icon svg { width: 22px; height: 22px; }
+.auth-eyebrow { position: relative; color: rgba(125,211,252,.65); font-size: 9px; font-weight: 700; letter-spacing: .19em; }
+.auth-dialog h2 { position: relative; margin-top: 5px; color: white; font-size: 22px; font-weight: 650; letter-spacing: -.025em; }
+.auth-description { position: relative; max-width: 410px; margin: 10px auto 0; color: #90a4bb; font-size: 12px; line-height: 1.7; }
+.auth-code-label { display: block; margin-top: 22px; color: #6f879f; font-size: 10px; text-align: left; }
+.auth-code { display: block; width: 100%; margin-top: 7px; border: 1px solid rgba(103,207,255,.32); border-radius: 15px; outline: none; padding: 15px 18px; color: #f4fbff; background: rgba(0,10,25,.5); box-shadow: inset 0 1px rgba(255,255,255,.055), 0 0 0 0 rgba(56,189,248,0); font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace; font-size: 27px; font-weight: 650; letter-spacing: .17em; text-align: center; transition: border-color .18s, box-shadow .18s; }
+.auth-code:focus { border-color: rgba(103,207,255,.7); box-shadow: 0 0 0 3px rgba(56,189,248,.11), 0 14px 35px rgba(0,0,0,.15); }
+.auth-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 13px; }
+.auth-actions button { justify-content: center; }
+.auth-hint { margin-top: 13px; color: #627a92; font-size: 10px; }
+.auth-waiting { display: flex; min-height: 62px; align-items: center; justify-content: center; gap: 10px; margin-top: 20px; border: 1px solid rgba(255,255,255,.07); border-radius: 14px; color: #91a7bd; background: rgba(0,8,20,.24); font-size: 11px; }
+.auth-waiting.compact { min-height: auto; margin-top: 14px; border: 0; background: transparent; }
+.auth-waiting svg { width: 16px; height: 16px; color: #78d4ff; }
+@keyframes auth-overlay-in { from { opacity: 0; } }
+@keyframes auth-dialog-in { from { opacity: 0; transform: translateY(8px) scale(.975); } }
 .toast { position: absolute; z-index: 100; right: 23px; bottom: 20px; display: flex; max-width: 440px; align-items: center; gap: 10px; border: 1px solid rgba(125,211,252,.2); border-radius: 13px; padding: 11px 14px; color: #e4f5ff; background: rgba(7,29,50,.82); box-shadow: 0 18px 45px rgba(0,0,0,.34), inset 0 1px rgba(255,255,255,.08); backdrop-filter: blur(24px); animation: toast-in .25s ease both; }
 .toast.error { border-color: rgba(251,113,133,.2); }
 .toast p { font-size: 11px; line-height: 1.45; }
@@ -176,6 +195,11 @@ button { font: inherit; }
   .page-header { min-height: 52px; }
   .status-cell { padding-block: 9px; }
   .page-content { margin-top: 12px; }
+}
+@media (max-width: 620px) {
+  .auth-dialog { padding: 22px; }
+  .auth-actions { grid-template-columns: 1fr; }
+  .auth-code { font-size: 21px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }

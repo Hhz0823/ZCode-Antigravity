@@ -3,7 +3,7 @@
 > 在 Windows 与 macOS 上统一接入 Antigravity Gemini 和 xAI Grok，
 > 并把本机安全网关提供给 ZCode、Grok Build、Codex、Claude Code 与 OpenCode。
 
-**当前版本：** Windows / macOS `v0.6.0-test`
+**当前版本：** Windows `v0.6.1-test`；macOS `v0.6.0-test`
 **适用系统：** macOS 12+（Apple Silicon / Intel）、Windows 10 / 11 x64
 **项目状态：** 测试版
 
@@ -11,6 +11,7 @@
 ## 功能特性
 
 - 可在控制中心切换 **Antigravity** 与 **Grok / xAI**；账号、模型、额度和 Agent 配置跟随切换。
+- Windows 的 Grok 设备登录会把 xAI 生成的临时验证码直接显示在软件内，支持选中、复制和重新打开官方授权页；用户把该码输入 `accounts.x.ai` 页面后，软件自动检测授权结果。
 - Antigravity 精确写入 `gemini-3.7-flash` / `gemini-3.6-flash`；Grok 只同步 xAI 返回的文本模型，自动排除 Imagine 图片和视频模型。
 - 支持 Low / Medium / High 思考等级，并转换为 Gemini `thinkingLevel`。
 - 支持文本、图片、音频和视频输入转换；当前 Gemini 3.7 Flash 声明输出仅为文本。
@@ -39,10 +40,10 @@
 | 文件 | 用途 | 建议 |
 | --- | --- | --- |
 | `ZCode-Antigravity-macOS-Universal-v0.6.0-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
-| `ZCode-Antigravity-Setup-v0.6.0-test.exe` | Windows 图形化安装器 | **普通用户首选** |
-| `ZCode-Antigravity-OneClick-v0.6.0-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
-| `ZCode-Antigravity-Windows-x64-0.6.0-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
-| `ZCode-Antigravity-Source-v0.6.0-test.zip` | 当前源码快照 | 审计 / 构建 |
+| `ZCode-Antigravity-Setup-v0.6.1-test.exe` | Windows 图形化安装器 | **普通用户首选** |
+| `ZCode-Antigravity-OneClick-v0.6.1-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
+| `ZCode-Antigravity-Windows-x64-0.6.1-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
+| `ZCode-Antigravity-Source-v0.6.1-test.zip` | 当前源码快照 | 审计 / 构建 |
 
 ## macOS 快速安装
 
@@ -77,9 +78,9 @@ AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切�
 
 1. 从 Windows 系统托盘完全退出 ZCode。仅关闭窗口可能仍会留下 `ZCode.exe` 进程。
 2. 确认 v2rayN 已开启 TUN，且本地代理端口与配置一致。
-3. 下载 `ZCode-Antigravity-Setup-v0.6.0-test.exe`，并先校验 SHA-256。请勿使用缺少发布版 OAuth 配置的 `v0.5.2-test`；Windows 也不要继续使用点击操作缺少反馈的 `v0.4.3-test`、界面退化且高 DPI 字体异常的 `v0.4.2-test` 或更早测试版。
+3. 下载 `ZCode-Antigravity-Setup-v0.6.1-test.exe`，并先校验 SHA-256。请勿使用缺少发布版 OAuth 配置的 `v0.5.2-test`；Windows 也不要继续使用点击操作缺少反馈的 `v0.4.3-test`、界面退化且高 DPI 字体异常的 `v0.4.2-test` 或更早测试版。
 4. 双击安装器。程序会校验内嵌 ZIP 和三个 EXE，然后安装到当前用户目录。
-5. 在控制中心选择 Antigravity 或 Grok，完成对应授权并等待状态检查通过。
+5. 在控制中心选择 Antigravity 或 Grok，完成对应授权并等待状态检查通过。Grok 登录时，将软件弹层中的临时验证码输入已打开的 xAI 官方页面；授权后无需再把结果粘贴回软件。
 6. 重新打开 ZCode，选择 Provider `Antigravity + Grok (Local Bridge)`；控制中心会作为任务栏额度小组件继续驻留。
 7. 先发送一条短消息进行小规模验收。账号权限和实时额度以第一次真实请求为准。
 
@@ -106,7 +107,7 @@ $env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
 
 ## 已验证范围
 
-Windows 基线与 `v0.6.0-test` 新增的构建及实机测试记录包括：
+Windows 基线与 `v0.6.1-test` 新增的构建及实机测试记录包括：
 
 - 管理器与 CLIProxyAPI 的 Go 测试、Windows x64 构建和静态检查通过。
 - OAuth PKCE / callback、DPAPI 凭据存储、原子替换和 loopback 约束通过。
@@ -131,6 +132,9 @@ Windows 基线与 `v0.6.0-test` 新增的构建及实机测试记录包括：
 - 同机已从主界面切换到“设置”页并打开任务栏额度组件；液态玻璃文本对比度、完整窗口边界、七页导航和 150% DPI 布局正常。“一键接入 ZCode”会启动当前候选包内的本地网关，不再出现点击无反馈。
 - 已实测 Antigravity → Grok → Antigravity 切换：Grok 0 账号页面不显示 Gemini Token，切回后立即恢复 Antigravity 的额度与 Token 缓存；安装器启动控制中心后也会自动执行一次接入。
 - 已修复旧版复用网关时把状态路径误写成新版本目录的问题；升级只允许停止同一 `ZCodeAntigravity/app-*` 根目录下的历史后端，仍拒绝处理无关进程。
+- `v0.6.1-test` 在 Windows 11 实机完成 Antigravity Google OAuth 登录；登录进程正常结束并新增当前用户凭据，既有凭据未删除。
+- 同机完成 Grok Build 设备流预授权：软件弹层与 `accounts.x.ai` 官方页面显示同一短码，短码可选中/复制，等待状态在后台轮询期间持续可见。因测试机没有已授权的 xAI 账号，没有代替用户完成最后的账号批准，也没有生成 xAI 凭据。
+- 取消未完成 Grok 测试后恢复 Antigravity 网关：`/healthz` 返回 200，模型目录返回 13 个模型，ZCode 进程保持连接；远程测试脚本、计划任务和下载目录临时包已清理。
 
 `v0.6.0-test` 的 macOS 验证包括：
 

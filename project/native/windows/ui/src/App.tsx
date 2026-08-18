@@ -40,6 +40,8 @@ type Provider = "antigravity" | "xai";
 type Section = "overview" | "accounts" | "proxy" | "routing" | "connectors" | "analytics" | "settings";
 
 interface DashboardItem { ok: boolean; label: string; detail?: string; running?: boolean }
+interface DeviceAuthorization { userCode: string; verificationURL: string }
+interface DashboardOperation { running: boolean; name?: string; message?: string; error?: string; deviceAuthorization?: DeviceAuthorization }
 interface DashboardStatus {
   version: string;
   gateway: DashboardItem;
@@ -49,7 +51,7 @@ interface DashboardStatus {
   providerAccounts: { antigravity: number; xai: number };
   selectedProvider: Provider;
   models: string[];
-  operation: { running: boolean; name?: string; message?: string; error?: string };
+  operation: DashboardOperation;
   updatedAt: string;
 }
 interface QuotaBucket { name: string; window: string; remainingPercent?: number; resetTime?: string }
@@ -234,6 +236,49 @@ function ActionPanel({ busy, onAction }: { busy: boolean; onAction: (action: str
   return <div className="space-y-2.5">{actions.map(([id, title, description, Icon, variant]) => <button key={id} disabled={busy} onClick={() => onAction(id)} className={cn("action-row", variant === "primary" && "primary", variant === "danger" && "danger")}><span className="action-icon"><Icon /></span><span className="min-w-0 flex-1 text-left"><strong>{title}</strong><small>{description}</small></span><ChevronRight /></button>)}</div>;
 }
 
+function AuthenticationOverlay({ operation, provider, onCopy, onError }: { operation?: DashboardOperation; provider: Provider; onCopy: (value: string) => void; onError: (message: string) => void }) {
+  if (!operation?.running || !["login", "login-grok", "setup"].includes(operation.name ?? "")) return null;
+  const device = operation.deviceAuthorization;
+  const grok = operation.name === "login-grok" || (operation.name === "setup" && provider === "xai");
+  const openVerificationPage = async () => {
+    if (!device) return;
+    try {
+      if (hasTauri()) await invoke("open_xai_verification_url", { url: device.verificationURL });
+      else window.open(device.verificationURL, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      onError(`无法打开 xAI 授权页：${normalizeError(error)}`);
+    }
+  };
+  return (
+    <div className="auth-overlay" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+      <div className="auth-dialog glass-card">
+        <div className="auth-glow" />
+        <div className="auth-icon">{grok ? <Zap /> : <KeyRound />}</div>
+        <p className="auth-eyebrow">SECURE DEVICE AUTHORIZATION</p>
+        <h2 id="auth-title">{grok ? "Grok / xAI 设备授权" : "Antigravity 登录"}</h2>
+        {grok && device ? (
+          <>
+            <p className="auth-description">请在已经打开的 xAI 官方页面中输入下方验证码。验证码只用于本次登录，不会保存到日志。</p>
+            <label className="auth-code-label" htmlFor="xai-user-code">临时验证码</label>
+            <input id="xai-user-code" className="auth-code" value={device.userCode} readOnly spellCheck={false} onFocus={(event) => event.currentTarget.select()} />
+            <div className="auth-actions">
+              <Button onClick={() => onCopy(device.userCode)}><Copy className="size-4" />复制验证码</Button>
+              <Button variant="secondary" onClick={() => void openVerificationPage()}><ExternalLink className="size-4" />打开 xAI 授权页</Button>
+            </div>
+            <p className="auth-hint">授权后无需返回填写，软件会自动检测并完成登录。</p>
+          </>
+        ) : (
+          <>
+            <p className="auth-description">{grok ? "正在向 xAI 申请临时验证码，请稍候…" : "Google OAuth 已在浏览器中打开，请完成账号授权。软件正在等待登录结果。"}</p>
+            <div className="auth-waiting"><LoaderCircle className="animate-spin" /><span>{operation.message || "正在等待浏览器授权…"}</span></div>
+          </>
+        )}
+        {grok && device && <div className="auth-waiting compact"><LoaderCircle className="animate-spin" /><span>正在等待 xAI 确认…</span></div>}
+      </div>
+    </div>
+  );
+}
+
 function Overview({ status, quota, usage, manager, provider, busy, onAction }: { status?: DashboardStatus; quota?: QuotaReport; usage?: UsageReport; manager?: ManagerReport; provider: Provider; busy: boolean; onAction: (action: string) => void }) {
   return (
     <div className="content-grid">
@@ -293,7 +338,7 @@ export default function App() {
   const [usage, setUsage] = useState<UsageReport>();
   const [manager, setManager] = useState<ManagerReport>();
   const [connectors, setConnectors] = useState<ConnectorResponse>();
-  const [version, setVersion] = useState("0.6.0-test");
+  const [version, setVersion] = useState("0.6.1-test");
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
@@ -324,16 +369,20 @@ export default function App() {
     setBusy(true); setNotice({ text: action === "setup" ? "正在启动网关并接入 ZCode…" : "本机操作正在进行…" });
     try {
       await apiPost("/api/action", { action });
-      const deadline = Date.now() + 120_000;
+      const interactiveLogin = action === "login" || action === "login-grok" || action === "setup";
+      const deadline = Date.now() + (interactiveLogin ? 10 * 60_000 : 120_000);
+      let completed = false;
       while (Date.now() < deadline) {
         await new Promise((resolve) => setTimeout(resolve, 900));
         const next = await apiGet<DashboardStatus>("/api/status");
         setStatus(next);
         if (!next.operation.running) {
           if (next.operation.error) throw new Error(next.operation.error);
+          completed = true;
           break;
         }
       }
+      if (!completed) throw new Error("授权等待超时，请重新发起登录");
       setNotice({ text: action === "setup" ? "ZCode 已接入并启动" : "操作已完成" });
       await refresh(true);
     } catch (error) { setNotice({ text: normalizeError(error), error: true }); }
@@ -356,8 +405,8 @@ export default function App() {
     finally { setSaving(false); }
   }, [saving]);
 
-  const copy = useCallback(async (value: string) => {
-    try { await navigator.clipboard.writeText(value); setNotice({ text: "Agent 配置已复制" }); }
+  const copy = useCallback(async (value: string, message = "Agent 配置已复制") => {
+    try { await navigator.clipboard.writeText(value); setNotice({ text: message }); }
     catch { setNotice({ text: "无法写入剪贴板", error: true }); }
   }, []);
 
@@ -366,7 +415,7 @@ export default function App() {
     initialized.current = true;
     void (async () => {
       try {
-        const startup = hasTauri() ? await invoke<StartupInfo>("startup_info") : { version: "0.6.0-test", autoSetup: false };
+        const startup = hasTauri() ? await invoke<StartupInfo>("startup_info") : { version: "0.6.1-test", autoSetup: false };
         setVersion(startup.version);
         await refresh(true);
         if (startup.autoSetup) await runAction("setup");
@@ -417,6 +466,7 @@ export default function App() {
           <div className="page-content">{content}</div>
         </main>
       </div>
+      <AuthenticationOverlay operation={status?.operation} provider={provider} onCopy={(value) => void copy(value, "xAI 验证码已复制")} onError={(text) => setNotice({ text, error: true })} />
       {notice && <div className={cn("toast", notice.error && "error")}><span className={cn("status-dot online", notice.error && "!bg-rose-400 !shadow-[0_0_12px_rgba(251,113,133,.8)]")} /><p>{notice.text}</p></div>}
     </div>
   );

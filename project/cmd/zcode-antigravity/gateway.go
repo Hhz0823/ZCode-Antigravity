@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -484,7 +485,65 @@ func (a *app) login() error {
 	return nil
 }
 
+type xaiDeviceAuthorization struct {
+	UserCode        string `json:"userCode"`
+	VerificationURL string `json:"verificationURL"`
+}
+
+type loginOutputCapture struct {
+	mu       sync.Mutex
+	buffer   bytes.Buffer
+	onUpdate func(string)
+}
+
+func (capture *loginOutputCapture) Write(payload []byte) (int, error) {
+	capture.mu.Lock()
+	written, errWrite := capture.buffer.Write(payload)
+	snapshot := capture.buffer.String()
+	capture.mu.Unlock()
+	if capture.onUpdate != nil {
+		capture.onUpdate(snapshot)
+	}
+	return written, errWrite
+}
+
+func (capture *loginOutputCapture) String() string {
+	capture.mu.Lock()
+	defer capture.mu.Unlock()
+	return capture.buffer.String()
+}
+
+func parseXAIDeviceAuthorization(output string) (xaiDeviceAuthorization, bool) {
+	var result xaiDeviceAuthorization
+	for _, rawLine := range strings.Split(strings.ReplaceAll(output, "\r\n", "\n"), "\n") {
+		line := strings.TrimSpace(rawLine)
+		if strings.HasPrefix(line, "Then enter this code:") {
+			result.UserCode = strings.TrimSpace(strings.TrimPrefix(line, "Then enter this code:"))
+			continue
+		}
+		if strings.HasPrefix(line, "https://") {
+			parsed, errURL := url.Parse(line)
+			if errURL == nil && parsed.Scheme == "https" && strings.EqualFold(parsed.Hostname(), "accounts.x.ai") {
+				result.VerificationURL = line
+			}
+		}
+	}
+	if result.UserCode == "" || result.VerificationURL == "" {
+		return xaiDeviceAuthorization{}, false
+	}
+	if len(result.UserCode) > 32 || strings.IndexFunc(result.UserCode, func(value rune) bool {
+		return !(value == '-' || value >= '0' && value <= '9' || value >= 'A' && value <= 'Z')
+	}) >= 0 {
+		return xaiDeviceAuthorization{}, false
+	}
+	return result, true
+}
+
 func (a *app) loginGrok() error {
+	return a.loginGrokWithDeviceStatus(nil)
+}
+
+func (a *app) loginGrokWithDeviceStatus(onDeviceAuthorization func(xaiDeviceAuthorization)) error {
 	cfg := a.currentSettings()
 	if _, err := os.Stat(a.paths.Backend); err != nil {
 		return fmt.Errorf("缺少网关程序 %s: %w", a.paths.Backend, err)
@@ -498,7 +557,14 @@ func (a *app) loginGrok() error {
 	}
 	fmt.Println("浏览器将打开 xAI 设备授权页。完成验证前请不要关闭此窗口。")
 	started := a.now()
-	var captured bytes.Buffer
+	captured := &loginOutputCapture{onUpdate: func(output string) {
+		if onDeviceAuthorization == nil {
+			return
+		}
+		if authorization, ok := parseXAIDeviceAuthorization(output); ok {
+			onDeviceAuthorization(authorization)
+		}
+	}}
 	cmd := exec.Command(a.paths.Backend, "-config", a.paths.Config, "-xai-login")
 	cmd.Dir = a.paths.Data
 	prepareChildProcess(cmd)
@@ -506,12 +572,12 @@ func (a *app) loginGrok() error {
 		cmd.Env = append(os.Environ(), "CLIPROXY_BROWSER="+browserPath)
 	}
 	if a.guiMode {
-		cmd.Stdout = &captured
-		cmd.Stderr = &captured
+		cmd.Stdout = captured
+		cmd.Stderr = captured
 	} else {
 		cmd.Stdin = os.Stdin
-		cmd.Stdout = io.MultiWriter(os.Stdout, &captured)
-		cmd.Stderr = io.MultiWriter(os.Stderr, &captured)
+		cmd.Stdout = io.MultiWriter(os.Stdout, captured)
+		cmd.Stderr = io.MultiWriter(os.Stderr, captured)
 	}
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("xAI OAuth 登录进程失败: %w", err)

@@ -19,7 +19,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Manager, State};
 use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
-const VERSION: &str = "0.6.0-test";
+const VERSION: &str = "0.6.1-test";
 
 struct NativeHost {
     child: Child,
@@ -225,6 +225,21 @@ fn update_tray_summary(app: AppHandle, summary: TraySummary) -> Result<(), Strin
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn open_xai_verification_url(url: String) -> Result<(), String> {
+    let parsed: ureq::http::Uri = url.parse().map_err(|_| "xAI 授权地址无效".to_string())?;
+    if parsed.scheme_str() != Some("https") || parsed.host() != Some("accounts.x.ai") {
+        return Err("只允许打开 xAI 官方授权地址".to_string());
+    }
+    Command::new("rundll32.exe")
+        .arg("url.dll,FileProtocolHandler")
+        .arg(url)
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map_err(|error| format!("无法打开 xAI 授权页：{error}"))?;
+    Ok(())
+}
+
 fn show_main(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
@@ -288,7 +303,8 @@ fn main() {
             api_get,
             api_post,
             startup_info,
-            update_tray_summary
+            update_tray_summary,
+            open_xai_verification_url
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

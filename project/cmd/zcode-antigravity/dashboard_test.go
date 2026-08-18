@@ -141,3 +141,49 @@ func TestTraySnapshotAndIconRepresentSelectedProvider(t *testing.T) {
 		t.Fatalf("icon bounds = %v", decoded.Bounds())
 	}
 }
+
+func TestParseXAIDeviceAuthorizationForSoftwarePrompt(t *testing.T) {
+	output := "Starting xAI authentication...\r\n\r\nTo authenticate, please visit:\r\n" +
+		"https://accounts.x.ai/oauth2/device?user_code=ABCD-1234\r\n\r\n" +
+		"Then enter this code: ABCD-1234\r\nWaiting for authorization...\r\n"
+	authorization, ok := parseXAIDeviceAuthorization(output)
+	if !ok {
+		t.Fatal("device authorization was not detected")
+	}
+	if authorization.UserCode != "ABCD-1234" {
+		t.Fatalf("user code = %q", authorization.UserCode)
+	}
+	if authorization.VerificationURL != "https://accounts.x.ai/oauth2/device?user_code=ABCD-1234" {
+		t.Fatalf("verification URL = %q", authorization.VerificationURL)
+	}
+
+	for _, invalid := range []string{
+		"https://accounts.x.ai.evil.example/device\nThen enter this code: ABCD-1234\n",
+		"https://accounts.x.ai/device\nThen enter this code: abcd-1234\n",
+		"https://accounts.x.ai/device\nThen enter this code: ABCD 1234\n",
+	} {
+		if _, accepted := parseXAIDeviceAuthorization(invalid); accepted {
+			t.Fatalf("accepted unsafe device authorization output %q", invalid)
+		}
+	}
+}
+
+func TestLoginOutputCapturePublishesDevicePromptBeforeCompletion(t *testing.T) {
+	var detected xaiDeviceAuthorization
+	capture := &loginOutputCapture{onUpdate: func(output string) {
+		if authorization, ok := parseXAIDeviceAuthorization(output); ok {
+			detected = authorization
+		}
+	}}
+	for _, chunk := range []string{
+		"To authenticate, please visit:\nhttps://accounts.x.ai/oauth2/device\n",
+		"Then enter this code: ZXCV-5678\nWaiting for authorization...\n",
+	} {
+		if _, err := capture.Write([]byte(chunk)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if detected.UserCode != "ZXCV-5678" || detected.VerificationURL != "https://accounts.x.ai/oauth2/device" {
+		t.Fatalf("detected authorization = %#v", detected)
+	}
+}

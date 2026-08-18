@@ -2,6 +2,21 @@
 
 最新验证日期：2026-08-18（Asia/Shanghai）
 
+## v0.6.1-test Windows 双登录与 Grok 验证码修复
+
+- 根因确认：Grok Build 后端会先输出 `accounts.x.ai` 设备授权地址和短码，再持续轮询；旧 Tauri
+  原生宿主在命令结束前把 stdout/stderr 全部留在内存，导致用户在等待期间看不到验证码。
+- Go Core 现在增量读取登录输出，只接受 HTTPS 且主机名严格为 `accounts.x.ai` 的授权地址，
+  并只接受大写字母、数字和连字符组成的短码；设备码、access token 和 refresh token 不进入 GUI API。
+- Tauri 控制中心新增液态玻璃授权弹层、只读可选中验证码框、复制按钮、官方页面重开按钮和实时等待状态；
+  Google OAuth 也显示独立等待弹层。交互登录超时由 2 分钟延长为 10 分钟，超时不再误报“操作已完成”。
+- Windows 11 实机确认 Grok 操作会打开 xAI 官方设备页，软件与页面显示同一短码并持续轮询；
+  因测试机没有已授权 xAI 账号，测试在创建 xAI 凭据前主动终止。
+- 同机完成一次 Antigravity Google OAuth：登录进程正常完成，新增一份当前用户凭据且不删除旧凭据。
+  随后恢复网关，`/healthz` 返回 200，模型目录返回 13 项，ZCode 仍在运行。
+- Go 单测、race detector、vet、CLIProxyAPI `go mod verify`/全量测试、React 生产构建、
+  Windows GNU target `cargo check --locked` 与完整 Release 交叉编译通过。
+
 ## v0.6.0-test Windows Tauri 2 界面与拖动闪烁修复
 
 - Windows 控制中心从自绘 Rust/Win32 GDI 完整迁移到 Tauri 2.11.5、React 19、Tailwind CSS 4
