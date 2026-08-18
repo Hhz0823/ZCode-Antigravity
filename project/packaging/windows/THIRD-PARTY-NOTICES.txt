@@ -22,12 +22,14 @@ The API service is configured with host 127.0.0.1, plugins disabled, remote mana
 its control panel disabled, and detailed request logging disabled. A random per-user key protects
 the loopback-only management calls used by the local quota dashboard.
 
-Native Windows control center
-=============================
+Windows Tauri control center
+============================
 
-The v0.4 native control center is written in Rust and uses Microsoft windows-sys,
-ureq, serde, and their transitive dependencies. The exact dependency list is in
-RUST-DEPENDENCIES.txt; unmodified upstream license files are under rust-licenses/.
+The v0.6 control center uses Tauri 2, React, Tailwind CSS, lucide-react, Rust,
+Microsoft windows-sys, ureq, serde, and their transitive dependencies. Exact Rust
+versions are recorded in Cargo.lock and RUST-DEPENDENCIES.txt; JavaScript versions and
+integrity hashes are recorded in ui/package-lock.json. Upstream license files shipped by
+the package are under rust-licenses/.
 
 Interface behavior reference
 ============================
@@ -36,14 +38,14 @@ The v0.5.0 account, quota, protocol, routing, retry, and refresh behavior was in
 reviewing lbjlaq/Antigravity-Manager (snapshot a2e3c45), licensed CC BY-NC-SA 4.0:
 https://github.com/lbjlaq/Antigravity-Manager
 
-No Tauri, React, or source files from that project are included. See
+No source files, components, or assets from that project are copied. See
 project/docs/ANTIGRAVITY-MANAGER-REFERENCE.md in the source distribution.
 
 The v0.5.0 liquid-glass dashboard, taskbar widget, quota hierarchy, and effective-throughput terminology were independently
 implemented after reviewing shanggqm/codexU (snapshot eb28c8f), licensed MIT:
 https://github.com/shanggqm/codexU
 
-No SwiftUI, Tauri, React, Rust, asset, or other source files from codexU are included. See
+No SwiftUI, Tauri, React, Rust, asset, or other source files from codexU are copied. See
 project/docs/CODEXU-REFERENCE.md in the source distribution.
 
 System tray

@@ -1,0 +1,21 @@
+ZCode Antigravity Tauri UI - web dependency notice
+==================================================
+
+The compiled control-center UI directly uses these packages:
+
+- React / react-dom 19.2.8 - MIT
+- Tailwind CSS 4.3.3 - MIT
+- @tauri-apps/api 2.11.1 - Apache-2.0 OR MIT
+- lucide-react 1.31.0 - ISC
+- class-variance-authority 0.7.1 - Apache-2.0
+- clsx 2.1.1 - MIT
+- tailwind-merge 3.6.0 - MIT
+- Vite 8.2.1 and @vitejs/plugin-react 6.0.5 - MIT (build-time)
+- TypeScript 7.0.2 - Apache-2.0 (build-time)
+
+ui/package-lock.json records exact versions, resolved package identities, integrity hashes,
+and transitive dependencies. The UI was independently authored for ZCode Antigravity; no
+source code or assets were copied from codexU or Antigravity Manager.
+
+This notice describes third-party components only. It does not grant a license for first-party
+ZCode Antigravity source beyond any license separately declared by its copyright holder.

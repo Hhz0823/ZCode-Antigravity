@@ -26,7 +26,11 @@ state.json
 /release/
 /output/
 **/target/
-/.playwright-cli/
+**/node_modules/
+**/dist/
+**/gen/
+*.tsbuildinfo
+**/.playwright-cli/
 
 # Editor and OS noise
 .DS_Store

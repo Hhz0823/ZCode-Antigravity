@@ -1,27 +1,27 @@
 ZCode Antigravity Bridge build information
 ===========================================
 
-Package: ZCode-Antigravity-Windows-x64-0.5.3-test
-Build date (UTC): 2026-08-17
-Target: Windows x64 (PE32+ Go console Core and Rust/Win32 GUI control center)
+Package: ZCode-Antigravity-Windows-x64-0.6.0-test
+Build date (UTC): 2026-08-18
+Target: Windows x64 (PE32+ Go console Core and Tauri 2 GUI control center)
 
 Manager
 -------
-Version: 0.5.3-test
+Version: 0.6.0-test
 Go: 1.26.4
 CGO: disabled
 SHA-256: __MANAGER_SHA256__
 
 Control center
 --------------
-Version: 0.5.3-test
-Language: Rust 2024 Edition
-Bindings: windows-sys 0.61.2
+Version: 0.6.0-test
+UI: Tauri 2.11.5, React 19.2.8, Tailwind CSS 4.3.3, shadcn-style components
+Native shell: Rust 2024 Edition, windows-sys 0.61.2
 Subsystem: Windows GUI (no console window)
-Process DPI: Per-Monitor DPI V2
+Rendering: system WebView2 with native DWM Acrylic and responsive DPI scaling
 Quota view: protected loopback route, redacted cache, grouped native bars, 5-minute refresh
 Token view: protocol usage, output/reasoning tokens, generation/effective token/s, no prompt text
-Theme: native Microsoft YaHei UI, ClearType, owner-drawn blue dashboard and bundled icon
+Theme: Segoe UI Variable / Microsoft YaHei, liquid glass, animated light orbs, bundled icon
 SHA-256: __CONTROL_CENTER_SHA256__
 
 Backend
@@ -47,10 +47,10 @@ Local backend patches
 10. Provide a SHA-256 verified single-BAT installer with v2rayN TUN/proxy preflight.
 11. Stage and verify the payload, safely stop the recorded gateway, then deploy so same-version reruns cannot overwrite a running backend.
 12. Add a no-console native control center that injects the Provider, manages the local bridge, and renders provider quota.
-13. Apply native system typography, responsive Win32 controls, progress feedback, and crisp mixed-DPI rendering.
+13. Apply system typography, responsive CSS controls, progress feedback, and crisp mixed-DPI rendering.
 14. Encode the native installer's embedded Chinese PowerShell script with a UTF-8 BOM at build time and runtime for Windows PowerShell 5.1.
 15. Start the Go Core and all PowerShell, tasklist, netstat, taskkill, OAuth, browser, and ZCode child processes without console windows.
-16. Use a Rust/Win32 main window with Segoe UI Variable, ClearType, Per-Monitor DPI V2 and DPI-change relayout.
+16. Use a Tauri 2 + React/Tailwind main window with Segoe UI Variable, WebView2 DPI scaling, and responsive relayout.
 17. Add a persistent native Windows taskbar quota widget with provider switching and click-to-open behavior.
 18. Add official xAI device OAuth, Grok text-model selection, Grok Build billing display, and encrypted-token-safe management proxying.
 19. Generate copyable Grok Build, Codex, Claude Code, OpenCode, and generic Agent connector configurations.
@@ -61,16 +61,16 @@ Local backend patches
 24. Keep provider-specific Token caches isolated so Grok never displays Gemini usage while switching.
 25. Preserve the real historical backend path when reusing a gateway and safely recover same-root legacy state during upgrades.
 26. Honor --auto-setup in the native control center so a successful installer launch begins bridge setup automatically.
-27. Combine DWM Desktop Acrylic with a real behind-window sample, three-pass separable Gaussian blur, and resampling after move/resize.
+27. Use native DWM Acrylic without desktop capture and pause ambient CSS animation during native move/resize.
 28. Refuse release builds without working Antigravity OAuth desktop configuration and automatically recover a recorded bridge after an unexpected process exit.
 
 Verification evidence
 ---------------------
-Current v0.5.3-test build-host checks:
+Current v0.6.0-test build-host checks:
 - Manager go test ./... and Windows x64 build: passed
 - Manager go test -race: passed on the macOS build host
 - CLIProxyAPI go mod verify, go test ./..., and Windows x64 build: passed
-- Rust control center cargo check: passed; cargo-clippy is not installed on the macOS build host
+- React/Tailwind production frontend build and Tauri control center cargo check: passed
 - Go native-host baseURL and connector baseURL protocol regression tests: passed
 - Antigravity quota HTTP 403 projectless retry and fetchAvailableModels fallback tests: passed
 - Rust x86_64-pc-windows-gnu release build, PE32+ GUI subsystem, icon resource, and imports: passed
@@ -79,9 +79,9 @@ Current v0.5.3-test build-host checks:
 - EXE/BAT/ZIP payload integrity, three executable hashes, PE32+ x64, and GUI subsystem checks: passed
 - Windows child-process CREATE_NO_WINDOW test and Windows x64 test-binary cross-compile: passed
 - Provider/model selection, Grok billing proxy, tray state, and five Agent connector tests: passed
-- Native SwiftUI macOS main executable and native Rust Windows main executable build checks: passed
-- v0.5.3-test target Windows 11 real-account quota cards, seven-page liquid-glass dashboard, taskbar widget, and 144-DPI full-window capture: passed
-- High-contrast five-color/black-white-line reference: lines remain sharp outside the window and merge into continuous blurred bands inside: passed
+- Native SwiftUI macOS main executable and Tauri 2 Windows main executable build checks: passed
+- v0.6.0-test target Windows 11 real-account quota cards, seven-page liquid-glass dashboard, taskbar widget, and native Acrylic: passed
+- Seven-second Windows drag recording (198 frames): no white/black frame, tearing, or frozen desktop sample: passed
 - 5-second connection/Token poll left quota fetchedAt/cache write time unchanged; five-minute quota cadence is isolated: passed
 - Real response usage sample (45 output Token, 31.1 generation Token/s) and sanitized local persistence: passed
 - Taskbar single-click menu (5-hour 100%, week 98%, reset times, latest Token/s): passed
@@ -89,7 +89,7 @@ Current v0.5.3-test build-host checks:
 - Antigravity -> Grok -> Antigravity switch isolation and immediate cached restoration: passed
 - v0.4.5 stale backend-path upgrade recovery plus installer-triggered automatic setup: passed
 - Release build without OAuth configuration: rejected before compilation; verified credential-bearing backend: accepted
-- Target Windows stale/dead gateway state: automatically replaced with the v0.5.3-test backend
+- Target Windows stale/dead gateway state: automatically replaced with the v0.6.0-test backend
 - Forced gateway crash: new PID online within the recovery window; 32 ZCode connections re-established
 - Non-interactive OAuth preflight: login flow waiting for callback, no missing-client configuration error
 - Real target-account gemini-3.7-flash request: exact ZCODE_SMOKE_OK

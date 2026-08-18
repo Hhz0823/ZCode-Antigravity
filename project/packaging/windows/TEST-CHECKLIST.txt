@@ -1,7 +1,7 @@
 Windows acceptance checklist
 ============================
 
-[ ] ZCode-Antigravity-Setup-v0.5.3-test.exe opens a native confirmation dialog without a terminal.
+[ ] ZCode-Antigravity-Setup-v0.6.0-test.exe opens a native confirmation dialog without a terminal.
 [ ] Control-center refresh, login, sync, stop, port inspection, and ZCode launch never flash a console window.
 [ ] The native EXE writes install.ps1 with exactly one EF BB BF UTF-8 BOM before Windows PowerShell 5.1 parses it.
 [ ] A release build without injected or verified Antigravity OAuth desktop configuration fails before producing artifacts.
@@ -9,6 +9,7 @@ Windows acceptance checklist
 [ ] The EXE refuses installation while ZCode or the target control center is still running.
 [ ] Successful EXE installation creates current-user Desktop/Start Menu shortcuts, opens the GUI, and automatically begins one-click setup.
 [ ] Verify-Package.bat reports three [OK] lines.
+[ ] WebView2Loader.dll is installed beside ZCode-Antigravity-ControlCenter.exe and the Tauri window opens on a clean target machine.
 [ ] The single BAT --extract-only workflow verifies its embedded ZIP and all three executable hashes.
 [ ] Normal double-click returns immediately without leaving a terminal window and opens the control center.
 [ ] The control center shortcut is created on the Desktop and in the current-user Start Menu.
@@ -17,7 +18,7 @@ Windows acceptance checklist
 [ ] A single left-click on the taskbar icon opens a menu showing the selected provider, account count, five-hour quota, weekly quota, reset times, latest output tokens, and token/s.
 [ ] Overview, Accounts, API Proxy, Model Routing, Agent Connectors, Analytics, and Settings switch in place without opening a browser or console.
 [ ] In light and dark Windows themes, the liquid-glass background keeps headings, metrics, buttons, and progress bars legible.
-[ ] With a high-contrast window behind the app, lines become blurred color bands inside the client area and are resampled after move/resize.
+[ ] With a high-contrast window behind the app, native Acrylic continuously blurs it; a recorded drag contains no white/black frames or background-capture tearing.
 [ ] Account labels and stable IDs are redacted; the manager API contains no OAuth token, API key, prompt, or reply.
 [ ] Routing, session affinity, liquid glass, and 5/10 minute refresh settings persist to manager-settings.json and survive restart.
 [ ] After one successful model response, the main panel shows protocol-reported output/reasoning tokens and generation token/s; it never derives tokens from text length.
@@ -25,7 +26,7 @@ Windows acceptance checklist
 [ ] Keep the panel open for at least 15 seconds; connection state may update but quota fetchedAt must not change before the five-minute interval.
 [ ] At 150% display scaling, all four status cards, the quota card, and the full action column remain inside the window.
 [ ] Segoe UI Variable text stays crisp at 100%, 125%, 150%, 200%, and a mixed-DPI monitor move.
-[ ] WM_DPICHANGED relayout keeps every status tile, action, quota row, and connector control visible.
+[ ] WebView2 DPI relayout keeps every status tile, action, quota row, and connector control visible.
 [ ] Cached quota contains no complete email, project ID, access token, or refresh token.
 [ ] With the gateway running and ZCode fully exited, rerunning the same BAT stops the recorded
     backend before deployment and does not report that cli-proxy-api.exe is in use.

@@ -1,31 +1,16 @@
-ZCode Antigravity native Windows control center - Rust dependency notice
-======================================================================
+ZCode Antigravity Tauri 2 Windows control center - Rust dependency notice
+=======================================================================
 
-The following crates are linked into ZCode-Antigravity-ControlCenter.exe.
-Exact upstream license files are shipped under rust-licenses/<crate-version>/.
+The executable links Tauri 2.11.5, tauri-plugin-single-instance 2.4.3,
+serde 1.0.229, serde_json 1.0.151, ureq 3.4.0, windows-sys 0.61.2, and their
+transitive Rust dependencies. Tauri and the listed direct libraries are distributed under
+MIT, Apache-2.0, or dual MIT/Apache-2.0 terms as declared by their upstream packages.
 
-- base64 0.23.1 — MIT OR Apache-2.0
-- bytes 1.12.1 — MIT
-- http 1.5.0 — MIT OR Apache-2.0
-- httparse 1.10.1 — MIT OR Apache-2.0
-- itoa 1.0.18 — MIT OR Apache-2.0
-- log 0.4.33 — MIT OR Apache-2.0
-- memchr 2.8.3 — Unlicense OR MIT
-- percent-encoding 2.3.2 — MIT OR Apache-2.0
-- proc-macro2 1.0.107 — MIT OR Apache-2.0
-- quote 1.0.47 — MIT OR Apache-2.0
-- serde 1.0.229 — MIT OR Apache-2.0
-- serde_core 1.0.229 — MIT OR Apache-2.0
-- serde_derive 1.0.229 — MIT OR Apache-2.0
-- serde_json 1.0.151 — MIT OR Apache-2.0
-- syn 3.0.3 — MIT OR Apache-2.0
-- unicode-ident 1.0.24 — MIT OR Apache-2.0, plus Unicode-3.0 portions
-- ureq 3.4.0 — MIT OR Apache-2.0
-- ureq-proto 0.6.1 — MIT OR Apache-2.0
-- utf8-zero 0.8.1 — MIT OR Apache-2.0
-- windows-link 0.2.1 — MIT OR Apache-2.0
-- windows-sys 0.61.2 — MIT OR Apache-2.0
-- zmij 1.0.23 — MIT
+Cargo.lock is the authoritative machine-readable list of every exact Rust package version
+used by this build. ui/package-lock.json is the corresponding JavaScript dependency lock.
+The package's THIRD-PARTY-NOTICES.txt and rust-licenses/ directory contain the redistributed
+notices available at build time. A dependency lock is not a license grant; consult each
+upstream package's license metadata and text when redistributing a modified build.
 
 This notice describes third-party components only. It does not grant a license
 for first-party ZCode Antigravity source beyond any license separately declared

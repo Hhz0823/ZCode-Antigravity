@@ -6,7 +6,7 @@ Purpose
 This package lets ZCode and other local agents use Antigravity Gemini or xAI Grok text
 models through a loopback-only compatible Provider. The control center switches account,
 model, quota, and connector views together. Image/video generation models are not injected.
-The Rust/Win32 window uses a high-contrast blue/purple liquid-glass design and seven native
+The Tauri 2 window uses React, Tailwind CSS, shadcn-style components, native Acrylic, and seven
 pages: Overview, Accounts, API Proxy, Model Routing, Agent Connectors, Analytics, and Settings.
 
 Important risk
@@ -28,17 +28,17 @@ Requirements
 First test
 ----------
 Recommended: fully exit ZCode from the tray, enable v2rayN TUN, and double-click
-ZCode-Antigravity-Setup-v0.5.3-test.exe. This is a native Windows GUI installer: it shows no
+ZCode-Antigravity-Setup-v0.6.0-test.exe. This is a native Windows GUI installer: it shows no
 terminal, verifies the embedded ZIP plus all three executables, installs only for the current
 user, creates Desktop/Start Menu shortcuts, and opens the control center after completion.
 Do not use v0.4.0-test on Windows; its Rust client expected baseUrl while the Go Core correctly
 emitted baseURL, so startup stopped before the control center could open.
 Do not use v0.5.2-test for a fresh Antigravity login; that release was packaged without the
-required OAuth desktop configuration. v0.5.3-test also repairs a recorded gateway automatically
+required OAuth desktop configuration. v0.6.0-test also repairs a recorded gateway automatically
 when its process exits unexpectedly, while preserving an intentional Stop.
 
 For the single-BAT fallback, fully exit ZCode from the tray, enable v2rayN TUN, and double-click
-ZCode-Antigravity-OneClick-v0.5.3-test.bat. It verifies and extracts its embedded package,
+ZCode-Antigravity-OneClick-v0.6.0-test.bat. It verifies and extracts its embedded package,
 then opens the graphical control center without leaving a terminal window. The control center
 opens OAuth when needed, writes the verified ZCode Provider directly, and starts ZCode after
 successful readback.
@@ -48,7 +48,7 @@ For the expanded package:
 2. Double-click Verify-Package.bat and confirm all three checks say [OK].
 3. In the Windows system tray, right-click ZCode and choose Exit. Closing the ZCode window
    normally leaves ZCode.exe running in the tray; the bridge refuses to edit while it runs.
-4. Double-click Setup-and-Start.bat. The native Rust/Win32 control center opens without Chrome
+4. Double-click Setup-and-Start.bat. The Tauri control center opens without external Chrome
    or a terminal window.
 5. Select Antigravity or Grok / xAI and complete the corresponding browser authorization.
 6. The first model-directory load can take up to about 35 seconds on a poor connection.
@@ -110,18 +110,17 @@ Files and privacy
 Graphical control center and quota
 ----------------------------------
 - Desktop/Start Menu shortcut: ZCode Antigravity 控制中心
-- The control center is a native Rust + Win32 Windows GUI executable. It starts the audited Go
-  manager as a CREATE_NO_WINDOW child and never needs Chrome to render the panel.
+- The control center is a Tauri 2 Windows GUI using React, Tailwind CSS, and shadcn-style
+  components. It starts the audited Go manager as a CREATE_NO_WINDOW child and uses the system
+  WebView2 runtime rather than launching Chrome.
 - The main window and taskbar quota widget share a liquid-glass visual language. The client uses
-  DWM Desktop Acrylic plus a real behind-window desktop sample with three separable Gaussian
-  passes and a dark glass tint. It refreshes after a move/resize while cards stay opaque and crisp.
+  native DWM Acrylic with translucent WebView layers and animated light orbs. It does not capture
+  the desktop, so dragging and resizing do not wait for background resampling.
 - Seven pages expose redacted account state, OpenAI/Anthropic/Gemini endpoints, routing and
   session affinity, retry limits, Agent connectors, local Token analytics, refresh cadence,
   quota warning threshold, and UI settings.
-- It uses Segoe UI Variable, ClearType, Per-Monitor DPI V2, native controls, a bundled icon, and
-  responsive layout for mixed DPI and different desktop resolutions.
-- The behind-window sample exists only in process memory for painting; it is replaced after
-  move/resize and is never written to disk, uploaded, or included in usage metrics.
+- It uses Segoe UI Variable / Microsoft YaHei, WebView2 DPI scaling, a bundled icon, and a
+  responsive CSS layout for mixed DPI and different desktop resolutions.
 - It shows v2rayN TUN, proxy, bridge, ZCode, provider accounts, models, quota, and Agent connectors.
 - When the installer opens it with --auto-setup, the native client immediately begins the same
   one-click setup operation; a separate manual click is not required after a successful install.
@@ -143,8 +142,8 @@ Graphical control center and quota
   pay-as-you-go limits, and Extra Usage Credits. It never estimates account quota from local tokens.
 - Connector cards generate copyable Grok Build, Codex, Claude Code, OpenCode, and generic client
   settings. The control center does not overwrite those agents' existing config files.
-- Native hover, focus, progress, refresh, and operation feedback replace browser Canvas effects;
-  no fractional CSS font weights are used, so text remains crisp at Windows scaling levels.
+- CSS hover, focus, progress, refresh, and operation feedback are GPU-composited. Expensive ambient
+  animations and transitions pause during native window dragging to avoid white flashes and jank.
 - Quota is read through the already authenticated local bridge. Only a random-key-protected
   loopback management route is enabled; remote management and the web control panel stay disabled.
 - If Antigravity temporarily cannot refresh, the last redacted result is shown with a stale badge
@@ -152,7 +151,8 @@ Graphical control center and quota
 
 Available scripts
 -----------------
-- ZCode-Antigravity-ControlCenter.exe  Native Rust/Win32 setup, status, actions, quota, and tray UI
+- ZCode-Antigravity-ControlCenter.exe  Tauri 2 setup, status, actions, quota, and tray UI
+- WebView2Loader.dll                  Tauri WebView2 bootstrap library required beside the EXE
 - Run-Menu.bat                  Interactive menu
 - Setup-and-Start.bat           Open the GUI and start first-time setup
 - Login-Antigravity.bat         Add or refresh an Antigravity account
@@ -169,9 +169,9 @@ Available scripts
 
 Installer formats
 -----------------
-- ZCode-Antigravity-Setup-v0.5.3-test.exe: recommended no-terminal current-user installer.
-- ZCode-Antigravity-OneClick-v0.5.3-test.bat: fallback single-file installer.
-- ZCode-Antigravity-Windows-x64-0.5.3-test.zip: manually verifiable expanded package.
+- ZCode-Antigravity-Setup-v0.6.0-test.exe: recommended no-terminal current-user installer.
+- ZCode-Antigravity-OneClick-v0.6.0-test.bat: fallback single-file installer.
+- ZCode-Antigravity-Windows-x64-0.6.0-test.zip: manually verifiable expanded package.
 - The EXE installer is custom-built and unsigned. It does not require administrator rights or
   7-Zip on the target computer; Windows SmartScreen may still require manual confirmation.
 
@@ -210,7 +210,7 @@ Troubleshooting
   bridge so its client-version refresh runs, then check the live account catalog and entitlement.
 - "project id unavailable": onboarding did not yield a usable project. The account may be
   ineligible or restricted; use another dedicated test account instead of bypassing controls.
-- Windows SmartScreen: these custom Rust/Go binaries are not code-signed. Verify checksums first,
+- Windows SmartScreen: these custom Tauri/Rust/Go binaries are not code-signed. Verify checksums first,
   then use More info -> Run anyway only if the hashes pass.
 - Stopping does not delete or revoke Google tokens. Removing the Provider also does not revoke
   Google authorization. Revoke access from your Google account separately if required.
@@ -246,8 +246,8 @@ cause a clear setup error instead of silently substituting another model.
 
 Build versions
 --------------
-- ZCode Antigravity Bridge: 0.5.3-test
-- Native control center: Rust 1.96, windows-sys 0.61.2, ureq 3.4.0
+- ZCode Antigravity Bridge: 0.6.0-test
+- Control center: Tauri 2.11.5, React 19.2.8, Tailwind CSS 4.3.3, Rust 1.96
 - CLIProxyAPI base: v7.2.132, commit 78f0c4079e3e6273d65d03b5549cffc898703264
 - Local build: 7.2.132-zcode.12
 

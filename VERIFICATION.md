@@ -1,6 +1,20 @@
 # 修复与验证记录
 
-最新验证日期：2026-08-17（Asia/Shanghai）
+最新验证日期：2026-08-18（Asia/Shanghai）
+
+## v0.6.0-test Windows Tauri 2 界面与拖动闪烁修复
+
+- Windows 控制中心从自绘 Rust/Win32 GDI 完整迁移到 Tauri 2.11.5、React 19、Tailwind CSS 4
+  与 shadcn 风格组件；Rust 只保留窗口、系统托盘、单实例、本地 API 代理和隐藏子进程边界。
+- 透明无边框窗口启用系统 Acrylic。旧版会在移动结束后重新截取桌面并自行高斯模糊，现已完全移除该路径；
+  桌面模糊由 DWM/WebView2 持续合成，拖动期间暂停环境光晕和 CSS transition。
+- 前端生产构建、Windows GNU target `cargo check --locked`、Release 交叉编译和 PE32+ GUI 子系统检查通过。
+- 首次真实 Windows 启动暴露出动态 `WebView2Loader.dll` 必须随 EXE 分发；构建脚本已将 DLL 纳入
+  展开包、ZIP、EXE/BAT 安装载荷与 SHA-256 清单。补齐后 Windows 11 实机成功启动并显示真实账号与额度。
+- Windows 11 目标机录制 7 秒、198 帧窗口拖动测试；4 fps 联系表逐帧检查没有白屏、黑屏、
+  冻结桌面采样或背景撕裂，控制中心进程测试后仍响应。
+- 1180×760、1536×864 浏览器开发预览和 Windows 实机均检查了总览、Token 统计、Grok 切换、
+  七页导航、5 小时 / 本周额度与响应式布局。
 
 ## v0.5.3-test Windows 登录与 ZCode 重连修复
 

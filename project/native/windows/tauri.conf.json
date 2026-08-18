@@ -1,0 +1,47 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ZCode Antigravity",
+  "version": "0.6.0-test",
+  "identifier": "cn.zcode.antigravity",
+  "build": {
+    "frontendDist": "ui/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "ZCode · Antigravity 控制中心 · Tauri 2",
+        "width": 1180,
+        "height": 760,
+        "minWidth": 960,
+        "minHeight": 660,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": true,
+        "skipTaskbar": false,
+        "backgroundColor": "#00000000",
+        "windowEffects": {
+          "effects": ["acrylic"],
+          "state": "active",
+          "color": [8, 20, 38, 164]
+        }
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": ["assets/AppIcon.ico"],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      }
+    }
+  }
+}

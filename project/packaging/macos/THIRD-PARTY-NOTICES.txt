@@ -24,14 +24,14 @@ The v0.5.0 account, quota, protocol, routing, retry, and refresh behavior was in
 reviewing lbjlaq/Antigravity-Manager (snapshot a2e3c45), licensed CC BY-NC-SA 4.0:
 https://github.com/lbjlaq/Antigravity-Manager
 
-No Tauri, React, or source files from that project are included. See
+No source files, components, or assets from that project are copied. See
 project/docs/ANTIGRAVITY-MANAGER-REFERENCE.md in the source distribution.
 
 The v0.5.0 liquid-glass dashboard, menu-bar widget, quota hierarchy, and effective-throughput terminology were independently
 implemented after reviewing shanggqm/codexU (snapshot eb28c8f), licensed MIT:
 https://github.com/shanggqm/codexU
 
-No SwiftUI, Tauri, React, Rust, asset, or other source files from codexU are included. See
+No SwiftUI, Tauri, React, Rust, asset, or other source files from codexU are copied. See
 project/docs/CODEXU-REFERENCE.md in the source distribution.
 
 ZCode, Google, Gemini, Antigravity, Grok, xAI, macOS, and Apple are names or marks of their

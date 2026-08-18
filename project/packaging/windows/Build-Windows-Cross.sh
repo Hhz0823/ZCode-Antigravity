@@ -6,7 +6,7 @@ project_dir=${script_dir:h:h}
 repo_root=${project_dir:h}
 backend_dir="$repo_root/third_party/CLIProxyAPI-7.2.132-patched"
 native_dir="$project_dir/native/windows"
-release_version=${VERSION:-0.5.3-test}
+release_version=${VERSION:-0.6.0-test}
 output_dir=${OUTPUT_DIR:-$repo_root/dist/windows}
 package_name="ZCode-Antigravity-Windows-x64-${release_version}"
 package_root="$output_dir/$package_name"
@@ -16,7 +16,7 @@ single_bat_path="$output_dir/ZCode-Antigravity-OneClick-v${release_version}.bat"
 build_root=$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/zcode-antigravity-windows.XXXXXX")
 trap '/bin/rm -rf "$build_root"' EXIT
 
-for tool in go cargo x86_64-w64-mingw32-gcc x86_64-w64-mingw32-windres \
+for tool in go cargo npm x86_64-w64-mingw32-gcc \
   /usr/bin/base64 /usr/bin/ditto /usr/bin/fold /usr/bin/iconv /usr/bin/perl \
   /usr/bin/sed /usr/bin/shasum /usr/bin/strings /usr/bin/zip; do
   command -v "$tool" >/dev/null
@@ -28,6 +28,10 @@ if ! /usr/bin/grep -Fq "const version = \"$release_version\"" "$project_dir/cmd/
 fi
 if ! /usr/bin/grep -Fq "version = \"$release_version\"" "$native_dir/Cargo.toml"; then
   print -u2 "VERSION=$release_version 与 Rust 客户端源码版本不一致"
+  exit 1
+fi
+if ! /usr/bin/grep -Fq "\"version\": \"$release_version\"" "$native_dir/ui/package.json"; then
+  print -u2 "VERSION=$release_version 与 Tauri 前端版本不一致"
   exit 1
 fi
 if [[ -n ${ANTIGRAVITY_OAUTH_CLIENT_ID:-} || -n ${ANTIGRAVITY_OAUTH_CLIENT_SECRET:-} ]]; then
@@ -86,14 +90,22 @@ else
 fi
 
 (
+  cd "$native_dir/ui"
+  npm ci --ignore-scripts
+  npm run build
+)
+(
   cd "$native_dir"
   cargo build --release --locked --target x86_64-pc-windows-gnu
 )
-/bin/cp "$native_dir/target/x86_64-pc-windows-gnu/release/zcode-antigravity-native.exe" \
+/bin/cp "$native_dir/target/x86_64-pc-windows-gnu/release/zcode-antigravity-tauri.exe" \
   "$package_root/ZCode-Antigravity-ControlCenter.exe"
+/bin/cp "$native_dir/target/x86_64-pc-windows-gnu/release/WebView2Loader.dll" \
+  "$package_root/WebView2Loader.dll"
 
 for payload in README-Windows.txt TEST-CHECKLIST.txt settings.json THIRD-PARTY-NOTICES.txt \
-  LICENSE-CLIProxyAPI.txt LICENSE-TRAY-DEPENDENCIES.txt RUST-DEPENDENCIES.txt; do
+  LICENSE-CLIProxyAPI.txt LICENSE-TRAY-DEPENDENCIES.txt RUST-DEPENDENCIES.txt \
+  WEB-DEPENDENCIES.txt; do
   /bin/cp "$script_dir/$payload" "$package_root/$payload"
 done
 for payload in "$script_dir"/*.bat; do
