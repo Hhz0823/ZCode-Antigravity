@@ -1,7 +1,7 @@
 ZCode Antigravity Bridge - macOS Universal test build
 ====================================================
 
-版本：0.6.0-test
+版本：0.6.4-test
 架构：Apple Silicon (arm64) + Intel (x86_64)
 最低系统：macOS 12
 
@@ -14,7 +14,8 @@ App 会在程序坞显示图标，并在菜单栏持续显示所选账号额度�
 Agent 接入、用量统计和设置七个原生页面。
 额度卡片按账号和时间窗口显示彩色进度条、重置时间与最低余量；程序每 5 分钟
 自动刷新一次额度，手动刷新、切换提供商和接入完成后会立即刷新。
-菜单栏点击菜单同时显示 5 小时 / 本周余量与重置时间；主界面显示协议返回的
+单击菜单栏图标只显示独立额度 Popover（5 小时 / 本周余量与重置时间），不会把
+主窗口带到其他应用上层；主界面显示协议返回的
 最近输出 Token、推理 Token、Token/s 和本地累计输出，不保存提示词或回复。
 
 这是非官方测试版，会使用未公开的 Antigravity 接口。Google 可能限流、暂停
@@ -31,7 +32,7 @@ API 权限或封禁账号。请只使用专门的测试账号，不要使用主 
 5. 双击“ZCode Antigravity.app”，在原生控制中心选择 Antigravity 或 Grok / xAI。
 6. 按需完成 Google OAuth 或 xAI 设备授权，再点击“一键接入 ZCode”。
 7. 在 ZCode 中选择 Antigravity + Grok (Local Bridge) 下的目标模型，先发送一条短消息验收。
-8. 关闭原生窗口后菜单栏额度组件继续运行；程序坞或菜单栏均可重开窗口。
+8. 关闭原生窗口后菜单栏额度组件继续运行；程序坞或 Popover 内的“打开主界面”可重开窗口。
 
 普通使用只需打开 App，不会启动 Chrome，也不会弹出 Terminal。“Terminal Tools”中的 .command 是
 维护和诊断入口，双击它们时 macOS 会按设计显示终端窗口。如果已把 App 拖入

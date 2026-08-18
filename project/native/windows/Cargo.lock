@@ -4995,7 +4995,7 @@ dependencies = [
 
 [[package]]
 name = "zcode-antigravity-tauri"
-version = "0.6.3-test"
+version = "0.6.4-test"
 dependencies = [
  "serde",
  "serde_json",

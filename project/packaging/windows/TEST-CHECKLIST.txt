@@ -1,7 +1,7 @@
 Windows acceptance checklist
 ============================
 
-[ ] ZCode-Antigravity-Setup-v0.6.3-test.exe opens a native confirmation dialog without a terminal.
+[ ] ZCode-Antigravity-Setup-v0.6.4-test.exe opens a native confirmation dialog without a terminal.
 [ ] Control-center refresh, login, sync, stop, port inspection, and ZCode launch never flash a console window.
 [ ] The native EXE writes install.ps1 with exactly one EF BB BF UTF-8 BOM before Windows PowerShell 5.1 parses it.
 [ ] A release build without injected or verified Antigravity OAuth desktop configuration fails before producing artifacts.
@@ -15,7 +15,7 @@ Windows acceptance checklist
 [ ] The control center shortcut is created on the Desktop and in the current-user Start Menu.
 [ ] Control center APIs listen only on 127.0.0.1 and reject requests without the per-launch session key.
 [ ] Weekly and five-hour remaining quota show exact percentages, reset times, and native progress state.
-[ ] A single left-click on the taskbar icon opens a menu showing the selected provider, account count, five-hour quota, weekly quota, reset times, latest output tokens, and token/s.
+[ ] A single left-click on the taskbar icon opens only the independent quota widget, showing provider switching, account count, quota/reset data, output tokens, and token/s without restoring or raising the main window.
 [ ] Overview, Accounts, API Proxy, Model Routing, Agent Connectors, Analytics, and Settings switch in place without opening a browser or console.
 [ ] In light and dark Windows themes, the liquid-glass background keeps headings, metrics, buttons, and progress bars legible.
 [ ] With a high-contrast window behind the app, native Acrylic continuously blurs it; a recorded drag contains no white/black frames or background-capture tearing.
@@ -41,7 +41,7 @@ Windows acceptance checklist
 [ ] After fully exiting ZCode, Sync-ZCode.bat creates a timestamped backup.
 [ ] ZCode shows Provider "Antigravity + Grok (Local Bridge)"; Antigravity has exactly the two managed Gemini entries.
 [ ] Grok / xAI login uses browser device authorization, then exposes text models but no Imagine image/video models.
-[ ] System-tray double-click reopens the panel; provider switch changes quota/model cards; Exit removes the tray and releases port 18200-18250.
+[ ] The widget's Open Control Center button and tray context-menu item explicitly reopen the panel; provider switch changes quota/model cards; Exit removes the tray and releases the local API.
 [ ] Agent connector cards render for Grok Build, Codex, Claude Code, OpenCode, and generic clients without overwriting external files.
 [ ] Model list contains gemini-3.7-flash with 1,048,576 context tokens and no redundant -high suffix.
 [ ] Model list contains gemini-3.6-flash and contains no Claude, GPT, agent, image, or other Gemini model.

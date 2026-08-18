@@ -1,20 +1,20 @@
 ZCode Antigravity Bridge build information
 ===========================================
 
-Package: ZCode-Antigravity-Windows-x64-0.6.3-test
+Package: ZCode-Antigravity-Windows-x64-0.6.4-test
 Build date (UTC): 2026-08-18
 Target: Windows x64 (PE32+ Go console Core and Tauri 2 GUI control center)
 
 Manager
 -------
-Version: 0.6.3-test
+Version: 0.6.4-test
 Go: 1.26.4
 CGO: disabled
 SHA-256: __MANAGER_SHA256__
 
 Control center
 --------------
-Version: 0.6.3-test
+Version: 0.6.4-test
 UI: Tauri 2.11.5, React 19.2.8, Tailwind CSS 4.3.3, shadcn-style components
 Native shell: Rust 2024 Edition, windows-sys 0.61.2
 Subsystem: Windows GUI (no console window)
@@ -51,12 +51,12 @@ Local backend patches
 14. Encode the native installer's embedded Chinese PowerShell script with a UTF-8 BOM at build time and runtime for Windows PowerShell 5.1.
 15. Start the Go Core and all PowerShell, tasklist, netstat, taskkill, OAuth, browser, and ZCode child processes without console windows.
 16. Use a Tauri 2 + React/Tailwind main window with Segoe UI Variable, WebView2 DPI scaling, and responsive relayout.
-17. Add a persistent native Windows taskbar quota widget with provider switching and click-to-open behavior.
+17. Add a persistent native Windows taskbar quota widget with provider switching and an explicit full-window action.
 18. Add official xAI device OAuth, Grok text-model selection, Grok Build billing display, and encrypted-token-safe management proxying.
 19. Generate copyable Grok Build, Codex, Claude Code, OpenCode, and generic Agent connector configurations.
 20. Retry Antigravity quota requests without project metadata after HTTP 403 and fall back to per-model quota data.
 21. Collect sanitized backend usage records and expose provider-specific output Token, reasoning Token, and token/s metrics.
-22. Show five-hour/week reset details and recent token performance on taskbar click; double-click opens the window.
+22. Show five-hour/week reset details and recent token performance in an independent taskbar-click widget without raising the main window.
 23. Keep Antigravity/Grok quota caches isolated and reject stale provider-switch display updates.
 24. Keep provider-specific Token caches isolated so Grok never displays Gemini usage while switching.
 25. Preserve the real historical backend path when reusing a gateway and safely recover same-root legacy state during upgrades.
@@ -65,10 +65,12 @@ Local backend patches
 28. Refuse release builds without working Antigravity OAuth desktop configuration and automatically recover a recorded bridge after an unexpected process exit.
 29. Treat a provider with no logged-in account as a normal empty quota state instead of HTTP 503, and isolate quota refresh failures from dashboard status.
 30. Lower the native Acrylic tint and frontend glass-layer opacity so the live desktop blur remains visible behind readable controls.
+31. Separate tray-click and main-window activation, add a DPI-aware always-on-top quota popup, and strengthen specular Acrylic layers.
+32. Match the macOS light liquid-glass information architecture and remove nested blur layers from scrollable content.
 
 Verification evidence
 ---------------------
-Current v0.6.3-test build-host checks:
+Current v0.6.4-test build-host checks:
 - Manager go test ./... and Windows x64 build: passed
 - Manager go test -race: passed on the macOS build host
 - CLIProxyAPI go mod verify, go test ./..., and Windows x64 build: passed
@@ -82,17 +84,19 @@ Current v0.6.3-test build-host checks:
 - Windows child-process CREATE_NO_WINDOW test and Windows x64 test-binary cross-compile: passed
 - Provider/model selection, Grok billing proxy, tray state, and five Agent connector tests: passed
 - Native SwiftUI macOS main executable and Tauri 2 Windows main executable build checks: passed
-- v0.6.3-test target Windows 11 Grok quota recovery after gateway startup, real device login, seven-page liquid-glass dashboard, taskbar widget, and native Acrylic: passed
+- v0.6.4-test candidate preserves the verified Grok recovery/login path and adds an independent DPI-aware taskbar quota widget
 - Target control-center SHA-256 matched the release candidate after installation; temporary test tasks, scripts, screenshots, and extraction directories were removed
 - Seven-second Windows drag recording (198 frames): no white/black frame, tearing, or frozen desktop sample: passed
 - 5-second connection/Token poll left quota fetchedAt/cache write time unchanged; five-minute quota cadence is isolated: passed
 - Real response usage sample (45 output Token, 31.1 generation Token/s) and sanitized local persistence: passed
-- Taskbar single-click menu (5-hour 100%, week 98%, reset times, latest Token/s): passed
+- Light macOS-style main layout and quota widget: browser visual regression and Windows 11 native Acrylic rendering passed
+- Taskbar single-click widget layout (provider switch, quota/reset data, output Token and Token/s): Windows 11 native z-order validation passed; the main control center remained behind ZCode
+- Continuous main-panel down/up scrolling on Windows 11 after nested-blur removal: passed; provider, quota, status, and action content remained intact
 - Settings navigation, text contrast, manager settings API, and one-click gateway startup: passed
 - Antigravity -> Grok -> Antigravity switch isolation and immediate cached restoration: passed
 - v0.4.5 stale backend-path upgrade recovery plus installer-triggered automatic setup: passed
 - Release build without OAuth configuration: rejected before compilation; verified credential-bearing backend: accepted
-- Target Windows stale/dead gateway state: automatically replaced with the v0.6.3-test backend
+- Target Windows stale/dead gateway state: automatically replaced with the v0.6.4-test backend
 - Forced gateway crash: new PID online within the recovery window; 32 ZCode connections re-established
 - Non-interactive OAuth preflight: login flow waiting for callback, no missing-client configuration error
 - Real target-account gemini-3.7-flash request: exact ZCODE_SMOKE_OK

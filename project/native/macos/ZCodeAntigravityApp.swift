@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "0.6.0-test"
+private let appVersion = "0.6.4-test"
 
 private extension Notification.Name {
     static let selectBridgeProvider = Notification.Name("ZCodeSelectBridgeProvider")
@@ -757,12 +757,10 @@ final class StatusBarController: NSObject {
 
     @objc private func togglePopover() {
         guard let button = statusItem?.button else { return }
-        bringMainWindowForward()
         if popover.isShown {
             popover.performClose(nil)
         } else {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            NSApp.activate(ignoringOtherApps: true)
         }
     }
 
@@ -903,6 +901,8 @@ private enum CodexUPalette {
     static let tertiary = Color(red: 255 / 255, green: 159 / 255, blue: 10 / 255)
     static let border = Color(red: 148 / 255, green: 163 / 255, blue: 184 / 255).opacity(0.32)
     static let pageBackground = Color.clear
+    static let glassFill = Color(nsColor: .controlBackgroundColor).opacity(0.38)
+    static let glassFillLight = Color(nsColor: .controlBackgroundColor).opacity(0.24)
     static let glassStroke = LinearGradient(
         colors: [.white.opacity(0.72), accentLight.opacity(0.36), secondary.opacity(0.28)],
         startPoint: .topLeading,
@@ -934,29 +934,32 @@ private struct LiquidGlassBackground: View {
     var body: some View {
         ZStack {
             NativeBlurBackground()
-            LinearGradient(
-                colors: scheme == .dark
-                    ? [Color(red: 0.04, green: 0.08, blue: 0.20).opacity(0.26), CodexUPalette.secondary.opacity(0.10)]
-                    : [Color.white.opacity(0.14), CodexUPalette.accentLight.opacity(0.09), CodexUPalette.secondary.opacity(0.07)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            Circle()
-                .fill(CodexUPalette.accent.opacity(scheme == .dark ? 0.16 : 0.11))
-                .frame(width: 520, height: 520)
-                .blur(radius: 90)
-                .offset(x: -350, y: -270)
-            Circle()
-                .fill(CodexUPalette.secondary.opacity(scheme == .dark ? 0.15 : 0.10))
-                .frame(width: 580, height: 580)
-                .blur(radius: 110)
-                .offset(x: 420, y: 250)
-            Ellipse()
-                .fill(Color.cyan.opacity(scheme == .dark ? 0.10 : 0.07))
-                .frame(width: 700, height: 300)
-                .blur(radius: 100)
-                .rotationEffect(.degrees(-18))
-                .offset(x: 120, y: -300)
+            ZStack {
+                LinearGradient(
+                    colors: scheme == .dark
+                        ? [Color(red: 0.04, green: 0.08, blue: 0.20).opacity(0.26), CodexUPalette.secondary.opacity(0.10)]
+                        : [Color.white.opacity(0.14), CodexUPalette.accentLight.opacity(0.09), CodexUPalette.secondary.opacity(0.07)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                Circle()
+                    .fill(CodexUPalette.accent.opacity(scheme == .dark ? 0.16 : 0.11))
+                    .frame(width: 520, height: 520)
+                    .blur(radius: 68)
+                    .offset(x: -350, y: -270)
+                Circle()
+                    .fill(CodexUPalette.secondary.opacity(scheme == .dark ? 0.15 : 0.10))
+                    .frame(width: 580, height: 580)
+                    .blur(radius: 76)
+                    .offset(x: 420, y: 250)
+                Ellipse()
+                    .fill(Color.cyan.opacity(scheme == .dark ? 0.10 : 0.07))
+                    .frame(width: 700, height: 300)
+                    .blur(radius: 72)
+                    .rotationEffect(.degrees(-18))
+                    .offset(x: 120, y: -300)
+            }
+            .drawingGroup(opaque: false, colorMode: .linear)
         }
         .ignoresSafeArea()
     }
@@ -992,7 +995,7 @@ struct DashboardView: View {
                 Color(nsColor: .windowBackgroundColor).ignoresSafeArea()
             }
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     topToolbar
                     contextRow
                     navigationTabs
@@ -1034,7 +1037,7 @@ struct DashboardView: View {
                 ThemeModeButton(icon: "display", value: "system", selection: $theme)
             }
             .padding(3)
-            .background(.thinMaterial, in: Capsule())
+            .background(CodexUPalette.glassFillLight, in: Capsule())
             .overlay(Capsule().stroke(CodexUPalette.border))
             Button { Task { await model.refreshAll() } } label: {
                 Image(systemName: "arrow.clockwise")
@@ -1042,16 +1045,16 @@ struct DashboardView: View {
                     .frame(width: 38, height: 38)
             }
             .buttonStyle(.plain)
-            .background(.thinMaterial, in: Circle())
+            .background(CodexUPalette.glassFillLight, in: Circle())
             .overlay(Circle().stroke(CodexUPalette.border))
             .rotationEffect(.degrees(model.loading ? 360 : 0))
             .animation(model.loading ? .linear(duration: 0.8).repeatForever(autoreverses: false) : .default, value: model.loading)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
+        .background(CodexUPalette.glassFill, in: RoundedRectangle(cornerRadius: 24))
         .overlay(RoundedRectangle(cornerRadius: 24).stroke(CodexUPalette.glassStroke, lineWidth: 1))
-        .shadow(color: CodexUPalette.secondary.opacity(0.16), radius: 24, y: 10)
+        .shadow(color: CodexUPalette.secondary.opacity(0.12), radius: 10, y: 4)
     }
 
     private var contextRow: some View {
@@ -1061,7 +1064,7 @@ struct DashboardView: View {
                 .font(.caption.weight(.medium))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
-                .background(.thinMaterial, in: Capsule())
+                .background(CodexUPalette.glassFillLight, in: Capsule())
                 .overlay(Capsule().stroke(CodexUPalette.border))
             Text("\(model.provider == "xai" ? "Grok / xAI" : "Antigravity") · \(selectedProviderCount) 个账号")
                 .font(.callout)
@@ -1072,7 +1075,7 @@ struct DashboardView: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
-                .background(.thinMaterial, in: Capsule())
+                .background(CodexUPalette.glassFillLight, in: Capsule())
                 .overlay(Capsule().stroke(CodexUPalette.border))
         }
         .padding(.horizontal, 6)
@@ -1093,7 +1096,7 @@ struct DashboardView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(5)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .background(CodexUPalette.glassFill, in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(CodexUPalette.glassStroke))
     }
 
@@ -1144,7 +1147,7 @@ struct DashboardView: View {
             }
         }
         .padding(5)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .background(CodexUPalette.glassFill, in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(CodexUPalette.glassStroke))
         .disabled(model.providerSwitching)
     }
@@ -1265,7 +1268,7 @@ struct DashboardView: View {
                             }
                             .padding(16)
                             .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
-                            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                            .background(CodexUPalette.glassFillLight, in: RoundedRectangle(cornerRadius: 16))
                             .overlay(RoundedRectangle(cornerRadius: 16).stroke(CodexUPalette.glassStroke))
                         }
                     }
@@ -1374,7 +1377,7 @@ struct DashboardView: View {
                             .font(.callout.monospacedDigit().weight(.semibold)).foregroundStyle(CodexUPalette.secondary)
                     }
                     .padding(11)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .background(CodexUPalette.glassFillLight, in: RoundedRectangle(cornerRadius: 12))
                 }
                 if model.usage?.recent.isEmpty != false {
                     ContentUnavailableViewCompat(title: "等待首次模型调用", detail: "完成一次响应后，这里会出现 Token、耗时与 tok/s。")
@@ -1436,7 +1439,7 @@ struct DashboardView: View {
             content()
         }
         .padding(16)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 15))
+        .background(CodexUPalette.glassFillLight, in: RoundedRectangle(cornerRadius: 15))
         .overlay(RoundedRectangle(cornerRadius: 15).stroke(CodexUPalette.glassStroke))
     }
 
@@ -1660,7 +1663,7 @@ struct ProviderChoiceButton: View {
         .foregroundStyle(selected ? Color.white : Color.primary)
         .background(selected ? CodexUPalette.accent : Color.clear, in: RoundedRectangle(cornerRadius: 13))
         .overlay(RoundedRectangle(cornerRadius: 13).stroke(selected ? CodexUPalette.accent : Color.clear))
-        .shadow(color: selected ? CodexUPalette.accent.opacity(0.24) : .clear, radius: 10, y: 5)
+        .shadow(color: selected ? CodexUPalette.accent.opacity(0.18) : .clear, radius: 5, y: 2)
         .animation(.easeInOut(duration: 0.18), value: selected)
     }
 }
@@ -1696,9 +1699,9 @@ struct StatusTile: View {
         }
         .padding(13)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .background(CodexUPalette.glassFill, in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(CodexUPalette.glassStroke))
-        .shadow(color: CodexUPalette.accent.opacity(0.10), radius: 16, y: 7)
+        .shadow(color: CodexUPalette.accent.opacity(0.07), radius: 6, y: 2)
     }
 }
 
@@ -1707,9 +1710,9 @@ struct NativeCard<Content: View>: View {
     var body: some View {
         content()
             .padding(20)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
+            .background(CodexUPalette.glassFill, in: RoundedRectangle(cornerRadius: 24))
             .overlay(RoundedRectangle(cornerRadius: 24).stroke(CodexUPalette.glassStroke, lineWidth: 1))
-            .shadow(color: CodexUPalette.secondary.opacity(0.15), radius: 24, y: 10)
+            .shadow(color: CodexUPalette.secondary.opacity(0.10), radius: 9, y: 3)
     }
 }
 
@@ -1754,7 +1757,7 @@ struct QuotaSummaryTile: View {
         }
         .padding(11)
         .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 13))
+        .background(CodexUPalette.glassFillLight, in: RoundedRectangle(cornerRadius: 13))
         .overlay(RoundedRectangle(cornerRadius: 13).stroke(CodexUPalette.border))
     }
 }
@@ -1775,7 +1778,7 @@ struct SettingsMetric: View {
         }
         .padding(13)
         .frame(maxWidth: .infinity, minHeight: 100, alignment: .topLeading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .background(CodexUPalette.glassFillLight, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(CodexUPalette.glassStroke))
     }
 }
@@ -1850,7 +1853,7 @@ struct ActionButton: View {
         .foregroundStyle(primary ? Color.white : (destructive ? Color.red : Color.primary))
         .background(primary ? CodexUPalette.accent : Color.clear, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(primary ? Color.clear : CodexUPalette.border))
-        .shadow(color: primary ? CodexUPalette.accent.opacity(0.2) : .clear, radius: 10, y: 5)
+        .shadow(color: primary ? CodexUPalette.accent.opacity(0.16) : .clear, radius: 5, y: 2)
     }
 }
 

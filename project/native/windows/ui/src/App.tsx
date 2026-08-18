@@ -149,35 +149,29 @@ function WindowChrome() {
 }
 
 const navigation: Array<{ id: Section; label: string; icon: LucideIcon }> = [
-  { id: "overview", label: "模型与额度", icon: Gauge },
+  { id: "overview", label: "总览", icon: Gauge },
   { id: "accounts", label: "账号管理", icon: Users },
-  { id: "proxy", label: "本地代理", icon: Network },
+  { id: "proxy", label: "API 代理", icon: Network },
   { id: "routing", label: "模型路由", icon: Boxes },
   { id: "connectors", label: "Agent 接入", icon: Bot },
-  { id: "analytics", label: "Token 统计", icon: BarChart3 },
-  { id: "settings", label: "偏好设置", icon: Settings2 },
+  { id: "analytics", label: "用量统计", icon: BarChart3 },
+  { id: "settings", label: "设置", icon: Settings2 },
 ];
 
-function Sidebar({ section, setSection, provider, online, version }: { section: Section; setSection: (value: Section) => void; provider: Provider; online: boolean; version: string }) {
+function HorizontalNavigation({ section, setSection }: { section: Section; setSection: (value: Section) => void }) {
   return (
-    <aside className="sidebar">
-      <div className="brand-block">
-        <div className="brand-logo"><Sparkles className="size-6" /></div>
-        <div><p className="font-semibold tracking-[-.02em] text-white">ZCode Bridge</p><p className="mt-0.5 text-xs text-slate-400">AI Control Center</p></div>
-      </div>
-      <p className="nav-caption">控制中心</p>
-      <nav className="space-y-1.5">
+    <nav className="horizontal-nav" aria-label="控制中心功能">
+      <div className="horizontal-nav-items">
         {navigation.map((item) => {
           const Icon = item.icon;
-          return <button key={item.id} onClick={() => setSection(item.id)} className={cn("nav-item", section === item.id && "active")}><Icon /><span>{item.label}</span>{section === item.id && <ChevronRight className="ml-auto !size-3.5 opacity-60" />}</button>;
+          return <button key={item.id} onClick={() => setSection(item.id)} className={cn("nav-item", section === item.id && "active")}><Icon /><span>{item.label}</span></button>;
         })}
-      </nav>
-      <div className="sidebar-footer">
-        <div className="mb-2 flex items-center justify-between"><span className="text-[10px] uppercase tracking-[.16em] text-slate-500">本地安全边界</span><span className={cn("status-dot", online && "online")} /></div>
-        <p className="text-xs leading-5 text-slate-300">127.0.0.1 · 当前用户密钥</p>
-        <p className="text-[11px] text-slate-500">{providerName(provider)} · v{version}</p>
       </div>
-    </aside>
+      <div className="nav-signature">
+        <ShieldCheck />
+        <span>Antigravity Tools 核心功能</span>
+      </div>
+    </nav>
   );
 }
 
@@ -288,17 +282,24 @@ function AuthenticationOverlay({ operation, provider, onCopy, onError }: { opera
 }
 
 function Overview({ status, quota, usage, manager, provider, busy, onAction }: { status?: DashboardStatus; quota?: QuotaReport; usage?: UsageReport; manager?: ManagerReport; provider: Provider; busy: boolean; onAction: (action: string) => void }) {
+  const latest = usage?.latest;
   return (
     <div className="content-grid">
       <Card className="min-h-[450px]">
         <CardHeader eyebrow={provider === "xai" ? "GROK USAGE" : "ANTIGRAVITY USAGE"} title={provider === "xai" ? "Grok 模型额度" : "Gemini 模型额度"} description={quota?.fetchedAt ? `上次额度刷新 ${formatTime(quota.fetchedAt)}` : "每 5 分钟自动刷新；切换提供商立即刷新"} action={<Badge tone={quota?.warning ? "warn" : "good"}>{quota?.warning ? "需注意" : "额度监控"}</Badge>} />
-        <div className="p-5"><QuotaHero quota={quota} provider={provider} warningPercent={manager?.settings.quotaWarningPercent} />
+        <div className="p-5">
+          <div className="overview-metrics">
+            <Metric label="最近输出" value={latest ? formatNumber(latest.outputTokens) : "—"} suffix={latest ? "tok" : ""} />
+            <Metric label="有效吞吐" value={latest ? latest.outputTokensPerSecond.toFixed(1) : "—"} suffix={latest ? "tok/s" : ""} />
+            <Metric label="推理 Token" value={latest ? formatNumber(latest.reasoningTokens) : "—"} suffix={latest ? "tok" : ""} />
+            <Metric label="本地累计输出" value={usage ? formatNumber(usage.total.outputTokens) : "—"} suffix={usage ? "tok" : ""} />
+          </div>
+          <QuotaHero quota={quota} provider={provider} warningPercent={manager?.settings.quotaWarningPercent} />
           <div className="mt-5 rounded-2xl border border-white/[.07] bg-slate-950/20 p-4"><div className="flex items-center justify-between"><span className="text-xs text-slate-400">当前模型</span><Badge tone="blue">{status?.models.length ?? 0} 个</Badge></div><p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-200">{status?.models.length ? status.models.join("  ·  ") : "等待网关同步"}</p></div>
           {quota?.warning && <p className="mt-3 text-xs leading-5 text-amber-200/80">{quota.warning}</p>}
         </div>
       </Card>
       <Card><CardHeader eyebrow="LOCAL ACTIONS" title="接入控制" description={status?.operation.message || status?.operation.error || "所有操作均在本机完成"} action={busy ? <LoaderCircle className="size-4 animate-spin text-sky-300" /> : undefined} /><div className="p-5"><ActionPanel busy={busy} onAction={onAction} /></div></Card>
-      <Card className="md:col-span-2"><div className="grid grid-cols-3 divide-x divide-white/[.07] p-4"><Metric label="累计输出 Token" value={formatNumber(usage?.total.outputTokens)} suffix="tok" /><Metric label="平均生成速度" value={(usage?.total.averageTokensPerSecond ?? 0).toFixed(1)} suffix="tok/s" /><Metric label="最近请求" value={formatNumber(usage?.total.requests)} suffix="次" /></div></Card>
     </div>
   );
 }
@@ -338,7 +339,121 @@ function InfoLine({ label, value }: { label: string; value: string }) { return <
 function Empty({ icon: Icon, title, text }: { icon: LucideIcon; title: string; text: string }) { return <div className="empty-state"><Icon /><h3>{title}</h3><p>{text}</p></div>; }
 function StatCard({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) { return <Card className="p-4"><div className="mb-3 flex items-center justify-between"><span className="quota-icon !size-8"><Icon /></span><Activity className="size-3.5 text-slate-600" /></div><p className="text-[11px] text-slate-500">{label}</p><p className="mt-1 text-xl font-semibold text-white">{value}</p></Card>; }
 
-export default function App() {
+function WidgetGauge({ label, bucket, icon: Icon }: { label: string; bucket?: QuotaBucket; icon: LucideIcon }) {
+  const value = bucket?.remainingPercent;
+  return (
+    <div className="widget-gauge">
+      <div className="widget-gauge-header"><span><Icon />{label}</span><strong>{typeof value === "number" ? `${Math.round(value)}%` : "--"}</strong></div>
+      <Progress value={value ?? 0} warning={typeof value === "number" && value <= 20} />
+      <p>重置 {formatTime(bucket?.resetTime)}</p>
+    </div>
+  );
+}
+
+function TrayWidget() {
+  const [provider, setProvider] = useState<Provider>("antigravity");
+  const [status, setStatus] = useState<DashboardStatus>();
+  const [quota, setQuota] = useState<QuotaReport>();
+  const [usage, setUsage] = useState<UsageReport>();
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("正在读取当前额度…");
+  const refreshing = useRef(false);
+  const quotaRef = useRef<QuotaReport | undefined>(undefined);
+
+  const refresh = useCallback(async (forceQuota = false, requestedProvider?: Provider) => {
+    if (refreshing.current) return;
+    refreshing.current = true;
+    setLoading(true);
+    try {
+      const nextStatus = await apiGet<DashboardStatus>("/api/status");
+      const target = requestedProvider ?? nextStatus.selectedProvider;
+      setStatus(nextStatus);
+      setProvider(target);
+      const accountCount = target === "xai" ? nextStatus.providerAccounts.xai : nextStatus.providerAccounts.antigravity;
+      const nextUsage = await apiGet<UsageReport>(`/api/usage?provider=${target}`).catch(() => undefined);
+      setUsage(nextUsage);
+      if (accountCount === 0) {
+        quotaRef.current = undefined;
+        setQuota(undefined);
+        setMessage(`尚未登录 ${providerName(target)}`);
+      } else if (!nextStatus.gateway.ok) {
+        if (!quotaRef.current || quotaRef.current.provider !== target) setQuota(undefined);
+        setMessage("本地网关未启动，请打开控制中心接入 ZCode");
+      } else if (forceQuota || !quotaRef.current || quotaRef.current.provider !== target) {
+        const nextQuota = await apiGet<QuotaReport>(`/api/quota?provider=${target}`);
+        quotaRef.current = nextQuota;
+        setQuota(nextQuota);
+        setMessage(nextQuota.warning || `已于 ${formatTime(nextQuota.fetchedAt)} 更新`);
+      }
+    } catch (error) {
+      setMessage(`额度刷新失败：${normalizeError(error)}`);
+    } finally {
+      setLoading(false);
+      refreshing.current = false;
+    }
+  }, []);
+
+  const selectProvider = useCallback(async (next: Provider) => {
+    if (next === provider || refreshing.current) return;
+    setProvider(next);
+    quotaRef.current = undefined;
+    setQuota(undefined);
+    setMessage(`正在切换到 ${providerName(next)}…`);
+    try {
+      await apiPost("/api/provider", { provider: next });
+      await refresh(true, next);
+    } catch (error) {
+      setMessage(`切换失败：${normalizeError(error)}`);
+    }
+  }, [provider, refresh]);
+
+  useEffect(() => {
+    void refresh(true);
+    const statusTimer = window.setInterval(() => void refresh(false), 5_000);
+    const quotaTimer = window.setInterval(() => void refresh(true), 5 * 60_000);
+    const nativeRefresh = () => void refresh(true);
+    window.addEventListener("zcode:refresh", nativeRefresh);
+    return () => {
+      clearInterval(statusTimer);
+      clearInterval(quotaTimer);
+      window.removeEventListener("zcode:refresh", nativeRefresh);
+    };
+  }, [refresh]);
+
+  const five = quotaWindow(quota, "five");
+  const week = quotaWindow(quota, "week");
+  const shared = allBuckets(quota).find((bucket) => typeof bucket.remainingPercent === "number");
+  const account = quota?.accounts[0];
+  const openMain = () => { if (hasTauri()) void invoke("show_main_window"); };
+  const hide = () => { if (hasTauri()) void getCurrentWindow().hide(); };
+
+  return (
+    <div className="widget-shell">
+      <div className="widget-orb widget-orb-one" /><div className="widget-orb widget-orb-two" /><div className="noise-layer" />
+      <header className="widget-header" data-tauri-drag-region>
+        <div className="widget-brand" data-tauri-drag-region><span><Sparkles /></span><div><strong>ZCode 当前额度</strong><small>{status?.gateway.ok ? "本地网关在线" : "本地安全核心"}</small></div></div>
+        <div className="widget-header-actions">
+          <button aria-label="刷新额度" disabled={loading} onClick={() => void refresh(true)}><RefreshCw className={cn(loading && "animate-spin")} /></button>
+          <button aria-label="关闭小组件" onClick={hide}><X /></button>
+        </div>
+      </header>
+      <div className="widget-provider-tabs">
+        {(["antigravity", "xai"] as Provider[]).map((item) => <button key={item} aria-label={`切换到 ${providerName(item)}`} className={cn(provider === item && "active")} onClick={() => void selectProvider(item)}><span>{item === "xai" ? <Zap /> : <Sparkles />}{providerName(item)}</span><em>{item === "xai" ? status?.providerAccounts.xai ?? 0 : status?.providerAccounts.antigravity ?? 0}</em></button>)}
+      </div>
+      <section className="widget-content">
+        <div className="widget-account"><span className={cn("status-dot", status?.gateway.ok && "online")} /><div><strong>{account?.account || providerName(provider)}</strong><small>{account?.plan || message}</small></div><Badge tone={quota?.stale ? "warn" : quota ? "good" : "neutral"}>{quota?.stale ? "缓存" : quota ? "实时" : "等待"}</Badge></div>
+        <div className="widget-gauges">
+          {provider === "xai" ? <WidgetGauge label="共享额度" bucket={shared} icon={Zap} /> : <><WidgetGauge label="当前 5 小时" bucket={five} icon={Activity} /><WidgetGauge label="本周额度" bucket={week} icon={CircleGauge} /></>}
+          {provider === "xai" && <div className="widget-credit"><span>可用 Credits</span><strong>{account?.credits?.available ? account.credits.amount : "--"}</strong><small>{account?.credits?.creditType || "xAI"}</small></div>}
+        </div>
+        <div className="widget-stats"><div><span>累计输出</span><strong>{formatNumber(usage?.total.outputTokens)} <small>tok</small></strong></div><div><span>当前速度</span><strong>{(usage?.latest?.outputTokensPerSecond ?? 0).toFixed(1)} <small>tok/s</small></strong></div></div>
+      </section>
+      <footer className="widget-footer"><button onClick={openMain}><ExternalLink />打开控制中心</button><span>{message}</span></footer>
+    </div>
+  );
+}
+
+function ControlCenterApp() {
   const [section, setSection] = useState<Section>("overview");
   const [provider, setProvider] = useState<Provider>("antigravity");
   const [status, setStatus] = useState<DashboardStatus>();
@@ -346,7 +461,7 @@ export default function App() {
   const [usage, setUsage] = useState<UsageReport>();
   const [manager, setManager] = useState<ManagerReport>();
   const [connectors, setConnectors] = useState<ConnectorResponse>();
-  const [version, setVersion] = useState("0.6.3-test");
+  const [version, setVersion] = useState("0.6.4-test");
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
@@ -354,6 +469,7 @@ export default function App() {
   const pendingRefresh = useRef<{ forceQuota: boolean; provider?: Provider } | undefined>(undefined);
   const refreshRef = useRef<((forceQuota?: boolean, requestedProvider?: Provider) => Promise<void>) | undefined>(undefined);
   const initialized = useRef(false);
+  const scrollIdleTimer = useRef<number | undefined>(undefined);
 
   const refresh = useCallback(async (forceQuota = false, requestedProvider?: Provider) => {
     if (refreshing.current) {
@@ -471,7 +587,7 @@ export default function App() {
     initialized.current = true;
     void (async () => {
       try {
-        const startup = hasTauri() ? await invoke<StartupInfo>("startup_info") : { version: "0.6.3-test", autoSetup: false };
+        const startup = hasTauri() ? await invoke<StartupInfo>("startup_info") : { version: "0.6.4-test", autoSetup: false };
         setVersion(startup.version);
         await refresh(true);
         if (startup.autoSetup) await runAction("setup");
@@ -500,6 +616,20 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [notice]);
 
+  useEffect(() => () => {
+    if (scrollIdleTimer.current) window.clearTimeout(scrollIdleTimer.current);
+    document.documentElement.classList.remove("window-scrolling");
+  }, []);
+
+  const handleMainScroll = useCallback(() => {
+    document.documentElement.classList.add("window-scrolling");
+    if (scrollIdleTimer.current) window.clearTimeout(scrollIdleTimer.current);
+    scrollIdleTimer.current = window.setTimeout(() => {
+      document.documentElement.classList.remove("window-scrolling");
+      scrollIdleTimer.current = undefined;
+    }, 140);
+  }, []);
+
   const subtitle = useMemo(() => status?.operation.running ? status.operation.message || "本机操作正在进行" : status?.gateway.ok ? "本地安全核心在线" : "请选择提供商并执行一键接入", [status]);
   const content = section === "overview" ? <Overview {...{ status, quota, usage, manager, provider, busy, onAction: runAction }} />
     : section === "accounts" ? <AccountsView {...{ manager, quota, provider }} />
@@ -514,16 +644,26 @@ export default function App() {
       <div className="liquid-orb orb-one" /><div className="liquid-orb orb-two" /><div className="noise-layer" />
       <WindowChrome />
       <div className="app-body">
-        <Sidebar {...{ section, setSection, provider, online: !!status?.gateway.ok, version }} />
-        <main className="main-panel">
-          <header className="page-header"><div><p className="page-kicker">ZCODE ANTIGRAVITY TOOLS</p><h1>{navigation.find((item) => item.id === section)?.label}</h1><p>{subtitle}</p></div><Button size="sm" onClick={() => void refresh(true)} disabled={busy}><RefreshCw className={cn("size-3.5", refreshing.current && "animate-spin")} />刷新额度</Button></header>
+        <main className="main-panel" onScroll={handleMainScroll}>
+          <header className="mac-brand-bar">
+            <div className="mac-brand-identity"><span className="mac-brand-logo">ZA</span><div><h1>ZCode Antigravity</h1><p>Updated {status?.updatedAt ? formatTime(status.updatedAt) : "等待首次刷新"}</p></div></div>
+            <div className="mac-brand-actions"><Badge tone={status?.gateway.ok ? "good" : "neutral"}>{status?.gateway.ok ? "本地在线" : "Local only"}</Badge><Button size="icon" aria-label="刷新额度" onClick={() => void refresh(true)} disabled={busy}><RefreshCw className={cn("size-4", refreshing.current && "animate-spin")} /></Button></div>
+          </header>
+          <div className="mac-meta-row"><div><span className={cn("status-dot", status?.gateway.ok && "online")} /><strong>{providerName(provider)}</strong><span>· {provider === "xai" ? status?.providerAccounts.xai ?? 0 : status?.providerAccounts.antigravity ?? 0} 个账号</span></div><div><Activity /><span>额度每 {manager?.settings.autoRefreshMinutes ?? 5} 分钟 · Token 每 5 秒</span></div></div>
+          <HorizontalNavigation section={section} setSection={setSection} />
           <ProviderTabs provider={provider} counts={status?.providerAccounts} busy={busy} onSelect={(value) => void selectProvider(value)} />
           <StatusStrip status={status} />
           <div className="page-content">{content}</div>
+          <footer className="mac-app-footer"><span>127.0.0.1 · 当前用户密钥</span><span>{subtitle} · v{version}</span></footer>
         </main>
       </div>
       <AuthenticationOverlay operation={status?.operation} provider={provider} onCopy={(value) => void copy(value, "xAI 验证码已复制")} onError={(text) => setNotice({ text, error: true })} />
       {notice && <div className={cn("toast", notice.error && "error")}><span className={cn("status-dot online", notice.error && "!bg-rose-400 !shadow-[0_0_12px_rgba(251,113,133,.8)]")} /><p>{notice.text}</p></div>}
     </div>
   );
+}
+
+export default function App() {
+  const widgetMode = new URLSearchParams(window.location.search).get("view") === "widget";
+  return widgetMode ? <TrayWidget /> : <ControlCenterApp />;
 }

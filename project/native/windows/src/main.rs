@@ -16,10 +16,12 @@ use std::thread;
 use std::time::{Duration, Instant};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, State};
+use tauri::window::{Color, Effect, EffectsBuilder};
+use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, State, WebviewUrl, WebviewWindowBuilder};
 use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
-const VERSION: &str = "0.6.3-test";
+const VERSION: &str = "0.6.4-test";
+const WIDGET_LABEL: &str = "quota-widget";
 
 struct NativeHost {
     child: Child,
@@ -241,11 +243,83 @@ fn open_xai_verification_url(url: String) -> Result<(), String> {
 }
 
 fn show_main(app: &AppHandle) {
+    if let Some(widget) = app.get_webview_window(WIDGET_LABEL) {
+        let _ = widget.hide();
+    }
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
     }
+}
+
+#[tauri::command]
+fn show_main_window(app: AppHandle) {
+    show_main(&app);
+}
+
+fn build_quota_widget(app: &tauri::App) -> tauri::Result<()> {
+    WebviewWindowBuilder::new(
+        app,
+        WIDGET_LABEL,
+        WebviewUrl::App("index.html?view=widget".into()),
+    )
+    .title("ZCode · 当前额度")
+    .inner_size(430.0, 368.0)
+    .min_inner_size(430.0, 368.0)
+    .max_inner_size(430.0, 368.0)
+    .resizable(false)
+    .decorations(false)
+    .transparent(true)
+    .background_color(Color(0, 0, 0, 0))
+    .shadow(true)
+    .skip_taskbar(true)
+    .always_on_top(true)
+    .focused(false)
+    .visible(false)
+    .effects(
+        EffectsBuilder::new()
+            .effect(Effect::Acrylic)
+            .color(Color(228, 235, 249, 82))
+            .build(),
+    )
+    .build()?;
+    Ok(())
+}
+
+fn toggle_quota_widget(app: &AppHandle, click: PhysicalPosition<f64>) {
+    let Some(window) = app.get_webview_window(WIDGET_LABEL) else {
+        return;
+    };
+    if window.is_visible().unwrap_or(false) {
+        let _ = window.hide();
+        return;
+    }
+
+    let size = window
+        .outer_size()
+        .unwrap_or_else(|_| PhysicalSize::new(430, 368));
+    if let Ok(Some(monitor)) = app
+        .monitor_from_point(click.x, click.y)
+        .or_else(|_| app.primary_monitor())
+    {
+        let area = monitor.work_area();
+        let left = area.position.x as f64 + 8.0;
+        let top = area.position.y as f64 + 8.0;
+        let right = area.position.x as f64 + area.size.width as f64 - size.width as f64 - 8.0;
+        let bottom = area.position.y as f64 + area.size.height as f64 - size.height as f64 - 8.0;
+        let x = (click.x - size.width as f64 / 2.0).clamp(left, right.max(left));
+        let preferred_y = if click.y > area.position.y as f64 + area.size.height as f64 / 2.0 {
+            click.y - size.height as f64 - 14.0
+        } else {
+            click.y + 14.0
+        };
+        let y = preferred_y.clamp(top, bottom.max(top));
+        let _ = window.set_position(PhysicalPosition::new(x.round() as i32, y.round() as i32));
+    }
+    let _ = window.eval("window.dispatchEvent(new CustomEvent('zcode:refresh'))");
+    let _ = window.show();
+    let _ = window.set_focus();
 }
 
 fn build_tray(app: &tauri::App) -> tauri::Result<()> {
@@ -259,22 +333,23 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .tooltip("ZCode · 正在读取额度")
         .on_tray_icon_event(|tray, event| {
-            if matches!(
-                event,
-                TrayIconEvent::Click {
-                    button: MouseButton::Left,
-                    button_state: MouseButtonState::Up,
-                    ..
-                }
-            ) {
-                show_main(tray.app_handle());
+            if let TrayIconEvent::Click {
+                position,
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                toggle_quota_widget(tray.app_handle(), position);
             }
         })
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_main(app),
             "refresh" => {
-                show_main(app);
                 if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.eval("window.dispatchEvent(new CustomEvent('zcode:refresh'))");
+                }
+                if let Some(window) = app.get_webview_window(WIDGET_LABEL) {
                     let _ = window.eval("window.dispatchEvent(new CustomEvent('zcode:refresh'))");
                 }
             }
@@ -296,6 +371,7 @@ fn main() {
         .setup(|app| {
             let runtime = AppRuntime::start().map_err(std::io::Error::other)?;
             app.manage(runtime);
+            build_quota_widget(app)?;
             build_tray(app)?;
             Ok(())
         })
@@ -304,12 +380,19 @@ fn main() {
             api_post,
             startup_info,
             update_tray_summary,
+            show_main_window,
             open_xai_verification_url
         ])
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.hide();
+            match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+                tauri::WindowEvent::Focused(false) if window.label() == WIDGET_LABEL => {
+                    let _ = window.hide();
+                }
+                _ => {}
             }
         })
         .run(tauri::generate_context!())

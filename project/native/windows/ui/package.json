@@ -1,7 +1,7 @@
 {
   "name": "zcode-antigravity-control-center",
   "private": true,
-  "version": "0.6.3-test",
+  "version": "0.6.4-test",
   "type": "module",
   "scripts": {
     "dev": "vite",

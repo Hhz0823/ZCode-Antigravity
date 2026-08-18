@@ -2,6 +2,23 @@
 
 最新验证日期：2026-08-18（Asia/Shanghai）
 
+## v0.6.4-test 双平台滚动、浅色玻璃与独立额度小组件
+
+- Windows Tauri 2 主界面改为与 macOS SwiftUI 版一致的浅色液态玻璃信息架构：顶部品牌栏、
+  横向七页导航、Antigravity / Grok 双栏切换、四个连接状态卡、额度与 Token 指标、右侧接入控制。
+- Windows 主窗口和额度小组件继续使用 DWM Acrylic；可滚动内容不再为每张卡重复执行
+  `backdrop-filter`，滚动和窗口拖动期间暂停环境光晕与非必要 transition，保留单一系统玻璃层。
+- macOS 保留主窗口唯一 `NSVisualEffectView`，把滚动卡片的嵌套 `Material` 改为轻量半透明填充，
+  主内容使用 `LazyVStack`，降低大面积阴影和背景模糊半径。
+- Windows 11 x64 实机安装后控制中心 SHA-256 与候选包一致；真实 Grok 账号、共享额度、模型、
+  Token 与 Token/s 正常显示，连续向下及向上滚动后界面完整返回顶部。
+- 实机将 ZCode 保持前台后单击 Windows 系统托盘图标，只出现右下角额度小组件；主控制中心没有
+  被恢复、聚焦或置顶。小组件显示 Grok 95% 共享额度、重置时间、累计输出与当前生成速度。
+- Apple Silicon Mac 原生 App 完成连续上下滚动；单击菜单栏额度入口只显示原生 Popover，
+  只有明确点击“打开主界面”才激活控制中心。
+- React/Tailwind 生产构建、Windows GNU target `cargo check` / Release 交叉编译、SwiftUI 双架构
+  类型检查、Windows/macOS ZIP 完整性及可执行文件结构检查通过。
+
 ## v0.6.3-test Windows Grok 额度自动恢复修复
 
 - 实机原始接口确认 xAI 登录与 billing 服务均正常：同一 Windows 11 账号的
