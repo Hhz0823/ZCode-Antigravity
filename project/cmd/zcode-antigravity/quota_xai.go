@@ -72,6 +72,16 @@ func (a *app) fetchXAIQuotaReport() (quotaReport, error) {
 	if err != nil {
 		return quotaReport{}, err
 	}
+	report := quotaReport{
+		FetchedAt: a.now().UTC(),
+		Provider:  "xai",
+		Source:    "xAI account discovery",
+		Accounts:  make([]quotaAccount, 0),
+	}
+	if len(credentials) == 0 {
+		report.Warning = "尚未登录 Grok / xAI，请点击“登录 Grok / xAI”获取验证码"
+		return report, nil
+	}
 	var authFiles managementAuthFiles
 	if errAuth := a.managementJSON(current.Port, http.MethodGet, "/v0/management/auth-files", nil, &authFiles); errAuth != nil {
 		return quotaReport{}, fmt.Errorf("Grok 额度接口尚未就绪: %w", errAuth)
@@ -86,15 +96,12 @@ func (a *app) fetchXAIQuotaReport() (quotaReport, error) {
 			xaiFiles = append(xaiFiles, struct{ AuthIndex, Email, Label string }{authFile.AuthIndex, authFile.Email, authFile.Label})
 		}
 	}
-	if len(credentials) == 0 || len(xaiFiles) == 0 {
-		return quotaReport{}, errors.New("没有 Grok / xAI 账号，请先登录")
+	if len(xaiFiles) == 0 {
+		report.Warning = "尚未登录 Grok / xAI，请点击“登录 Grok / xAI”获取验证码"
+		return report, nil
 	}
-	report := quotaReport{
-		FetchedAt: a.now().UTC(),
-		Provider:  "xai",
-		Source:    "xAI Grok Build billing",
-		Accounts:  make([]quotaAccount, 0, len(xaiFiles)),
-	}
+	report.Source = "xAI Grok Build billing"
+	report.Accounts = make([]quotaAccount, 0, len(xaiFiles))
 	for _, authFile := range xaiFiles {
 		credential, found := matchXAICredential(credentials, authFile.Email)
 		account := quotaAccount{Account: maskEmail(firstText(authFile.Email, authFile.Label, credential.Email, credential.Subject, "Grok account")), Status: "ready"}

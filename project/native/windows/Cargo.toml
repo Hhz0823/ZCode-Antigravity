@@ -1,6 +1,6 @@
 [package]
 name = "zcode-antigravity-tauri"
-version = "0.6.1-test"
+version = "0.6.2-test"
 edition = "2024"
 license = "LicenseRef-Proprietary"
 publish = false

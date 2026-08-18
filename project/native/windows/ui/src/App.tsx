@@ -207,6 +207,14 @@ function StatusStrip({ status }: { status?: DashboardStatus }) {
 }
 
 function QuotaHero({ quota, provider, warningPercent = 20 }: { quota?: QuotaReport; provider: Provider; warningPercent?: number }) {
+  if (quota && quota.accounts.length === 0) {
+    const Icon = provider === "xai" ? Zap : KeyRound;
+    const loginNeeded = quota.warning?.includes("尚未登录") ?? false;
+    const title = loginNeeded
+      ? provider === "xai" ? "尚未登录 Grok / xAI" : "尚未登录 Antigravity"
+      : `${providerName(provider)} 额度暂不可用`;
+    return <div className="quota-empty md:col-span-2"><span className="quota-icon"><Icon /></span><div><h3>{title}</h3><p>{quota.warning || `请先完成 ${providerName(provider)} 授权`}</p></div></div>;
+  }
   const five = quotaWindow(quota, "five");
   const week = quotaWindow(quota, "week");
   const cards = provider === "xai"
@@ -338,7 +346,7 @@ export default function App() {
   const [usage, setUsage] = useState<UsageReport>();
   const [manager, setManager] = useState<ManagerReport>();
   const [connectors, setConnectors] = useState<ConnectorResponse>();
-  const [version, setVersion] = useState("0.6.1-test");
+  const [version, setVersion] = useState("0.6.2-test");
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
@@ -357,7 +365,35 @@ export default function App() {
       ]);
       setStatus(nextStatus); setUsage(nextUsage); setManager(nextManager);
       if (!requestedProvider) setProvider(nextStatus.selectedProvider);
-      if (forceQuota || !quota || quota.provider !== target) setQuota(await apiGet<QuotaReport>(`/api/quota?provider=${target}`));
+      if (forceQuota || !quota || quota.provider !== target) {
+        const accountCount = target === "xai" ? nextStatus.providerAccounts.xai : nextStatus.providerAccounts.antigravity;
+        if (accountCount === 0) {
+          setQuota({
+            fetchedAt: nextStatus.updatedAt,
+            provider: target,
+            source: "本地账号状态",
+            stale: false,
+            accounts: [],
+            warning: target === "xai"
+              ? "尚未登录 Grok / xAI，请点击右侧“登录 Grok / xAI”获取验证码"
+              : "尚未登录 Antigravity，请点击右侧“登录 Antigravity”完成授权",
+          });
+        } else if (!nextStatus.gateway.ok) {
+          setQuota((current) => current?.provider === target
+            ? { ...current, stale: true, warning: "本地网关尚未运行，请点击“一键接入 ZCode”后刷新额度" }
+            : { provider: target, source: "本地网关状态", stale: true, accounts: [], warning: "本地网关尚未运行，请点击“一键接入 ZCode”后刷新额度" });
+        } else {
+          try {
+            setQuota(await apiGet<QuotaReport>(`/api/quota?provider=${target}`));
+          } catch (error) {
+            const message = normalizeError(error);
+            setQuota((current) => current?.provider === target
+              ? { ...current, stale: true, warning: `实时额度暂不可用：${message}` }
+              : { provider: target, source: "额度接口", stale: true, accounts: [], warning: `实时额度暂不可用：${message}` });
+            if (forceQuota) setNotice({ text: `${providerName(target)} 额度刷新失败：${message}`, error: true });
+          }
+        }
+      }
       try { setConnectors(await apiGet<ConnectorResponse>("/api/connectors")); } catch { setConnectors(undefined); }
     } catch (error) {
       setNotice({ text: `状态刷新失败：${normalizeError(error)}`, error: true });
@@ -415,7 +451,7 @@ export default function App() {
     initialized.current = true;
     void (async () => {
       try {
-        const startup = hasTauri() ? await invoke<StartupInfo>("startup_info") : { version: "0.6.1-test", autoSetup: false };
+        const startup = hasTauri() ? await invoke<StartupInfo>("startup_info") : { version: "0.6.2-test", autoSetup: false };
         setVersion(startup.version);
         await refresh(true);
         if (startup.autoSetup) await runAction("setup");

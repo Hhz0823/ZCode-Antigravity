@@ -222,7 +222,9 @@ func (a *app) fetchQuotaReport() (quotaReport, error) {
 		report.Accounts = append(report.Accounts, account)
 	}
 	if len(report.Accounts) == 0 {
-		return a.cachedQuotaReport(errors.New("没有可查询的 Antigravity 账号"))
+		report.Source = "Antigravity account discovery"
+		report.Warning = "尚未登录 Antigravity，请点击“登录 Antigravity”完成授权"
+		return report, nil
 	}
 	sort.Slice(report.Accounts, func(i, j int) bool { return report.Accounts[i].Account < report.Accounts[j].Account })
 	if !quotaReportHasBuckets(report) {
