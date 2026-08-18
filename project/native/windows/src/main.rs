@@ -19,7 +19,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Manager, State};
 use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
-const VERSION: &str = "0.6.2-test";
+const VERSION: &str = "0.6.3-test";
 
 struct NativeHost {
     child: Child,

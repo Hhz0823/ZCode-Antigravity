@@ -346,15 +346,24 @@ export default function App() {
   const [usage, setUsage] = useState<UsageReport>();
   const [manager, setManager] = useState<ManagerReport>();
   const [connectors, setConnectors] = useState<ConnectorResponse>();
-  const [version, setVersion] = useState("0.6.2-test");
+  const [version, setVersion] = useState("0.6.3-test");
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
   const refreshing = useRef(false);
+  const pendingRefresh = useRef<{ forceQuota: boolean; provider?: Provider } | undefined>(undefined);
+  const refreshRef = useRef<((forceQuota?: boolean, requestedProvider?: Provider) => Promise<void>) | undefined>(undefined);
   const initialized = useRef(false);
 
   const refresh = useCallback(async (forceQuota = false, requestedProvider?: Provider) => {
-    if (refreshing.current) return;
+    if (refreshing.current) {
+      const pending = pendingRefresh.current;
+      pendingRefresh.current = {
+        forceQuota: forceQuota || pending?.forceQuota || false,
+        provider: requestedProvider ?? pending?.provider,
+      };
+      return;
+    }
     refreshing.current = true;
     const target = requestedProvider ?? provider;
     try {
@@ -365,7 +374,10 @@ export default function App() {
       ]);
       setStatus(nextStatus); setUsage(nextUsage); setManager(nextManager);
       if (!requestedProvider) setProvider(nextStatus.selectedProvider);
-      if (forceQuota || !quota || quota.provider !== target) {
+      const gatewayRecovered = nextStatus.gateway.ok
+        && quota?.provider === target
+        && quota.warning?.includes("本地网关尚未运行");
+      if (forceQuota || !quota || quota.provider !== target || gatewayRecovered) {
         const accountCount = target === "xai" ? nextStatus.providerAccounts.xai : nextStatus.providerAccounts.antigravity;
         if (accountCount === 0) {
           setQuota({
@@ -397,8 +409,16 @@ export default function App() {
       try { setConnectors(await apiGet<ConnectorResponse>("/api/connectors")); } catch { setConnectors(undefined); }
     } catch (error) {
       setNotice({ text: `状态刷新失败：${normalizeError(error)}`, error: true });
-    } finally { refreshing.current = false; }
+    } finally {
+      refreshing.current = false;
+      const pending = pendingRefresh.current;
+      pendingRefresh.current = undefined;
+      if (pending) {
+        window.setTimeout(() => void refreshRef.current?.(pending.forceQuota, pending.provider), 0);
+      }
+    }
   }, [provider, quota]);
+  refreshRef.current = refresh;
 
   const runAction = useCallback(async (action: string) => {
     if (busy) return;
@@ -451,7 +471,7 @@ export default function App() {
     initialized.current = true;
     void (async () => {
       try {
-        const startup = hasTauri() ? await invoke<StartupInfo>("startup_info") : { version: "0.6.2-test", autoSetup: false };
+        const startup = hasTauri() ? await invoke<StartupInfo>("startup_info") : { version: "0.6.3-test", autoSetup: false };
         setVersion(startup.version);
         await refresh(true);
         if (startup.autoSetup) await runAction("setup");
