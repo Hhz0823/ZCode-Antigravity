@@ -21,8 +21,6 @@
 - 额度面板每 5 分钟自动刷新；手动刷新、切换提供商和接入完成会立即刷新。刷新失败时保留上次成功数据。
 - 本地网关按协议返回的真实 usage 数据显示最近输出 Token、推理 Token、生成速度和本地累计输出；有首字节时间时使用“输出 Token ÷ 生成阶段耗时”，否则明确标为“有效吞吐”。统计不保存提示词或回复。
 - Antigravity / Grok 使用独立的原生选择卡、账号数、选中态与切换进度；切换期间保留各自最近成功额度，避免旧请求覆盖新提供商界面。
-- 核心管理闭环参考 [Antigravity Tools](https://github.com/lbjlaq/Antigravity-Manager) 的公开产品能力：账号管家、OpenAI / Anthropic / Gemini 三协议代理、轮询 / 加权 / 填满优先路由、会话亲和、401/429 重试、凭据轮换、Agent 默认模型与本机设置持久化；代码与素材均为本项目独立实现。
-- 原生界面参考 [codexU](https://github.com/shanggqm/codexU) 的信息层级，Windows 与 macOS 统一为浅色蓝紫液态玻璃背景、半透明圆角卡片、顶部胶囊导航和分层额度 / Token 指标。macOS 使用窗口后方 `NSVisualEffectView`；Windows 使用 Tauri 2 的原生 Acrylic 窗口效果叠加轻量动态光晕，桌面内容由系统合成器实时模糊，不再截取桌面图片。
 - Antigravity 额度请求支持 sandbox / daily / production 端点、HTTP 403 无项目字段重试和逐模型额度降级。
 - 内置 Grok Build、OpenAI Codex、Claude Code、OpenCode、通用 OpenAI / Anthropic 客户端配置卡，可一键复制，不会擅自覆盖外部 Agent 配置文件。
 - Windows 控制中心使用 **Tauri 2 + React + Tailwind CSS / shadcn 风格组件**，Rust 仅负责原生窗口、系统托盘和本地 API 边界；WebView2 随系统缩放并使用原生 Acrylic，子进程全部隐藏。
@@ -124,36 +122,6 @@ Windows 基线与 `v0.6.4-test` 新增的构建及实机测试记录包括：
 - 账号、三协议代理、模型路由、会话亲和、重试策略、5/10 分钟刷新与液态玻璃设置均通过带当前用户会话密钥的本机 API 读写；账号 ID 与标签脱敏，接口不返回凭据。
 - 双提供商切换、Grok billing 解析、文本模型过滤和五类 Agent 配置均有单元测试。
 - Antigravity 额度 HTTP 403 去项目字段重试和 `fetchAvailableModels` 降级路径均有回归测试。
-- 旧版网页控制面板仍保留为诊断回退入口；正式客户端为 macOS SwiftUI 与 Windows Tauri 2。
-- 已在 Windows 11 x64、144 DPI（150%）实机完成真实 Google AI Pro 额度刷新、完整窗口截图和响应性回归；四个状态卡与全部操作按钮均在窗口内可见。
-- `v0.6.0-test` 在同一实机显示账号摘要、5 小时 / 本周额度、分组进度条和重置时间；状态与 Token 统计每 5 秒更新，但不会改写独立的 5 分钟额度缓存周期。
-- 单击 Windows 任务栏通知区域图标只显示独立额度小组件，不恢复、不聚焦也不置顶主控制中心；需要主界面时使用小组件中的“打开控制中心”或右键菜单。
-- `v0.6.4-test` 已在同一 Windows 11 x64 实机安装并校验控制中心 SHA-256；浅色顶部品牌栏、横向七页导航、双提供商切换、四个状态卡、额度区和右侧操作区与 macOS 原生版保持相同布局。
-- 同机将 ZCode 保持在前台后单击系统托盘图标，只有右下角额度小组件出现，主控制中心仍位于 ZCode 后方；小组件实时显示 Grok 95% 共享额度、重置时间、累计输出与 Token/s。
-- Windows 与 Apple Silicon macOS 都完成连续上下滚动复测；滚动区域移除重复的 `backdrop-filter` / SwiftUI `Material`，滚动期间暂停背景光晕和卡片过渡，界面返回顶部后状态与额度仍正常更新。
-- 同机真实模型响应记录为输出 45 Token、生成阶段 31.1 Token/s；本地统计文件不含 API key、OAuth token、prompt 或回复字段。单击任务栏图标会打开 codexU 风格原生弹层，可见 5 小时 100%、本周 98%、重置时间和最近吞吐。
-- 同机已从主界面切换到“设置”页并打开任务栏额度组件；液态玻璃文本对比度、完整窗口边界、七页导航和 150% DPI 布局正常。“一键接入 ZCode”会启动当前候选包内的本地网关，不再出现点击无反馈。
-- 已实测 Antigravity → Grok → Antigravity 切换：Grok 0 账号页面不显示 Gemini Token，切回后立即恢复 Antigravity 的额度与 Token 缓存；安装器启动控制中心后也会自动执行一次接入。
-- 已修复旧版复用网关时把状态路径误写成新版本目录的问题；升级只允许停止同一 `ZCodeAntigravity/app-*` 根目录下的历史后端，仍拒绝处理无关进程。
-- `v0.6.1-test` 在 Windows 11 实机完成 Antigravity Google OAuth 登录；登录进程正常结束并新增当前用户凭据，既有凭据未删除。
-- 同机完成 Grok Build 设备流预授权：软件弹层与 `accounts.x.ai` 官方页面显示同一短码，短码可选中/复制，等待状态在后台轮询期间持续可见。因测试机没有已授权的 xAI 账号，没有代替用户完成最后的账号批准，也没有生成 xAI 凭据。
-- `v0.6.2-test` 在同一 Windows 11 实机完成 Grok 设备授权，账号计数由 0 更新为 1；登录前零账号、登录后网关离线均显示可操作的空状态，不再把预期状态弹成 `http status: 503`。
-- 同机以壁纸、桌面图标和多个窗口作为高对比背景复测 Acrylic；背景实时透入并模糊，窗口拖动时不使用桌面截图，标题、额度、按钮和状态卡仍清晰可读。
-- 取消未完成 Grok 测试后恢复 Antigravity 网关：`/healthz` 返回 200，模型目录返回 13 个模型，ZCode 进程保持连接；远程测试脚本、计划任务和下载目录临时包已清理。
-
-macOS Universal 基线与 `v0.6.4-test` 的验证包括：
-
-- 管理器、Keychain 凭据加密与后端相关测试通过。
-- SwiftUI 主程序、Go Core 和后端均为真正的 `x86_64 + arm64` Universal Mach-O。
-- App 临时签名、包内逐文件哈希、ZIP 完整性和隔离 `doctor` 检查通过。
-- Info.plist 已启用普通 App 激活策略（`LSUIElement=false`），Dock 图标、原生菜单栏组件、关闭窗口驻留和退出清理通过。
-- 本机已识别 `/Applications/ZCode.app` 及运行中的 `ZCode` 进程；未修改用户现有配置。
-- `v0.6.0-test` SwiftUI 原生界面已实机启动；液态玻璃主窗口、七页导航、5 分钟刷新设置、提供商切换、状态卡和原生菜单栏额度组件显示正常。
-- macOS 主窗口改为透明 `NSWindow` 与 `.behindWindow` 的 `NSVisualEffectView`；高对比背景实测可透过主窗口并被系统模糊，卡片层仍保持可读。
-- 单击 macOS 菜单栏额度入口只显示原生额度 Popover，不激活或置顶主窗口；只有明确点击“打开主界面”才恢复控制中心。
-
-注意：上游模型目录、账号资格、风控和额度都可能随时变化。列表中看到模型并不代表当前账号一定可用。
-
 ## 隐私与安全边界
 
 - Google / xAI access、refresh token 和运行状态保存在当前用户的 ZCodeAntigravity 数据目录。
@@ -254,26 +222,6 @@ cargo build --release --target x86_64-pc-windows-gnu
 
 同一发布包中的 `ZCode-Antigravity.exe` 是隐藏运行的 Go Core，Tauri 客户端通过一次性
 loopback 会话与它通信；OAuth、token 加密和模型路由仍由经过测试的 Core/后端负责。
-
-后端固定为 `router-for-me/CLIProxyAPI v7.2.132`，本地修改位于：
-
-```text
-project/docs/CLIProxyAPI-v7.2.132-zcode.patch
-```
-
-该文件是对上游版本的历史业务补丁。GitHub 发布树中将 OAuth 凭据改为环境变量的安全改动以当前源码为准。
-
-## 第三方说明与许可
-
-- 上游项目：[`router-for-me/CLIProxyAPI`](https://github.com/router-for-me/CLIProxyAPI)
-- Windows 客户端：Tauri 2、React、Tailwind CSS、Rust、[`windows-sys`](https://github.com/microsoft/windows-rs)、`ureq`、`serde`
-- 兼容回退任务栏组件：[`gogpu/systray`](https://github.com/gogpu/systray) `v0.2.8`
-- 固定版本：`v7.2.132`
-- 固定提交：`78f0c4079e3e6273d65d03b5549cffc898703264`
-- CLIProxyAPI 与 systray 上游许可：MIT License；平台依赖许可见发布包第三方说明。
-
-上游 MIT License 仅适用于对应的 CLIProxyAPI 内容。本项目其余代码尚未在本仓库顶层声明独立许可证，
-请勿自动将整个项目视为 MIT 授权。商标和产品名称归各自权利人所有。
 
 ## 免责声明
 
