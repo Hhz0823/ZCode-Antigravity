@@ -6,7 +6,8 @@ project_dir=${script_dir:h:h}
 repo_root=${project_dir:h}
 backend_dir="$repo_root/third_party/CLIProxyAPI-7.2.132-patched"
 native_dir="$project_dir/native/windows"
-release_version=${VERSION:-0.6.4-test}
+release_version=${VERSION:-0.6.6-test}
+build_date=${BUILD_DATE:-$(date -u +%Y-%m-%d)}
 output_dir=${OUTPUT_DIR:-$repo_root/dist/windows}
 package_name="ZCode-Antigravity-Windows-x64-${release_version}"
 package_root="$output_dir/$package_name"
@@ -16,7 +17,7 @@ single_bat_path="$output_dir/ZCode-Antigravity-OneClick-v${release_version}.bat"
 build_root=$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/zcode-antigravity-windows.XXXXXX")
 trap '/bin/rm -rf "$build_root"' EXIT
 
-for tool in go cargo npm x86_64-w64-mingw32-gcc \
+for tool in go npm \
   /usr/bin/base64 /usr/bin/ditto /usr/bin/fold /usr/bin/iconv /usr/bin/perl \
   /usr/bin/sed /usr/bin/shasum /usr/bin/strings /usr/bin/zip; do
   command -v "$tool" >/dev/null
@@ -26,12 +27,8 @@ if ! /usr/bin/grep -Fq "const version = \"$release_version\"" "$project_dir/cmd/
   print -u2 "VERSION=$release_version 与 Go Core 源码版本不一致"
   exit 1
 fi
-if ! /usr/bin/grep -Fq "version = \"$release_version\"" "$native_dir/Cargo.toml"; then
-  print -u2 "VERSION=$release_version 与 Rust 客户端源码版本不一致"
-  exit 1
-fi
 if ! /usr/bin/grep -Fq "\"version\": \"$release_version\"" "$native_dir/ui/package.json"; then
-  print -u2 "VERSION=$release_version 与 Tauri 前端版本不一致"
+  print -u2 "VERSION=$release_version 与 Electron 前端版本不一致"
   exit 1
 fi
 if [[ -n ${ANTIGRAVITY_OAUTH_CLIENT_ID:-} || -n ${ANTIGRAVITY_OAUTH_CLIENT_SECRET:-} ]]; then
@@ -92,26 +89,20 @@ fi
 (
   cd "$native_dir/ui"
   npm ci --ignore-scripts
+  npm run test:electron
   npm run build
+  npx electron-builder --win dir --x64
 )
-(
-  cd "$native_dir"
-  cargo build --release --locked --target x86_64-pc-windows-gnu
-)
-/bin/cp "$native_dir/target/x86_64-pc-windows-gnu/release/zcode-antigravity-tauri.exe" \
-  "$package_root/ZCode-Antigravity-ControlCenter.exe"
-/bin/cp "$native_dir/target/x86_64-pc-windows-gnu/release/WebView2Loader.dll" \
-  "$package_root/WebView2Loader.dll"
+/bin/cp -R "$native_dir/ui/electron-dist/win-unpacked/." "$package_root/"
 
 for payload in README-Windows.txt TEST-CHECKLIST.txt settings.json THIRD-PARTY-NOTICES.txt \
-  LICENSE-CLIProxyAPI.txt LICENSE-TRAY-DEPENDENCIES.txt RUST-DEPENDENCIES.txt \
+  LICENSE-CLIProxyAPI.txt LICENSE-TRAY-DEPENDENCIES.txt \
   WEB-DEPENDENCIES.txt; do
   /bin/cp "$script_dir/$payload" "$package_root/$payload"
 done
 for payload in "$script_dir"/*.bat; do
   /bin/cp "$payload" "$package_root/${payload:t}"
 done
-/bin/cp -R "$script_dir/rust-licenses" "$package_root/rust-licenses"
 /bin/cp "$repo_root/project/docs/CLIProxyAPI-v7.2.132-zcode.patch" "$package_root/CLIProxyAPI-v7.2.132-zcode.patch"
 
 manager_sha=$(sha256_upper "$package_root/ZCode-Antigravity.exe")
@@ -125,6 +116,7 @@ backend_sha=$(sha256_upper "$package_root/backend/cli-proxy-api.exe")
 /usr/bin/sed -e "s/__MANAGER_SHA256__/$manager_sha/g" \
   -e "s/__CONTROL_CENTER_SHA256__/$control_sha/g" \
   -e "s/__BACKEND_SHA256__/$backend_sha/g" \
+  -e "s/__BUILD_DATE__/$build_date/g" \
   "$script_dir/BUILD-INFO.txt.template" > "$package_root/BUILD-INFO.txt"
 
 (

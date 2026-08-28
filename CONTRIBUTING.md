@@ -4,7 +4,7 @@
 
 ## 仓库结构
 
-- `project/`：Go Core、SwiftUI macOS 客户端、Rust/Win32 客户端、打包脚本和回归测试。
+- `project/`：Go Core、SwiftUI macOS 客户端、Electron/React Windows 客户端、打包脚本和回归测试。
 - `third_party/CLIProxyAPI-7.2.132-patched/`：固定的 CLIProxyAPI 上游源码与本项目修改。
 - `project/docs/CLIProxyAPI-v7.2.132-zcode.patch`：对上游版本的历史业务补丁。
 - `VERIFICATION.md`：已验证能力和未验证边界。
@@ -13,7 +13,7 @@
 
 - Go 1.26.x
 - Swift 6.x / Xcode Command Line Tools（macOS Universal 客户端）
-- Rust 1.96+、`x86_64-pc-windows-gnu` target 与 MinGW-w64（Windows 原生客户端）
+- Node.js 22+ 与 npm（Electron/React Windows 客户端）
 - Windows x64 用于最终 DPAPI 和安装器验收
 - macOS 12+ 用于 Keychain、Universal App、签名和 `.command` 脚本验收
 - 普通 Go 单元测试可在 macOS、Linux 或 Windows 运行
@@ -44,14 +44,14 @@ go mod verify
 go test ./...
 ```
 
-Windows Rust 客户端：
+Windows Electron 客户端：
 
 ```bash
-cd project/native/windows
-rustfmt --check --edition 2024 src/main.rs build.rs
-cargo clippy --target x86_64-pc-windows-gnu -- -D warnings
-cargo test --no-run --locked --target x86_64-pc-windows-gnu
-cargo build --release --locked --target x86_64-pc-windows-gnu
+cd project/native/windows/ui
+npm ci
+npm run test:electron
+npm run build
+npm run package:windows
 ```
 
 如果修改 Windows 安装、DPAPI、进程或 GUI 逻辑，请同时按

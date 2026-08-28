@@ -5,14 +5,16 @@ script_dir=${0:A:h}
 project_dir=${script_dir:h:h}
 repo_root=${project_dir:h}
 backend_dir="$repo_root/third_party/CLIProxyAPI-7.2.132-patched"
-release_version=${VERSION:-0.6.4-test}
-short_version=${SHORT_VERSION:-0.6.4}
-bundle_version=${BUNDLE_VERSION:-64}
+release_version=${VERSION:-0.6.6-test}
+short_version=${SHORT_VERSION:-0.6.6}
+bundle_version=${BUNDLE_VERSION:-66}
 output_dir=${OUTPUT_DIR:-$repo_root/dist/macos}
 package_name="ZCode-Antigravity-macOS-Universal-v${release_version}"
-package_root="$output_dir/$package_name"
-archive_path="$output_dir/$package_name.zip"
 build_root=$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/zcode-antigravity-macos.XXXXXX")
+package_root="$build_root/stage/$package_name"
+archive_path="$build_root/$package_name.zip"
+final_package_root="$output_dir/$package_name"
+final_archive_path="$output_dir/$package_name.zip"
 trap '/bin/rm -rf "$build_root"' EXIT
 
 if ! /usr/bin/grep -Fq "const version = \"$release_version\"" "$project_dir/cmd/zcode-antigravity/main.go"; then
@@ -20,8 +22,8 @@ if ! /usr/bin/grep -Fq "const version = \"$release_version\"" "$project_dir/cmd/
   exit 1
 fi
 
-for tool in /usr/bin/lipo /usr/bin/codesign /usr/bin/ditto /usr/bin/iconutil /usr/bin/plutil \
-  /usr/bin/shasum /usr/bin/sips /usr/bin/strings go swift swiftc; do
+for tool in /usr/bin/lipo /usr/bin/codesign /usr/bin/ditto /usr/bin/iconutil /usr/bin/plutil /usr/bin/xattr \
+  /usr/bin/shasum /usr/bin/sips /usr/bin/strings /usr/bin/unzip go swift swiftc; do
   command -v "$tool" >/dev/null
 done
 
@@ -55,7 +57,8 @@ fi
 commit=$(git -C "$repo_root" rev-parse --short=12 HEAD 2>/dev/null || print none)
 build_date=${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
 
-/bin/rm -rf "$package_root" "$archive_path" "$archive_path.sha256"
+/bin/rm -rf "$final_package_root" "$final_archive_path" "$final_archive_path.sha256"
+/bin/mkdir -p "$output_dir"
 /bin/mkdir -p "$package_root/ZCode Antigravity.app/Contents/MacOS/backend" \
   "$package_root/ZCode Antigravity.app/Contents/Resources" "$package_root/Terminal Tools" \
   "$build_root/arm64" "$build_root/amd64"
@@ -149,6 +152,7 @@ done
 /bin/cp "$repo_root/project/packaging/windows/LICENSE-CLIProxyAPI.txt" "$package_root/LICENSE-CLIProxyAPI.txt"
 /bin/cp "$repo_root/project/packaging/windows/LICENSE-TRAY-DEPENDENCIES.txt" "$package_root/LICENSE-TRAY-DEPENDENCIES.txt"
 
+/usr/bin/xattr -cr "$app_root"
 /usr/bin/codesign --force --sign - "$app_root/Contents/MacOS/backend/cli-proxy-api"
 /usr/bin/codesign --force --sign - "$app_root/Contents/MacOS/ZCode-Antigravity-Core"
 /usr/bin/codesign --force --sign - "$app_root/Contents/MacOS/ZCode-Antigravity"
@@ -163,10 +167,12 @@ done
 )
 
 /usr/bin/ditto -c -k --norsrc --keepParent "$package_root" "$archive_path"
+/bin/cp "$archive_path" "$final_archive_path"
+/usr/bin/unzip -tq "$final_archive_path" >/dev/null
 (
   cd "$output_dir"
-  /usr/bin/shasum -a 256 "${archive_path:t}" > "${archive_path:t}.sha256"
+  /usr/bin/shasum -a 256 "${final_archive_path:t}" > "${final_archive_path:t}.sha256"
 )
 
-print "Built: $archive_path"
+print "Built: $final_archive_path"
 print "OAuth desktop configuration available in backend: $oauth_ready"

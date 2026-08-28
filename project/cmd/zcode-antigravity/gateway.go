@@ -46,6 +46,10 @@ type modelsResponse struct {
 
 func (a *app) writeBackendConfig(port int) error {
 	cfg := a.currentSettings()
+	proxyURL, proxySource := a.resolveProxy()
+	a.proxyMu.Lock()
+	a.activeProxy, a.proxySource = proxyURL, proxySource
+	a.proxyMu.Unlock()
 	quote := func(value string) string { return strconv.Quote(filepath.ToSlash(value)) }
 	var aliases strings.Builder
 	aliases.WriteString("oauth-model-alias:\n  antigravity:\n")
@@ -109,7 +113,7 @@ plugins:
   enabled: false
   dir: "plugins"
   configs: {}
-`, port, strconv.Quote(a.apiKey), quote(a.paths.AuthDir), strconv.Quote(a.apiKey), strconv.Quote(cfg.ProxyURL), cfg.RequestRetry, cfg.MaxRetryCredentials, cfg.MaxRetryInterval, aliases.String(), strconv.Quote(cfg.RoutingStrategy), cfg.SessionAffinity, strconv.Quote(cfg.SessionAffinityTTL))
+`, port, strconv.Quote(a.apiKey), quote(a.paths.AuthDir), strconv.Quote(a.apiKey), strconv.Quote(proxyURL), cfg.RequestRetry, cfg.MaxRetryCredentials, cfg.MaxRetryInterval, aliases.String(), strconv.Quote(cfg.RoutingStrategy), cfg.SessionAffinity, strconv.Quote(cfg.SessionAffinityTTL))
 	return writeAtomic(a.paths.Config, []byte(content), 0o600)
 }
 
@@ -473,7 +477,13 @@ func (a *app) login() error {
 		cmd.Stderr = io.MultiWriter(os.Stderr, &captured)
 	}
 	if err := cmd.Run(); err != nil {
+		if friendlyErr := antigravityLoginFailure(captured.String()); friendlyErr != nil {
+			return friendlyErr
+		}
 		return fmt.Errorf("OAuth 登录进程失败: %w", err)
+	}
+	if friendlyErr := antigravityLoginFailure(captured.String()); friendlyErr != nil {
+		return friendlyErr
 	}
 	if !strings.Contains(captured.String(), "Antigravity authentication successful!") {
 		return fmt.Errorf("登录程序未确认成功，请检查上方输出")
@@ -482,6 +492,14 @@ func (a *app) login() error {
 		return fmt.Errorf("登录程序报告成功，但未找到新凭据文件；不会继续覆盖 ZCode 配置")
 	}
 	fmt.Printf("Antigravity 登录成功。凭据只保存在当前用户目录: %s\n", a.paths.AuthDir)
+	return nil
+}
+
+func antigravityLoginFailure(output string) error {
+	lower := strings.ToLower(output)
+	if strings.Contains(lower, "authentication timed out") || strings.Contains(lower, "oauth flow timed out") {
+		return errors.New("Google OAuth 授权页已超时；请重新点击登录，并在新打开的页面中完成授权")
+	}
 	return nil
 }
 
@@ -856,10 +874,11 @@ func (a *app) doctor() error {
 			fmt.Printf("[OK] ZCode 配置: %s\n", a.paths.ZCodeConfig)
 		}
 	}
-	if cfg.ProxyURL == "" {
-		fmt.Println("[INFO] 未设置专用代理；会继承当前系统的 HTTP_PROXY/HTTPS_PROXY 环境变量。")
+	proxyURL, source := a.resolveProxy()
+	if proxyURL == "" {
+		fmt.Println("[OK] 网络出口: 直连（未发现可用 v2rayN / 系统代理，无需 TUN）。")
 	} else {
-		fmt.Printf("[OK] 专用代理: %s\n", redactURLUserinfo(cfg.ProxyURL))
+		fmt.Printf("[OK] 网络出口: %s · %s（无需 TUN）\n", source, redactURLUserinfo(proxyURL))
 	}
 	if isPortFree(cfg.PreferredPort) {
 		fmt.Printf("[OK] 默认 API 端口 %d 当前可用\n", cfg.PreferredPort)

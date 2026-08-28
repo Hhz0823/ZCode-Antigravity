@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -303,22 +302,20 @@ func (g *guiRuntime) status() dashboardStatus {
 		status.Gateway = dashboardItem{Label: "网关未启动", Detail: "点击“一键接入 ZCode”启动"}
 	}
 
-	proxyURL := g.app.currentSettings().ProxyURL
-	if runtime.GOOS == "darwin" && proxyURL == "" {
-		status.Proxy = dashboardItem{OK: true, Label: "使用系统网络 / TUN", Detail: "未固定专用代理", Running: true}
-	} else if reachable, detail := proxyEndpointStatus(proxyURL); reachable {
-		status.Proxy = dashboardItem{OK: true, Label: "本机代理在线", Detail: detail, Running: true}
+	proxyURL, source := g.app.activeProxyStatus()
+	if reachable, detail := proxyEndpointStatus(proxyURL); reachable {
+		label := source
+		if strings.TrimSpace(proxyURL) == "" {
+			label = "直连网络"
+		}
+		status.Proxy = dashboardItem{OK: true, Label: label, Detail: detail, Running: true}
 	} else {
 		status.Proxy = dashboardItem{Label: "本机代理不可用", Detail: detail}
 	}
 	if name, ok := detectTunAdapter(); ok {
 		status.TUN = dashboardItem{OK: true, Label: "TUN 已开启", Detail: name, Running: true}
 	} else {
-		detail := "请在 v2rayN 中开启 TUN 模式"
-		if runtime.GOOS == "darwin" {
-			detail = "未发现活动的 utun；如使用直连或显式代理可忽略"
-		}
-		status.TUN = dashboardItem{Label: "TUN 未检测到", Detail: detail}
+		status.TUN = dashboardItem{OK: true, Label: "TUN 未启用（可选）", Detail: "Gemini / Grok 可使用直连或专用代理", Running: false}
 	}
 
 	configured, baseURL, errProvider := zcodeProviderStatus(g.app.paths.ZCodeConfig)
@@ -339,7 +336,7 @@ func (g *guiRuntime) status() dashboardStatus {
 func proxyEndpointStatus(value string) (bool, string) {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return false, "settings.json 未配置专用代理"
+		return true, "未发现可用 v2rayN / 系统代理；无需 TUN"
 	}
 	parsed, errURL := url.Parse(value)
 	if errURL != nil || parsed.Host == "" {
@@ -443,7 +440,8 @@ func (g *guiRuntime) serveAction(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		return
 	}
-	if !map[string]bool{"setup": true, "login": true, "login-grok": true, "sync": true, "stop": true}[action] {
+	_, connectorActionOK := connectorIDFromAction(action)
+	if !map[string]bool{"setup": true, "login": true, "login-grok": true, "sync": true, "stop": true}[action] && !connectorActionOK {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported action"})
 		return
 	}
@@ -477,40 +475,44 @@ func (g *guiRuntime) runOperation(action string) {
 		errOperation = errLock
 	} else {
 		defer release()
-		switch action {
-		case "setup":
-			if g.currentProvider() == "xai" {
-				counts, errCounts := countProviderAccounts(g.app.paths.AuthDir)
-				if errCounts != nil {
-					errOperation = errCounts
-				} else if counts.XAI == 0 {
-					errOperation = g.app.loginGrokWithDeviceStatus(g.updateXAIDeviceAuthorization)
+		if connectorID, ok := connectorIDFromAction(action); ok {
+			errOperation = g.installAgentConnector(connectorID)
+		} else {
+			switch action {
+			case "setup":
+				if g.currentProvider() == "xai" {
+					counts, errCounts := countProviderAccounts(g.app.paths.AuthDir)
+					if errCounts != nil {
+						errOperation = errCounts
+					} else if counts.XAI == 0 {
+						errOperation = g.app.loginGrokWithDeviceStatus(g.updateXAIDeviceAuthorization)
+					}
+					if errOperation == nil {
+						errOperation = g.app.startAndConfigure()
+					}
+				} else {
+					errOperation = g.app.setup()
 				}
 				if errOperation == nil {
-					errOperation = g.app.startAndConfigure()
+					errOperation = openZCodeApplication()
 				}
-			} else {
-				errOperation = g.app.setup()
+			case "login":
+				errOperation = g.app.login()
+				if errOperation == nil {
+					g.setProvider("antigravity")
+				}
+			case "login-grok":
+				errOperation = g.app.loginGrokWithDeviceStatus(g.updateXAIDeviceAuthorization)
+				if errOperation == nil {
+					g.setProvider("xai")
+				}
+			case "sync":
+				errOperation = g.app.startAndConfigure()
+			case "recover":
+				errOperation = g.app.startAndConfigure()
+			case "stop":
+				errOperation = g.app.stop()
 			}
-			if errOperation == nil {
-				errOperation = openZCodeApplication()
-			}
-		case "login":
-			errOperation = g.app.login()
-			if errOperation == nil {
-				g.setProvider("antigravity")
-			}
-		case "login-grok":
-			errOperation = g.app.loginGrokWithDeviceStatus(g.updateXAIDeviceAuthorization)
-			if errOperation == nil {
-				g.setProvider("xai")
-			}
-		case "sync":
-			errOperation = g.app.startAndConfigure()
-		case "recover":
-			errOperation = g.app.startAndConfigure()
-		case "stop":
-			errOperation = g.app.stop()
 		}
 	}
 	g.operationMu.Lock()
@@ -537,6 +539,9 @@ func (g *guiRuntime) updateXAIDeviceAuthorization(authorization xaiDeviceAuthori
 }
 
 func operationStartMessage(action string) string {
+	if connectorID, ok := connectorIDFromAction(action); ok {
+		return "正在备份并一键接入 " + connectorDisplayName(connectorID) + "…"
+	}
 	switch action {
 	case "setup":
 		return "正在登录所选提供商、启动网关并接入 ZCode…"
@@ -556,6 +561,9 @@ func operationStartMessage(action string) string {
 }
 
 func operationSuccessMessage(action string) string {
+	if connectorID, ok := connectorIDFromAction(action); ok {
+		return connectorDisplayName(connectorID) + " 已接入；请新建会话使用当前模型"
+	}
 	switch action {
 	case "setup":
 		return "ZCode 已接入并启动"

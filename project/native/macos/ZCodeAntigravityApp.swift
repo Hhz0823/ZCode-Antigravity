@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "0.6.4-test"
+private let appVersion = "0.6.6-test"
 
 private extension Notification.Name {
     static let selectBridgeProvider = Notification.Name("ZCodeSelectBridgeProvider")
@@ -135,6 +135,7 @@ struct AgentConnector: Decodable, Identifiable {
     let name: String
     let description: String
     let model: String
+    let action: String?
     let snippets: [String: String]
 }
 
@@ -511,6 +512,7 @@ final class BridgeModel: ObservableObject {
         case "login-grok": return "正在打开 xAI 设备授权…"
         case "sync": return "正在重新同步模型…"
         case "stop": return "正在停止本地网关…"
+        case let value where value.hasPrefix("connect-agent-"): return "正在备份并一键接入 Agent / CLI…"
         default: return "正在处理…"
         }
     }
@@ -1609,11 +1611,15 @@ struct DashboardView: View {
                         Spacer()
                         Text(connectors.baseURL).font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
                     }
-                    ForEach(connectors.connectors) { connector in ConnectorDisclosure(connector: connector) }
+                    ForEach(connectors.connectors) { connector in
+                        ConnectorDisclosure(connector: connector) { action in
+                            Task { await model.runAction(action) }
+                        }
+                    }
                     Label("配置包含当前用户的本机密钥，请勿发给他人。", systemImage: "lock.fill")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
-                    ContentUnavailableViewCompat(title: "等待网关", detail: "启动网关后自动生成 Grok Build、Codex、Claude Code、OpenCode 和通用 Agent 配置。")
+                    ContentUnavailableViewCompat(title: "等待网关", detail: "启动网关后自动生成 DeepSeek Harness、Grok Build、Codex、Claude Code、OpenCode 和通用 Agent 配置。")
                 }
             }
         }
@@ -1859,6 +1865,7 @@ struct ActionButton: View {
 
 struct ConnectorDisclosure: View {
     let connector: AgentConnector
+    let onAction: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1866,6 +1873,15 @@ struct ConnectorDisclosure: View {
                 Text(connector.name).font(.headline)
                 Text(connector.description).font(.caption).foregroundStyle(.secondary)
             }.padding(.vertical, 4)
+            if let action = connector.action {
+                Button {
+                    onAction(action)
+                } label: {
+                    Label("一键接入", systemImage: "bolt.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+            }
             ForEach(connector.snippets.keys.sorted(), id: \.self) { key in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {

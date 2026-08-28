@@ -1,6 +1,29 @@
 # 修复与验证记录
 
-最新验证日期：2026-08-18（Asia/Shanghai）
+最新验证日期：2026-08-28（Asia/Shanghai）
+
+## v0.6.6-test Electron / Swift 双端统一与 macOS 真实接入验证
+
+- Windows 客户端已从 Tauri/Rust GUI 迁移到 Electron 44 + React 19 + Tailwind CSS 4；
+  保留 Go Core 本地安全边界，主窗口使用 DWM Acrylic，界面与 macOS SwiftUI 版共用
+  同一套浅色液态玻璃信息架构、导航、卡片层级和任务栏额度小组件。
+- Electron 生产窗口启用 `contextIsolation` 和 Chromium sandbox，禁用 Node 集成；
+  preload 只暴露固定的本地 API 白名单、剪贴板和官方 xAI 授权页。托盘单击只打开
+  430 × 368 独立额度小组件，不会把主控制中心抬到其他窗口上层。
+- React/Tailwind 生产构建和 Electron 协议白名单回归通过；在 1440 × 960 下检查了
+  Antigravity、Grok 切换和独立额度小组件，浏览器控制台为 0 个错误/警告。
+- macOS 使用真实 SwiftUI App 完成 Google OAuth；第一次授权页超过旧后端的 5 分钟
+  回调等待后出现 `ERR_CONNECTION_REFUSED`，新一次授权在时限内正常完成，证明根因是
+  本地回调服务已超时退出，不是 Google 账号或 OAuth code 不可用。
+- 后端源码已将 Antigravity OAuth 回调等待延长到 30 分钟，Go Core 也会把回调超时
+  转成“重新点击登录并在新页面完成授权”的可操作提示；时限和错误映射均有回归测试。
+- 在 macOS 真实点击“一键接入 ZCode”后，Provider 安全写入 `~/.zcode/v2/config.json`，
+  同时保留原有 7 个 Provider；改写前备份已生成，Bridge 监听 `127.0.0.1:18080`，
+  `/Applications/ZCode.app` 已启动，并观测到 ZCode 到 Bridge 的多条 `ESTABLISHED` 本地 TCP 连接。
+- 实机登录生成的 Antigravity access/refresh token 均为 `keychain:v1:` 密文，随机
+  AES-256-GCM 主密钥存在 macOS 登录钥匙串；账号文件权限为 0600，验证过程没有输出 token。
+- macOS 验证为 Apple Silicon 实机；Windows 本轮已完成 Electron 渲染、协议、构建与发布包
+  静态验证，但尚未在 Windows 10/11 上运行这个 Electron 候选版，不将交叉打包冒充实机通过。
 
 ## v0.6.4-test 双平台滚动、浅色玻璃与独立额度小组件
 

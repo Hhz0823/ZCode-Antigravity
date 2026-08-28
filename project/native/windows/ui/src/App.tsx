@@ -1,5 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   Activity,
   BarChart3,
@@ -34,7 +32,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Card, CardHeader, Progress, Switch } from "./components/ui";
 import { cn } from "./lib/utils";
-import { hasTauri, mockGet, mockPost } from "./lib/mock-api";
+import { mockGet, mockPost } from "./lib/mock-api";
+import { desktopBridge, hasDesktopBridge } from "./lib/native-api";
 
 type Provider = "antigravity" | "xai";
 type Section = "overview" | "accounts" | "proxy" | "routing" | "connectors" | "analytics" | "settings";
@@ -68,17 +67,17 @@ interface ManagerReport {
   settings: { autoRefreshMinutes: number; quotaWarningPercent: number; proxyURL: string; theme: string; liquidGlass: boolean; settingsPath: string };
   features: Array<{ id: string; name: string; description: string; available: boolean }>;
 }
-interface ConnectorResponse { provider: Provider; baseURL: string; model: string; connectors: Array<{ id: string; name: string; description: string; model: string; snippets: Record<string, string> }> }
+interface ConnectorResponse { provider: Provider; baseURL: string; model: string; connectors: Array<{ id: string; name: string; description: string; model: string; action?: string; snippets: Record<string, string> }> }
 interface StartupInfo { version: string; autoSetup: boolean }
 
 async function apiGet<T>(path: string): Promise<T> {
-  if (!hasTauri()) return mockGet(path) as Promise<T>;
-  return invoke<T>("api_get", { path });
+  if (!hasDesktopBridge()) return mockGet(path) as Promise<T>;
+  return desktopBridge()!.apiGet<T>(path);
 }
 
 async function apiPost<T = unknown>(path: string, body: Record<string, unknown> = {}): Promise<T> {
-  if (!hasTauri()) return mockPost(path, body) as Promise<T>;
-  return invoke<T>("api_post", { path, body });
+  if (!hasDesktopBridge()) return mockPost(path, body) as Promise<T>;
+  return desktopBridge()!.apiPost<T>(path, body);
 }
 
 function normalizeError(error: unknown) {
@@ -118,26 +117,15 @@ function quotaWindow(quota: QuotaReport | undefined, kind: "five" | "week") {
 }
 
 function WindowChrome() {
-  const drag = async () => {
-    if (!hasTauri()) return;
-    document.documentElement.classList.add("window-dragging");
-    try { await getCurrentWindow().startDragging(); } finally { document.documentElement.classList.remove("window-dragging"); }
-  };
   const windowAction = (action: "minimize" | "maximize" | "hide") => {
-    if (!hasTauri()) return;
-    const window = getCurrentWindow();
-    if (action === "minimize") void window.minimize();
-    if (action === "maximize") void window.toggleMaximize();
-    if (action === "hide") void window.hide();
+    void desktopBridge()?.windowAction(action);
   };
   return (
-    <div className="window-chrome" data-tauri-drag-region onDoubleClick={() => { if (hasTauri()) void getCurrentWindow().toggleMaximize(); }} onMouseDown={(event) => {
-      if (event.button === 0 && event.detail === 1 && event.target === event.currentTarget) void drag();
-    }}>
-      <div className="flex items-center gap-2.5 pointer-events-none" data-tauri-drag-region>
+    <div className="window-chrome">
+      <div className="flex items-center gap-2.5 pointer-events-none">
         <span className="grid size-6 place-items-center rounded-lg border border-sky-300/30 bg-sky-400/15 text-[9px] font-bold text-sky-100">ZA</span>
         <span className="text-xs font-medium tracking-wide text-slate-200">ZCode · Antigravity</span>
-        <Badge tone="blue">Tauri 2</Badge>
+        <Badge tone="blue">Electron</Badge>
       </div>
       <div className="window-controls">
         <button aria-label="最小化" onClick={() => windowAction("minimize")}><Minimize2 /></button>
@@ -245,7 +233,7 @@ function AuthenticationOverlay({ operation, provider, onCopy, onError }: { opera
   const openVerificationPage = async () => {
     if (!device) return;
     try {
-      if (hasTauri()) await invoke("open_xai_verification_url", { url: device.verificationURL });
+      if (hasDesktopBridge()) await desktopBridge()!.openXaiVerificationURL(device.verificationURL);
       else window.open(device.verificationURL, "_blank", "noopener,noreferrer");
     } catch (error) {
       onError(`无法打开 xAI 授权页：${normalizeError(error)}`);
@@ -314,7 +302,7 @@ function AccountsView({ manager, quota, provider }: { manager?: ManagerReport; q
 }
 
 function ProxyView({ manager, status }: { manager?: ManagerReport; status?: DashboardStatus }) {
-  return <div className="grid gap-4 md:grid-cols-[1.1fr_.9fr]"><Card><CardHeader eyebrow="LOCAL GATEWAY" title="本地多协议代理" description={manager?.proxy.baseURL || "网关未启动"} action={<Badge tone={manager?.proxy.running ? "good" : "bad"}>{manager?.proxy.running ? "在线" : "离线"}</Badge>} /><div className="grid gap-3 p-5">{manager?.proxy.protocols.map((item) => <div className="protocol-row" key={item.name}><div className="protocol-icon"><Network /></div><div><h3>{item.name}</h3><p>{item.description}</p></div><code>{item.path}</code></div>)}</div></Card><Card><CardHeader eyebrow="NETWORK" title="连接诊断" description="本机回环地址，不开放到局域网" /><div className="space-y-3 p-5">{[["TUN", status?.tun], ["系统代理", status?.proxy], ["网关", status?.gateway], ["ZCode", status?.zcode]].map(([label, item]) => <div className="diagnostic-row" key={label as string}><span className={cn("status-dot", (item as DashboardItem)?.ok && "online")} /><div><p>{label as string}</p><small>{(item as DashboardItem)?.label ?? "读取中"}</small></div></div>)}</div></Card></div>;
+  return <div className="grid gap-4 md:grid-cols-[1.1fr_.9fr]"><Card><CardHeader eyebrow="LOCAL GATEWAY" title="本地多协议代理" description={manager?.proxy.baseURL || "网关未启动"} action={<Badge tone={manager?.proxy.running ? "good" : "bad"}>{manager?.proxy.running ? "在线" : "离线"}</Badge>} /><div className="grid gap-3 p-5">{manager?.proxy.protocols.map((item) => <div className="protocol-row" key={item.name}><div className="protocol-icon"><Network /></div><div><h3>{item.name}</h3><p>{item.description}</p></div><code>{item.path}</code></div>)}</div></Card><Card><CardHeader eyebrow="NETWORK" title="连接诊断" description="本机回环地址，不开放到局域网" /><div className="space-y-3 p-5">{[["TUN（可选）", status?.tun], ["网络出口", status?.proxy], ["网关", status?.gateway], ["ZCode", status?.zcode]].map(([label, item]) => <div className="diagnostic-row" key={label as string}><span className={cn("status-dot", (item as DashboardItem)?.ok && "online")} /><div><p>{label as string}</p><small>{(item as DashboardItem)?.label ?? "读取中"}</small></div></div>)}</div></Card></div>;
 }
 
 function RoutingView({ manager, saveSetting, saving }: { manager?: ManagerReport; saveSetting: (body: Record<string, unknown>) => void; saving: boolean }) {
@@ -322,8 +310,8 @@ function RoutingView({ manager, saveSetting, saving }: { manager?: ManagerReport
   return <div className="grid gap-4 md:grid-cols-[1.15fr_.85fr]"><Card><CardHeader eyebrow="ROUTING" title="模型路由策略" description="保存后由本地网关即时应用" action={saving ? <LoaderCircle className="size-4 animate-spin" /> : undefined} /><div className="grid gap-3 p-5">{routes.map((route) => <button key={route.id} disabled={saving} onClick={() => saveSetting({ routingStrategy: route.id })} className={cn("route-card", manager?.routing.strategy === route.id && "active")}><span className="route-radio">{manager?.routing.strategy === route.id && <Check />}</span><div><h3>{route.title}</h3><p>{route.text}</p></div></button>)}</div></Card><Card><CardHeader eyebrow="RECOVERY" title="自动自愈" description="控制重试和会话稳定性" /><div className="space-y-3 p-5"><Switch checked={manager?.routing.sessionAffinity ?? false} onChange={(value) => saveSetting({ sessionAffinity: value })} label="会话亲和" /><InfoLine label="请求重试" value={`${manager?.routing.requestRetry ?? 0} 次`} /><InfoLine label="凭据轮换" value={`${manager?.routing.credentialRetry ?? 0} 次`} /><InfoLine label="最大重试间隔" value={`${manager?.routing.retryInterval ?? 0} 秒`} /><InfoLine label="后台模型" value={manager?.routing.backgroundModel || "自动"} /></div></Card></div>;
 }
 
-function ConnectorsView({ connectors, onCopy }: { connectors?: ConnectorResponse; onCopy: (value: string) => void }) {
-  return <Card><CardHeader eyebrow="AGENT CONNECTORS" title="接入更多 Agent 程序" description={connectors ? `当前模型 ${connectors.model} · ${connectors.baseURL}` : "请先启动本地网关"} /><div className="grid gap-3 p-5 md:grid-cols-2">{connectors?.connectors.length ? connectors.connectors.map((connector) => <div className="connector-card" key={connector.id}><div className="flex items-center justify-between"><div className="connector-icon"><Bot /></div><Badge tone="blue">{connector.model}</Badge></div><h3>{connector.name}</h3><p>{connector.description}</p><div className="mt-4 space-y-2">{Object.entries(connector.snippets).map(([name, snippet]) => <button onClick={() => onCopy(snippet)} className="snippet-row" key={name}><span>{name}</span><Copy /></button>)}</div></div>) : <Empty icon={Bot} title="等待本地网关" text="执行一键接入后生成当前提供商配置" />}</div></Card>;
+function ConnectorsView({ connectors, onCopy, onAction, busy }: { connectors?: ConnectorResponse; onCopy: (value: string) => void; onAction: (action: string) => void; busy: boolean }) {
+  return <Card><CardHeader eyebrow="AGENT CONNECTORS" title="接入更多 Agent 程序" description={connectors ? `当前模型 ${connectors.model} · ${connectors.baseURL}` : "请先启动本地网关"} /><div className="grid gap-3 p-5 md:grid-cols-2">{connectors?.connectors.length ? connectors.connectors.map((connector) => <div className="connector-card" key={connector.id}><div className="flex items-center justify-between"><div className="connector-icon"><Bot /></div><Badge tone="blue">{connector.model}</Badge></div><h3>{connector.name}</h3><p>{connector.description}</p>{connector.action && <Button className="mt-4 w-full" variant="primary" disabled={busy} onClick={() => onAction(connector.action!)}><Zap className="size-4" />一键接入</Button>}<div className="mt-4 space-y-2">{Object.entries(connector.snippets).map(([name, snippet]) => <button onClick={() => onCopy(snippet)} className="snippet-row" key={name}><span>{name}</span><Copy /></button>)}</div></div>) : <Empty icon={Bot} title="等待网关" text="执行一键接入后生成当前提供商配置" />}</div></Card>;
 }
 
 function AnalyticsView({ usage }: { usage?: UsageReport }) {
@@ -332,7 +320,7 @@ function AnalyticsView({ usage }: { usage?: UsageReport }) {
 }
 
 function SettingsView({ manager, saveSetting, saving }: { manager?: ManagerReport; saveSetting: (body: Record<string, unknown>) => void; saving: boolean }) {
-  return <div className="grid gap-4 md:grid-cols-[1fr_.85fr]"><Card><CardHeader eyebrow="APPEARANCE" title="界面与刷新" description="Windows Acrylic + WebView2 合成" action={saving ? <LoaderCircle className="size-4 animate-spin" /> : undefined} /><div className="space-y-3 p-5"><Switch checked={manager?.settings.liquidGlass ?? true} onChange={(value) => saveSetting({ liquidGlass: value })} label="液态玻璃背景" /><div className="setting-row"><div><p>额度自动刷新</p><small>默认每 5 分钟，不影响 5 秒状态探测</small></div><div className="segmented">{[5, 10].map((value) => <button className={cn(manager?.settings.autoRefreshMinutes === value && "active")} onClick={() => saveSetting({ autoRefreshMinutes: value })} key={value}>{value} 分钟</button>)}</div></div><InfoLine label="低额度警告" value={`${manager?.settings.quotaWarningPercent ?? 20}%`} /><InfoLine label="设置文件" value={manager?.settings.settingsPath || "当前用户目录"} /></div></Card><Card><CardHeader eyebrow="FEATURES" title="Antigravity Tools 能力" description="当前原生管理核心提供的功能" /><div className="space-y-2 p-5">{manager?.features.map((feature) => <div className="feature-row" key={feature.id}><span className={cn("feature-check", feature.available && "active")}>{feature.available && <Check />}</span><div><p>{feature.name}</p><small>{feature.description}</small></div></div>)}</div></Card></div>;
+  return <div className="grid gap-4 md:grid-cols-[1fr_.85fr]"><Card><CardHeader eyebrow="APPEARANCE" title="界面与刷新" description="Windows Acrylic + WebView2 合成" action={saving ? <LoaderCircle className="size-4 animate-spin" /> : undefined} /><div className="space-y-3 p-5"><Switch checked={manager?.settings.liquidGlass ?? true} onChange={(value) => saveSetting({ liquidGlass: value })} label="液态玻璃背景" /><div className="setting-row"><div><p>额度自动刷新</p><small>默认每 5 分钟，不影响 5 秒状态探测</small></div><div className="segmented">{[5, 10].map((value) => <button className={cn(manager?.settings.autoRefreshMinutes === value && "active")} onClick={() => saveSetting({ autoRefreshMinutes: value })} key={value}>{value} 分钟</button>)}</div></div><InfoLine label="网络模式" value={manager?.settings.proxyURL || "自动 v2rayN / 系统代理 / 直连"} /><InfoLine label="低额度警告" value={`${manager?.settings.quotaWarningPercent ?? 20}%`} /><InfoLine label="设置文件" value={manager?.settings.settingsPath || "当前用户目录"} /></div></Card><Card><CardHeader eyebrow="FEATURES" title="Antigravity Tools 能力" description="当前原生管理核心提供的功能" /><div className="space-y-2 p-5">{manager?.features.map((feature) => <div className="feature-row" key={feature.id}><span className={cn("feature-check", feature.available && "active")}>{feature.available && <Check />}</span><div><p>{feature.name}</p><small>{feature.description}</small></div></div>)}</div></Card></div>;
 }
 
 function InfoLine({ label, value }: { label: string; value: string }) { return <div className="info-line"><span>{label}</span><strong title={value}>{value}</strong></div>; }
@@ -413,10 +401,12 @@ function TrayWidget() {
     const quotaTimer = window.setInterval(() => void refresh(true), 5 * 60_000);
     const nativeRefresh = () => void refresh(true);
     window.addEventListener("zcode:refresh", nativeRefresh);
+    desktopBridge()?.onRefresh(nativeRefresh);
     return () => {
       clearInterval(statusTimer);
       clearInterval(quotaTimer);
       window.removeEventListener("zcode:refresh", nativeRefresh);
+      desktopBridge()?.removeRefreshListener();
     };
   }, [refresh]);
 
@@ -424,14 +414,14 @@ function TrayWidget() {
   const week = quotaWindow(quota, "week");
   const shared = allBuckets(quota).find((bucket) => typeof bucket.remainingPercent === "number");
   const account = quota?.accounts[0];
-  const openMain = () => { if (hasTauri()) void invoke("show_main_window"); };
-  const hide = () => { if (hasTauri()) void getCurrentWindow().hide(); };
+  const openMain = () => { void desktopBridge()?.showMainWindow(); };
+  const hide = () => { void desktopBridge()?.windowAction("hide"); };
 
   return (
     <div className="widget-shell">
       <div className="widget-orb widget-orb-one" /><div className="widget-orb widget-orb-two" /><div className="noise-layer" />
-      <header className="widget-header" data-tauri-drag-region>
-        <div className="widget-brand" data-tauri-drag-region><span><Sparkles /></span><div><strong>ZCode 当前额度</strong><small>{status?.gateway.ok ? "本地网关在线" : "本地安全核心"}</small></div></div>
+      <header className="widget-header">
+        <div className="widget-brand"><span><Sparkles /></span><div><strong>ZCode 当前额度</strong><small>{status?.gateway.ok ? "本地网关在线" : "本地安全核心"}</small></div></div>
         <div className="widget-header-actions">
           <button aria-label="刷新额度" disabled={loading} onClick={() => void refresh(true)}><RefreshCw className={cn(loading && "animate-spin")} /></button>
           <button aria-label="关闭小组件" onClick={hide}><X /></button>
@@ -461,7 +451,7 @@ function ControlCenterApp() {
   const [usage, setUsage] = useState<UsageReport>();
   const [manager, setManager] = useState<ManagerReport>();
   const [connectors, setConnectors] = useState<ConnectorResponse>();
-  const [version, setVersion] = useState("0.6.4-test");
+  const [version, setVersion] = useState("0.6.6-test");
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
@@ -578,7 +568,11 @@ function ControlCenterApp() {
   }, [saving]);
 
   const copy = useCallback(async (value: string, message = "Agent 配置已复制") => {
-    try { await navigator.clipboard.writeText(value); setNotice({ text: message }); }
+    try {
+      if (hasDesktopBridge()) await desktopBridge()!.writeClipboard(value);
+      else await navigator.clipboard.writeText(value);
+      setNotice({ text: message });
+    }
     catch { setNotice({ text: "无法写入剪贴板", error: true }); }
   }, []);
 
@@ -587,7 +581,7 @@ function ControlCenterApp() {
     initialized.current = true;
     void (async () => {
       try {
-        const startup = hasTauri() ? await invoke<StartupInfo>("startup_info") : { version: "0.6.4-test", autoSetup: false };
+        const startup: StartupInfo = hasDesktopBridge() ? await desktopBridge()!.startupInfo() : { version: "0.6.6-test", autoSetup: false };
         setVersion(startup.version);
         await refresh(true);
         if (startup.autoSetup) await runAction("setup");
@@ -602,12 +596,19 @@ function ControlCenterApp() {
     const heartbeat = window.setInterval(() => void apiPost("/api/heartbeat").catch(() => undefined), 15_000);
     const trayRefresh = () => void refresh(true);
     window.addEventListener("zcode:refresh", trayRefresh);
-    return () => { clearInterval(statusTimer); clearInterval(quotaTimer); clearInterval(heartbeat); window.removeEventListener("zcode:refresh", trayRefresh); };
+    desktopBridge()?.onRefresh(trayRefresh);
+    return () => {
+      clearInterval(statusTimer);
+      clearInterval(quotaTimer);
+      clearInterval(heartbeat);
+      window.removeEventListener("zcode:refresh", trayRefresh);
+      desktopBridge()?.removeRefreshListener();
+    };
   }, [manager?.settings.autoRefreshMinutes, refresh]);
 
   useEffect(() => {
     if (!quota && !usage) return;
-    if (hasTauri()) void invoke("update_tray_summary", { summary: { provider, fiveHour: quotaWindow(quota, "five")?.remainingPercent, week: quotaWindow(quota, "week")?.remainingPercent, tokensPerSecond: usage?.latest?.outputTokensPerSecond } });
+    if (hasDesktopBridge()) void desktopBridge()!.updateTraySummary({ provider, fiveHour: quotaWindow(quota, "five")?.remainingPercent, week: quotaWindow(quota, "week")?.remainingPercent, tokensPerSecond: usage?.latest?.outputTokensPerSecond });
   }, [provider, quota, usage]);
 
   useEffect(() => {
@@ -635,7 +636,7 @@ function ControlCenterApp() {
     : section === "accounts" ? <AccountsView {...{ manager, quota, provider }} />
     : section === "proxy" ? <ProxyView {...{ manager, status }} />
     : section === "routing" ? <RoutingView {...{ manager, saveSetting, saving }} />
-    : section === "connectors" ? <ConnectorsView connectors={connectors} onCopy={copy} />
+    : section === "connectors" ? <ConnectorsView connectors={connectors} onCopy={copy} onAction={runAction} busy={busy} />
     : section === "analytics" ? <AnalyticsView usage={usage} />
     : <SettingsView {...{ manager, saveSetting, saving }} />;
 

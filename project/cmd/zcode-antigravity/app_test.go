@@ -616,6 +616,16 @@ func TestCountProviderAccountsIncludesXAI(t *testing.T) {
 	}
 }
 
+func TestAntigravityLoginFailureExplainsExpiredCallback(t *testing.T) {
+	err := antigravityLoginFailure("antigravity: authentication timed out after 30m0s; start login again")
+	if err == nil || !strings.Contains(err.Error(), "重新点击登录") {
+		t.Fatalf("timeout error = %v", err)
+	}
+	if err := antigravityLoginFailure("unrelated backend failure"); err != nil {
+		t.Fatalf("unrelated output mapped to OAuth timeout: %v", err)
+	}
+}
+
 func TestManagerRunLockRejectsConcurrentOwnerAndRecovers(t *testing.T) {
 	a := testApp(t)
 	release, err := a.acquireRunLock()

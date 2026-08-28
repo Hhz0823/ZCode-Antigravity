@@ -1,24 +1,24 @@
 ZCode Antigravity Bridge build information
 ===========================================
 
-Package: ZCode-Antigravity-Windows-x64-0.6.4-test
-Build date (UTC): 2026-08-18
-Target: Windows x64 (PE32+ Go console Core and Tauri 2 GUI control center)
+Package: ZCode-Antigravity-Windows-x64-0.6.6-test
+Build date (UTC): __BUILD_DATE__
+Target: Windows x64 (PE32+ Go Core and Electron GUI control center)
 
 Manager
 -------
-Version: 0.6.4-test
+Version: 0.6.6-test
 Go: 1.26.4
 CGO: disabled
 SHA-256: __MANAGER_SHA256__
 
 Control center
 --------------
-Version: 0.6.4-test
-UI: Tauri 2.11.5, React 19.2.8, Tailwind CSS 4.3.3, shadcn-style components
-Native shell: Rust 2024 Edition, windows-sys 0.61.2
+Version: 0.6.6-test
+UI: Electron 44.0.0, React 19.2.8, Tailwind CSS 4.3.3, shadcn-style components
+Native shell: Electron main/preload with context isolation and renderer sandbox
 Subsystem: Windows GUI (no console window)
-Rendering: system WebView2 with native DWM Acrylic and responsive DPI scaling
+Rendering: packaged Chromium with native DWM Acrylic and responsive DPI scaling
 Quota view: protected loopback route, redacted cache, grouped native bars, 5-minute refresh
 Token view: protocol usage, output/reasoning tokens, generation/effective token/s, no prompt text
 Theme: Segoe UI Variable / Microsoft YaHei, liquid glass, animated light orbs, bundled icon
@@ -44,16 +44,16 @@ Local backend patches
 7. Translate ZCode base64 audio/video blocks to Gemini inlineData without weakening config-write guards.
 8. Publish thinking levels and map ZCode Low/Medium/High to Gemini thinkingLevel.
 9. Expose clean Gemini 3.7/3.6 Flash client IDs while routing to the exact upstream High entries.
-10. Provide a SHA-256 verified single-BAT installer with v2rayN TUN/proxy preflight.
+10. Provide a SHA-256 verified installer with automatic Windows/v2rayN loopback proxy discovery, direct fallback, and no TUN requirement.
 11. Stage and verify the payload, safely stop the recorded gateway, then deploy so same-version reruns cannot overwrite a running backend.
 12. Add a no-console native control center that injects the Provider, manages the local bridge, and renders provider quota.
 13. Apply system typography, responsive CSS controls, progress feedback, and crisp mixed-DPI rendering.
 14. Encode the native installer's embedded Chinese PowerShell script with a UTF-8 BOM at build time and runtime for Windows PowerShell 5.1.
 15. Start the Go Core and all PowerShell, tasklist, netstat, taskkill, OAuth, browser, and ZCode child processes without console windows.
-16. Use a Tauri 2 + React/Tailwind main window with Segoe UI Variable, WebView2 DPI scaling, and responsive relayout.
+16. Use an Electron + React/Tailwind main window with Segoe UI Variable, Chromium DPI scaling, and responsive relayout.
 17. Add a persistent native Windows taskbar quota widget with provider switching and an explicit full-window action.
 18. Add official xAI device OAuth, Grok text-model selection, Grok Build billing display, and encrypted-token-safe management proxying.
-19. Generate copyable Grok Build, Codex, Claude Code, OpenCode, and generic Agent connector configurations.
+19. Add backed-up one-click setup for DeepSeek Harness, Grok Build, Codex, Claude Code, Gemini CLI, Qwen Code, Kimi Code, and OpenCode.
 20. Retry Antigravity quota requests without project metadata after HTTP 403 and fall back to per-model quota data.
 21. Collect sanitized backend usage records and expose provider-specific output Token, reasoning Token, and token/s metrics.
 22. Show five-hour/week reset details and recent token performance in an independent taskbar-click widget without raising the main window.
@@ -67,25 +67,28 @@ Local backend patches
 30. Lower the native Acrylic tint and frontend glass-layer opacity so the live desktop blur remains visible behind readable controls.
 31. Separate tray-click and main-window activation, add a DPI-aware always-on-top quota popup, and strengthen specular Acrylic layers.
 32. Match the macOS light liquid-glass information architecture and remove nested blur layers from scrollable content.
+33. Replace the Rust/Tauri shell with Electron 44 while preserving the tested Go native-host API and React theme.
+34. Enable context isolation and renderer sandboxing, disable Node integration, and expose only fixed IPC methods.
+35. Use DWM Acrylic for the main window and independent tray widget while removing renderer-side full-window blur during scroll and drag.
 
 Verification evidence
 ---------------------
-Current v0.6.4-test build-host checks:
+Current v0.6.6-test build-host checks:
 - Manager go test ./... and Windows x64 build: passed
 - Manager go test -race: passed on the macOS build host
 - CLIProxyAPI go mod verify, go test ./..., and Windows x64 build: passed
-- React/Tailwind production frontend build and Tauri control center cargo check: passed
+- React/Tailwind production frontend build and Electron IPC allowlist tests: passed
 - Go native-host baseURL and connector baseURL protocol regression tests: passed
 - Antigravity quota HTTP 403 projectless retry and fetchAvailableModels fallback tests: passed
-- Rust x86_64-pc-windows-gnu release build, PE32+ GUI subsystem, icon resource, and imports: passed
+- Electron 44 Windows x64 cross-package, ASAR inventory, PE32+ GUI subsystem, icon resource, and Chromium runtime inventory: passed
 - Windows PowerShell code page 936 reproduction: 5 parser errors; first error UnexpectedToken
 - Correct UTF-8 parse, BOM writer unit tests, and generated EXE single-BOM byte check: passed
 - EXE/BAT/ZIP payload integrity, three executable hashes, PE32+ x64, and GUI subsystem checks: passed
 - Windows child-process CREATE_NO_WINDOW test and Windows x64 test-binary cross-compile: passed
-- Provider/model selection, Grok billing proxy, tray state, and five Agent connector tests: passed
-- Native SwiftUI macOS main executable and Tauri 2 Windows main executable build checks: passed
-- v0.6.4-test candidate preserves the verified Grok recovery/login path and adds an independent DPI-aware taskbar quota widget
-- Target control-center SHA-256 matched the release candidate after installation; temporary test tasks, scripts, screenshots, and extraction directories were removed
+- Provider/model selection, Grok billing proxy, tray state, and eight Agent connector tests: passed
+- Native SwiftUI macOS main executable and Electron Windows main executable build checks: passed
+- v0.6.6-test preserves the verified Grok recovery/login path and adds an independent DPI-aware taskbar quota widget
+- Electron target-runtime retest is required on Windows; the following visual/runtime items are retained from the earlier v0.6.4 Tauri baseline and are not claimed for Electron until rerun
 - Seven-second Windows drag recording (198 frames): no white/black frame, tearing, or frozen desktop sample: passed
 - 5-second connection/Token poll left quota fetchedAt/cache write time unchanged; five-minute quota cadence is isolated: passed
 - Real response usage sample (45 output Token, 31.1 generation Token/s) and sanitized local persistence: passed
@@ -96,7 +99,7 @@ Current v0.6.4-test build-host checks:
 - Antigravity -> Grok -> Antigravity switch isolation and immediate cached restoration: passed
 - v0.4.5 stale backend-path upgrade recovery plus installer-triggered automatic setup: passed
 - Release build without OAuth configuration: rejected before compilation; verified credential-bearing backend: accepted
-- Target Windows stale/dead gateway state: automatically replaced with the v0.6.4-test backend
+- Historical target Windows stale/dead gateway state: automatically replaced with the matching backend
 - Forced gateway crash: new PID online within the recovery window; 32 ZCode connections re-established
 - Non-interactive OAuth preflight: login flow waiting for callback, no missing-client configuration error
 - Real target-account gemini-3.7-flash request: exact ZCODE_SMOKE_OK

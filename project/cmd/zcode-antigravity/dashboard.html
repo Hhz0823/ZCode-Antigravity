@@ -160,6 +160,8 @@
     .connector-head strong { font-size: 14px; }
     .connector-head span { color: var(--muted); font: 10px var(--mono-font); }
     .connector-card p { min-height: 36px; margin: 6px 0 12px; color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .connector-install { width: 100%; margin: 0 0 10px; border: 1px solid #166ad7; background: #0b63f6; color: #fff; padding: 9px 12px; cursor: pointer; font: 600 11px var(--ui-font); transition: background .18s ease, transform .18s ease; }
+    .connector-install:hover { background: #0856d6; transform: translateY(-1px); }
     .snippet { position: relative; margin-top: 8px; }
     .snippet-label { margin-bottom: 5px; color: #52729b; font-size: 10px; }
     .snippet pre { margin: 0; max-height: 150px; overflow: auto; border: 1px solid #d8e4f3; background: #071a37; color: #d7e8ff; padding: 12px 70px 12px 12px; font: 10px/1.55 var(--mono-font); white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -459,7 +461,8 @@
       $('connectorsMeta').textContent = `${response.provider === 'xai' ? 'Grok / xAI' : 'Antigravity'} · ${response.baseURL}`;
       const connectors = response.connectors || [];
       if (!connectors.length) { $('connectorGrid').innerHTML = '<div class="empty">没有可生成的 Agent 配置。</div>'; return; }
-      $('connectorGrid').innerHTML = connectors.map(connector => `<article class="connector-card"><div class="connector-head"><strong>${escapeHTML(connector.name)}</strong><span>${escapeHTML(connector.model)}</span></div><p>${escapeHTML(connector.description)}</p>${Object.entries(connector.snippets || {}).map(([label,value], index) => `<div class="snippet"><div class="snippet-label">${escapeHTML(label)}</div><pre>${escapeHTML(value)}</pre><button class="copy-btn" data-copy-card="${escapeHTML(connector.id)}" data-copy-index="${index}">复制</button></div>`).join('')}</article>`).join('');
+      $('connectorGrid').innerHTML = connectors.map(connector => `<article class="connector-card"><div class="connector-head"><strong>${escapeHTML(connector.name)}</strong><span>${escapeHTML(connector.model)}</span></div><p>${escapeHTML(connector.description)}</p>${connector.action ? `<button class="connector-install" data-connector-action="${escapeHTML(connector.action)}">一键接入</button>` : ''}${Object.entries(connector.snippets || {}).map(([label,value], index) => `<div class="snippet"><div class="snippet-label">${escapeHTML(label)}</div><pre>${escapeHTML(value)}</pre><button class="copy-btn" data-copy-card="${escapeHTML(connector.id)}" data-copy-index="${index}">复制</button></div>`).join('')}</article>`).join('');
+      document.querySelectorAll('[data-connector-action]').forEach(button => button.addEventListener('click', () => runAction(button.dataset.connectorAction)));
       document.querySelectorAll('[data-copy-card]').forEach(button => button.addEventListener('click', async () => {
         const connector = connectors.find(item => item.id === button.dataset.copyCard); const value = Object.values(connector?.snippets || {})[Number(button.dataset.copyIndex)];
         try { await navigator.clipboard.writeText(value || ''); button.textContent = '已复制'; setTimeout(() => button.textContent = '复制', 1200); }

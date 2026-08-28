@@ -68,7 +68,7 @@ func TestRetrieveXAIBillingUsesOfficialGrokHeaders(t *testing.T) {
 }
 
 func TestBuildAgentConnectorsCoversMajorAgents(t *testing.T) {
-	connectors := buildAgentConnectors("http://127.0.0.1:18080", "local-key", "grok-4.5")
+	connectors := buildAgentConnectors("http://127.0.0.1:18080", "local-key", "grok-4.5", "xai")
 	seen := map[string]bool{}
 	for _, connector := range connectors {
 		seen[connector.ID] = true

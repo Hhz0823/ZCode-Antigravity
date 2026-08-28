@@ -59,24 +59,6 @@ function Test-LocalTcpPort([int]$Port) {
     finally { $client.Dispose() }
 }
 
-function Test-V2rayNTunUp {
-    $pattern = '(?i)tun|wintun|v2ray|xray|sing.?box'
-    try {
-        $adapters = @(Get-NetAdapter -IncludeHidden -ErrorAction Stop | Where-Object {
-            $_.Status -eq 'Up' -and (($_.Name + ' ' + $_.InterfaceDescription) -match $pattern)
-        })
-        if ($adapters.Count -gt 0) { return $true }
-    }
-    catch { }
-    try {
-        $fallback = @(Get-CimInstance Win32_NetworkAdapter -ErrorAction Stop | Where-Object {
-            $_.NetEnabled -eq $true -and (($_.Name + ' ' + $_.Description) -match $pattern)
-        })
-        return $fallback.Count -gt 0
-    }
-    catch { return $false }
-}
-
 if ($env:OS -ne 'Windows_NT' -or -not [Environment]::Is64BitOperatingSystem) {
     throw '本安装器仅支持 64 位 Windows。'
 }
@@ -88,22 +70,24 @@ $packageFull = [IO.Path]::GetFullPath($PackageDir)
 Write-Step '校验内嵌运行包中的三个可执行文件'
 $stagedManager = Confirm-VerifiedPackage $packageFull
 
-$proxyPort = 10808
+$proxyURL = ''
 if (-not [string]::IsNullOrWhiteSpace($env:ZCODE_ANTIGRAVITY_PROXY_PORT)) {
     $parsedPort = 0
     if (-not [int]::TryParse($env:ZCODE_ANTIGRAVITY_PROXY_PORT, [ref]$parsedPort) -or $parsedPort -lt 1 -or $parsedPort -gt 65535) {
         throw 'ZCODE_ANTIGRAVITY_PROXY_PORT 必须是 1-65535 的端口号。'
     }
-    $proxyPort = $parsedPort
+    $proxyURL = "http://127.0.0.1:$parsedPort"
 }
 
 if (-not $SkipEnvironmentPreflight) {
-    Write-Step '检查 v2rayN TUN 与本地代理'
-    if (-not (Test-V2rayNTunUp)) {
-        throw '没有检测到处于 Up 状态的 TUN/Wintun/Xray/sing-box 适配器。请先在 v2rayN 开启 TUN 模式。'
+    if ($proxyURL -ne '') {
+        if (-not (Test-LocalTcpPort $parsedPort)) {
+            throw "已指定的本机代理 127.0.0.1:$parsedPort 未监听。请启动代理或取消 ZCODE_ANTIGRAVITY_PROXY_PORT。"
+        }
+        Write-Step "使用显式本机代理 $proxyURL（TUN 可选）"
     }
-    if (-not (Test-LocalTcpPort $proxyPort)) {
-        throw "127.0.0.1:$proxyPort 未监听。请启动 v2rayN，或设置 ZCODE_ANTIGRAVITY_PROXY_PORT。"
+    else {
+        Write-Step '运行时自动发现 v2rayN / Windows 系统代理；未发现时使用直连（无需 TUN）'
     }
     if (@(Get-Process -Name ZCode -ErrorAction SilentlyContinue).Count -gt 0) {
         throw '检测到 ZCode 仍在运行。请从系统托盘右键 ZCode 并选择“退出”；安装器不会强制结束 ZCode。'
@@ -173,7 +157,7 @@ $settings = [ordered]@{
     portScanEnd = 18180
     callbackPreferredPort = 51121
     callbackScanEnd = 51221
-    proxyURL = "http://127.0.0.1:$proxyPort"
+    proxyURL = $proxyURL
 }
 [IO.File]::WriteAllText(
     (Join-Path $installDir 'settings.json'),
@@ -199,6 +183,7 @@ if (-not $SkipShortcuts) {
         $shortcut.TargetPath = $targetControlCenter
         $shortcut.WorkingDirectory = $installDir
         $shortcut.Description = 'ZCode Antigravity 模型与额度控制中心'
+        $shortcut.IconLocation = (Join-Path $installDir 'resources\AppIcon.ico')
         $shortcut.Save()
     }
 }

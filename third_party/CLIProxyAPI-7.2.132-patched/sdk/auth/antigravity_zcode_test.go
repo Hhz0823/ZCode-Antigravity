@@ -57,6 +57,12 @@ func TestAntigravityCallbackIsLoopbackAndRejectsInvalidRequests(t *testing.T) {
 	}
 }
 
+func TestAntigravityOAuthCallbackTimeoutAllowsInteractiveLogin(t *testing.T) {
+	if antigravityOAuthCallbackTimeout < 15*time.Minute {
+		t.Fatalf("OAuth callback timeout is too short: %s", antigravityOAuthCallbackTimeout)
+	}
+}
+
 func responseStatus(resp *http.Response) int {
 	if resp == nil {
 		return 0

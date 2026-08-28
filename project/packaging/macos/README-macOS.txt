@@ -1,7 +1,7 @@
 ZCode Antigravity Bridge - macOS Universal test build
 ====================================================
 
-版本：0.6.4-test
+版本：0.6.6-test
 架构：Apple Silicon (arm64) + Intel (x86_64)
 最低系统：macOS 12
 
@@ -12,6 +12,8 @@ ZCode Antigravity Bridge - macOS Universal test build
 App 会在程序坞显示图标，并在菜单栏持续显示所选账号额度。
 主窗口使用透明 NSWindow 与 behindWindow NSVisualEffectView 的系统高斯材质，并提供总览、账号、API 代理、模型路由、
 Agent 接入、用量统计和设置七个原生页面。
+Agent 页面可一键备份并接入 DeepSeek Harness、Grok Build、Codex、Claude Code、Gemini CLI、
+Qwen Code、Kimi Code 与 OpenCode；通用客户端配置仍可复制。
 额度卡片按账号和时间窗口显示彩色进度条、重置时间与最低余量；程序每 5 分钟
 自动刷新一次额度，手动刷新、切换提供商和接入完成后会立即刷新。
 单击菜单栏图标只显示独立额度 Popover（5 小时 / 本周余量与重置时间），不会把
@@ -31,6 +33,8 @@ API 权限或封禁账号。请只使用专门的测试账号，不要使用主 
    当前 App 使用临时签名，没有 Apple Developer ID，也没有公证。
 5. 双击“ZCode Antigravity.app”，在原生控制中心选择 Antigravity 或 Grok / xAI。
 6. 按需完成 Google OAuth 或 xAI 设备授权，再点击“一键接入 ZCode”。
+   Google OAuth 本地回调最长等待 30 分钟；如果页面明确提示超时，请回到程序
+   重新点击登录，不要重新加载旧的 localhost 回调页。
 7. 在 ZCode 中选择 Antigravity + Grok (Local Bridge) 下的目标模型，先发送一条短消息验收。
 8. 关闭原生窗口后菜单栏额度组件继续运行；程序坞或 Popover 内的“打开主界面”可重开窗口。
 
@@ -40,7 +44,7 @@ API 权限或封禁账号。请只使用专门的测试账号，不要使用主 
 
 网络与代理
 ----------
-默认不固定某个代理端口：macOS TUN 模式可透明接管流量，也可在 .env 中设置
+默认使用直连 / 系统网络，无需开启 TUN。macOS TUN 模式仍可透明接管流量，也可在 .env 中设置
 HTTP_PROXY / HTTPS_PROXY，或编辑 App 内 Contents/Resources/settings.json 的
 proxyURL。支持 http、https 和 socks5，且应只指向可信的本机代理。
 

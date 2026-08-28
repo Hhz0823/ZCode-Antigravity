@@ -3,10 +3,10 @@ const resetFive = new Date(now.getTime() + 3.4 * 60 * 60 * 1000).toISOString();
 const resetWeek = new Date(now.getTime() + 4.2 * 24 * 60 * 60 * 1000).toISOString();
 
 const status = {
-  version: "0.6.4-test",
+  version: "0.6.6-test",
   gateway: { ok: true, label: "网关在线", detail: "http://127.0.0.1:18080", running: true },
-  proxy: { ok: true, label: "本机代理在线", detail: "127.0.0.1:10808", running: true },
-  tun: { ok: true, label: "TUN 已开启", detail: "xray_tun", running: true },
+  proxy: { ok: true, label: "v2rayN 自动代理", detail: "127.0.0.1:10808 · 无需 TUN", running: true },
+  tun: { ok: true, label: "TUN 未启用（可选）", detail: "Gemini / Grok 可使用直连或专用代理", running: false },
   zcode: { ok: true, label: "ZCode 已接入", detail: "http://127.0.0.1:18080", running: true },
   providerAccounts: { antigravity: 2, xai: 1 },
   selectedProvider: "antigravity",
@@ -31,24 +31,20 @@ const usage = {
 };
 
 const manager = {
-  version: "0.6.4-test",
+  version: "0.6.6-test",
   accounts: [{ id: "ag-demo", provider: "antigravity", label: "y*****g@gmail.com", plan: "Google AI Pro", status: "active", updatedAt: now.toISOString() }, { id: "xai-demo", provider: "xai", label: "g***@example.com", plan: "SuperGrok", status: "active", updatedAt: now.toISOString() }],
   proxy: { running: true, baseURL: "http://127.0.0.1:18080", port: 18080, protocols: [{ name: "OpenAI", path: "/v1/chat/completions", description: "Chat Completions / Responses 兼容" }, { name: "Anthropic", path: "/v1/messages", description: "Claude Code 原生消息协议" }, { name: "Gemini", path: "/v1beta/models", description: "Google SDK 兼容协议" }] },
   routing: { strategy: "round-robin", sessionAffinity: true, sessionAffinityTTL: "1h", requestRetry: 3, credentialRetry: 3, retryInterval: 30, backgroundModel: "gemini-3.7-flash" },
-  settings: { autoRefreshMinutes: 5, quotaWarningPercent: 20, proxyURL: "http://127.0.0.1:10808", theme: "dark", liquidGlass: true, settingsPath: "%LOCALAPPDATA%\\ZCodeAntigravity\\settings.json" },
+  settings: { autoRefreshMinutes: 5, quotaWarningPercent: 20, proxyURL: "", theme: "dark", liquidGlass: true, settingsPath: "%LOCALAPPDATA%\\ZCodeAntigravity\\settings.json" },
   features: [{ id: "accounts", name: "多账号管家", description: "OAuth 登录、账号发现和脱敏状态", available: true }, { id: "protocols", name: "三协议中继", description: "OpenAI、Anthropic、Gemini", available: true }, { id: "routing", name: "模型路由", description: "轮询、加权与填满优先", available: true }, { id: "retry", name: "自动自愈", description: "401/429 重试与凭据轮换", available: true }, { id: "usage", name: "用量统计", description: "输出 Token、推理 Token 与 tok/s", available: true }],
 };
-
-export function hasTauri() {
-  return "__TAURI_INTERNALS__" in window;
-}
 
 export async function mockGet(path: string): Promise<unknown> {
   if (path === "/api/status") return status;
   if (path === "/api/manager") return manager;
   if (path.startsWith("/api/quota")) return quota(path.includes("xai") ? "xai" : "antigravity");
   if (path.startsWith("/api/usage")) return { ...usage, provider: path.includes("xai") ? "xai" : "antigravity" };
-  if (path === "/api/connectors") return { provider: "antigravity", baseURL: "http://127.0.0.1:18080", model: "gemini-3.7-flash", connectors: [{ id: "codex", name: "OpenAI Codex", description: "Responses API 自定义模型提供商", model: "gemini-3.7-flash", snippets: { "config.toml": "model_provider = \"zcode_bridge\"", "环境变量": "ZCODE_BRIDGE_API_KEY=local-only" } }, { id: "claude-code", name: "Claude Code", description: "Anthropic 兼容接口", model: "gemini-3.7-flash", snippets: { "PowerShell": "$env:ANTHROPIC_BASE_URL = \"http://127.0.0.1:18080\"" } }] };
+  if (path === "/api/connectors") return { provider: "antigravity", baseURL: "http://127.0.0.1:18080", model: "gemini-3.7-flash", connectors: [{ id: "deepseek-harness", name: "DeepSeek Harness", description: "自动写入 DSH Provider、凭据和默认模型", model: "gemini-3.7-flash", action: "connect-agent-deepseek-harness", snippets: { "settings.yaml": "provider: zcode-bridge" } }, { id: "codex", name: "OpenAI Codex", description: "Responses API 自定义模型提供商", model: "gemini-3.7-flash", action: "connect-agent-codex", snippets: { "config.toml": "model_provider = \"zcode_bridge\"" } }, { id: "claude-code", name: "Claude Code", description: "Anthropic 兼容接口", model: "gemini-3.7-flash", action: "connect-agent-claude-code", snippets: { "PowerShell": "$env:ANTHROPIC_BASE_URL = \"http://127.0.0.1:18080\"" } }, { id: "gemini-cli", name: "Gemini CLI", description: "Gemini 原生协议", model: "gemini-3.7-flash", action: "connect-agent-gemini-cli", snippets: { ".env": "GOOGLE_GEMINI_BASE_URL=http://127.0.0.1:18080" } }, { id: "qwen-code", name: "Qwen Code", description: "OpenAI-compatible Provider", model: "gemini-3.7-flash", action: "connect-agent-qwen-code", snippets: { "settings.json": "provider: zcode-bridge" } }, { id: "kimi-code", name: "Kimi Code", description: "OpenAI-compatible Provider", model: "gemini-3.7-flash", action: "connect-agent-kimi-code", snippets: { "config.toml": "provider = \"zcode-bridge\"" } }] };
   throw new Error("Unknown mock path");
 }
 

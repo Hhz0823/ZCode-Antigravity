@@ -20,6 +20,10 @@ import (
 // AntigravityAuthenticator implements OAuth login for the antigravity provider.
 type AntigravityAuthenticator struct{}
 
+// Keep the loopback callback alive long enough for users who must complete
+// account selection, consent, or a second-factor challenge in the browser.
+const antigravityOAuthCallbackTimeout = 30 * time.Minute
+
 // NewAntigravityAuthenticator constructs a new authenticator instance.
 func NewAntigravityAuthenticator() Authenticator { return &AntigravityAuthenticator{} }
 
@@ -94,7 +98,7 @@ func (AntigravityAuthenticator) Login(ctx context.Context, cfg *config.Config, o
 	fmt.Println("Waiting for antigravity authentication callback...")
 
 	var cbRes callbackResult
-	timeoutTimer := time.NewTimer(5 * time.Minute)
+	timeoutTimer := time.NewTimer(antigravityOAuthCallbackTimeout)
 	defer timeoutTimer.Stop()
 
 	var manualPromptTimer *time.Timer
@@ -146,7 +150,7 @@ waitForCallback:
 		case errManual := <-manualInputErrCh:
 			return nil, errManual
 		case <-timeoutTimer.C:
-			return nil, fmt.Errorf("antigravity: authentication timed out")
+			return nil, fmt.Errorf("antigravity: authentication timed out after %s; start login again", antigravityOAuthCallbackTimeout)
 		}
 	}
 

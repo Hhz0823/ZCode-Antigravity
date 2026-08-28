@@ -18,6 +18,6 @@ ZCode Antigravity `v0.6.0-test` 的核心管理闭环参考了
 - 输出 / 推理 Token、Token/s、额度窗口与 Agent 接入配置。
 
 本项目没有复制参考项目的 Tauri、React 组件、源码文件或资源。Windows 界面由本项目使用
-Tauri 2 + React + Tailwind/shadcn 独立实现，macOS 界面由 SwiftUI 原生实现；设置存储、路由配置生成、刷新调度和数据适配
+Electron + React + Tailwind/shadcn 独立实现，macOS 界面由 SwiftUI 原生实现；设置存储、路由配置生成、刷新调度和数据适配
 也是本项目的独立实现。参考项目使用 CC BY-NC-SA 4.0，因此本文只记录公开产品行为的参考边界，
 不把其代码许可证扩散到本项目其他源文件或第三方组件。

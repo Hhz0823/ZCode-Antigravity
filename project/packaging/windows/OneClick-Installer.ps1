@@ -61,30 +61,6 @@ function Test-LocalTcpPort([int]$Port) {
     }
 }
 
-function Test-V2rayNTunUp {
-    $pattern = '(?i)tun|wintun|v2ray|xray|sing.?box'
-    try {
-        $adapters = @(Get-NetAdapter -IncludeHidden -ErrorAction Stop | Where-Object {
-            $_.Status -eq 'Up' -and (($_.Name + ' ' + $_.InterfaceDescription) -match $pattern)
-        })
-        if ($adapters.Count -gt 0) {
-            return $true
-        }
-    }
-    catch {
-        $adapters = @()
-    }
-    try {
-        $fallback = @(Get-CimInstance Win32_NetworkAdapter -ErrorAction Stop | Where-Object {
-            $_.NetEnabled -eq $true -and (($_.Name + ' ' + $_.Description) -match $pattern)
-        })
-        return $fallback.Count -gt 0
-    }
-    catch {
-        return $false
-    }
-}
-
 function Expand-VerifiedPayload([string]$Destination) {
     $selfFull = [IO.Path]::GetFullPath($SelfPath)
     if (-not (Test-Path -LiteralPath $selfFull -PathType Leaf)) {
@@ -208,21 +184,20 @@ try {
     if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
         throw 'LOCALAPPDATA 未设置，无法确定当前用户安装目录。'
     }
-    $proxyPort = 10808
+    $proxyURL = ''
     if (-not [string]::IsNullOrWhiteSpace($env:ZCODE_ANTIGRAVITY_PROXY_PORT)) {
         $parsedPort = 0
         if (-not [int]::TryParse($env:ZCODE_ANTIGRAVITY_PROXY_PORT, [ref]$parsedPort) -or $parsedPort -lt 1 -or $parsedPort -gt 65535) {
             throw 'ZCODE_ANTIGRAVITY_PROXY_PORT 必须是 1-65535 的端口号。'
         }
-        $proxyPort = $parsedPort
+        if (-not (Test-LocalTcpPort $parsedPort)) {
+            throw "已指定的本机代理 127.0.0.1:$parsedPort 未监听。请启动代理或取消 ZCODE_ANTIGRAVITY_PROXY_PORT。"
+        }
+        $proxyURL = "http://127.0.0.1:$parsedPort"
+        Write-Step "使用显式本机代理 $proxyURL（TUN 可选）"
     }
-
-    Write-Step '检查 v2rayN TUN 与本地代理'
-    if (-not (Test-V2rayNTunUp)) {
-        throw '没有检测到处于 Up 状态的 TUN/Wintun/Xray/sing-box 适配器。请先在 v2rayN 开启 TUN 模式，再重新运行本 BAT。'
-    }
-    if (-not (Test-LocalTcpPort $proxyPort)) {
-        throw "127.0.0.1:$proxyPort 未监听。请启动 v2rayN；若端口不是 10808，请先设置环境变量 ZCODE_ANTIGRAVITY_PROXY_PORT。"
+    else {
+        Write-Step '运行时自动发现 v2rayN / Windows 系统代理；未发现时使用直连（无需 TUN）'
     }
 
     if (@(Get-Process -Name ZCode -ErrorAction SilentlyContinue).Count -gt 0) {
@@ -265,7 +240,7 @@ try {
         portScanEnd = 18180
         callbackPreferredPort = 51121
         callbackScanEnd = 51221
-        proxyURL = "http://127.0.0.1:$proxyPort"
+        proxyURL = $proxyURL
     }
     $settingsPath = Join-Path $installDir 'settings.json'
     $settingsJson = ($settings | ConvertTo-Json -Depth 3) + "`r`n"

@@ -73,6 +73,9 @@ type app struct {
 	paths        paths
 	settings     settings
 	settingsMu   sync.RWMutex
+	proxyMu      sync.RWMutex
+	activeProxy  string
+	proxySource  string
 	apiKey       string
 	now          func() time.Time
 	zcodeRunning func() bool
@@ -383,6 +386,9 @@ func (a *app) saveUserSettings(s settings) error {
 	a.settingsMu.Lock()
 	a.settings = s
 	a.settingsMu.Unlock()
+	a.proxyMu.Lock()
+	a.activeProxy, a.proxySource = "", ""
+	a.proxyMu.Unlock()
 	return nil
 }
 

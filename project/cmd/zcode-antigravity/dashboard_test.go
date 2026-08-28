@@ -51,6 +51,13 @@ func TestDashboardTokenComparisonIsExact(t *testing.T) {
 	}
 }
 
+func TestProxyEndpointStatusAllowsDirectNetworkWithoutTUN(t *testing.T) {
+	ok, detail := proxyEndpointStatus("")
+	if !ok || !strings.Contains(detail, "无需 TUN") {
+		t.Fatalf("direct network status = %t %q", ok, detail)
+	}
+}
+
 func TestGatewayNeedsRecoveryOnlyForUnexpectedBridgeExit(t *testing.T) {
 	recorded := state{Port: 18080, PID: 3210}
 	account := providerAccountCounts{Antigravity: 1}

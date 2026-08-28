@@ -47,3 +47,15 @@ func TestWriteWindowsPowerShellScriptRejectsInvalidUTF8(t *testing.T) {
 		t.Fatalf("invalid script should not be written; stat error = %v", err)
 	}
 }
+
+func TestInstallScriptsDefaultToDirectNetworking(t *testing.T) {
+	for _, path := range []string{"Install-From-Package.ps1", "../OneClick-Installer.ps1"} {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Contains(raw, []byte("$proxyURL = ''")) || bytes.Contains(raw, []byte("Test-V2rayNTunUp")) {
+			t.Fatalf("%s still forces a TUN/proxy dependency", path)
+		}
+	}
+}

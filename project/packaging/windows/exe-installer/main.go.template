@@ -64,7 +64,7 @@ func main() {
 	answer := showMessage(
 		"将为当前 Windows 用户安装 ZCode Antigravity Bridge "+packageVersion+"。\n\n"+
 			"安装前请确认：\n"+
-			"1. 已在 v2rayN 开启 TUN 模式；\n"+
+			"1. 已启动 v2rayN 即可自动使用其本机代理，无需开启 TUN；未运行时会尝试直连；\n"+
 			"2. 已从系统托盘完全退出 ZCode。\n\n"+
 			"安装器不会删除账号、聊天、项目或其它 Provider。是否继续？",
 		messageYesNo|messageIconQuestion,

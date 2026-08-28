@@ -124,7 +124,9 @@ func (g *guiRuntime) managerReport() managerReport {
 		},
 		Features: []managerFeature{
 			{ID: "accounts", Name: "多账号管家", Description: "OAuth 登录、账号发现和脱敏状态", Available: true},
+			{ID: "auto-proxy", Name: "v2rayN 自动代理", Description: "无需 TUN，自动发现系统代理与本机端口", Available: true},
 			{ID: "protocols", Name: "三协议中继", Description: "OpenAI、Anthropic、Gemini", Available: true},
+			{ID: "connectors", Name: "Agent 一键接入", Description: "备份并合并 8 类 CLI 配置", Available: true},
 			{ID: "routing", Name: "模型路由", Description: "轮询、加权与填满优先", Available: true},
 			{ID: "retry", Name: "自动自愈", Description: "401/429 重试与凭据轮换", Available: true},
 			{ID: "usage", Name: "用量统计", Description: "输出 Token、推理 Token 与 tok/s", Available: true},

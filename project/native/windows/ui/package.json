@@ -1,29 +1,66 @@
 {
   "name": "zcode-antigravity-control-center",
   "private": true,
-  "version": "0.6.4-test",
+  "version": "0.6.6-test",
+  "description": "Electron control center for ZCode Antigravity Bridge",
+  "author": "ZCode Antigravity contributors",
+  "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:electron": "node --test electron/protocol.test.cjs",
+    "package:windows": "npm run build && electron-builder --win dir --x64"
   },
-  "dependencies": {
-    "@tauri-apps/api": "2.11.1",
-    "class-variance-authority": "0.7.1",
-    "clsx": "2.1.1",
-    "lucide-react": "1.31.0",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
-    "tailwind-merge": "3.6.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.5",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "electron": "44.0.0",
+    "electron-builder": "26.15.3",
+    "lucide-react": "1.31.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "tailwind-merge": "3.6.0",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.2.1"
+  },
+  "build": {
+    "appId": "cn.zcode.antigravity",
+    "productName": "ZCode Antigravity",
+    "executableName": "ZCode-Antigravity-ControlCenter",
+    "asar": true,
+    "npmRebuild": false,
+    "files": [
+      "dist/**/*",
+      "electron/main.cjs",
+      "electron/preload.cjs",
+      "electron/protocol.cjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../assets/AppIcon.ico",
+        "to": "AppIcon.ico"
+      }
+    ],
+    "directories": {
+      "output": "electron-dist"
+    },
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
+    "win": {
+      "target": "dir",
+      "icon": "../assets/AppIcon.ico",
+      "signExecutable": false
+    }
   }
 }

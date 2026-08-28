@@ -11,6 +11,7 @@ type agentConnector struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description"`
 	Model       string            `json:"model"`
+	Action      string            `json:"action,omitempty"`
 	Snippets    map[string]string `json:"snippets"`
 }
 
@@ -54,7 +55,7 @@ func (g *guiRuntime) serveConnectors(w http.ResponseWriter, r *http.Request) {
 		Provider:   provider,
 		BaseURL:    baseURL,
 		Model:      model,
-		Connectors: buildAgentConnectors(baseURL, g.app.apiKey, model),
+		Connectors: buildAgentConnectors(baseURL, g.app.apiKey, model, provider),
 	})
 }
 
@@ -81,12 +82,24 @@ func preferredConnectorModel(provider string, models []modelInfo, backgroundMode
 	return ids[0]
 }
 
-func buildAgentConnectors(baseURL, apiKey, model string) []agentConnector {
+func buildAgentConnectors(baseURL, apiKey, model, provider string) []agentConnector {
 	openAIBase := strings.TrimRight(baseURL, "/") + "/v1"
+	geminiAction := ""
+	geminiDescription := "使用 Gemini 原生协议连接当前 Antigravity 模型"
+	if provider == "antigravity" {
+		geminiAction = connectorAction("gemini-cli")
+	} else {
+		geminiDescription = "Gemini 原生协议仅支持 Antigravity；Grok 请使用其他 OpenAI / Anthropic 客户端"
+	}
 	connectors := []agentConnector{
 		{
+			ID: "deepseek-harness", Name: "DeepSeek Harness", Description: "一键写入当前用户的 DSH Provider、凭据和默认模型；修改前自动备份",
+			Model: model, Action: connectorAction("deepseek-harness"),
+			Snippets: deepSeekHarnessSnippets(openAIBase, apiKey, model, provider == "antigravity"),
+		},
+		{
 			ID: "grok-build", Name: "Grok Build", Description: "让官方 Grok 终端 Agent 使用本地桥接模型",
-			Model: model,
+			Model: model, Action: connectorAction("grok-build"),
 			Snippets: map[string]string{
 				"macOS / Linux":      fmt.Sprintf("export GROK_MODELS_BASE_URL=%q\nexport GROK_MODELS_LIST_URL=%q\nexport XAI_API_KEY=%q\ngrok", openAIBase, openAIBase+"/models", apiKey),
 				"Windows PowerShell": fmt.Sprintf("$env:GROK_MODELS_BASE_URL = %q\n$env:GROK_MODELS_LIST_URL = %q\n$env:XAI_API_KEY = %q\ngrok", openAIBase, openAIBase+"/models", apiKey),
@@ -94,25 +107,47 @@ func buildAgentConnectors(baseURL, apiKey, model string) []agentConnector {
 		},
 		{
 			ID: "codex", Name: "OpenAI Codex", Description: "添加一个 Responses API 自定义模型提供商",
-			Model: model,
+			Model: model, Action: connectorAction("codex"),
 			Snippets: map[string]string{
-				"~/.codex/config.toml": fmt.Sprintf("model = %q\nmodel_provider = \"zcode_bridge\"\n\n[model_providers.zcode_bridge]\nname = \"ZCode Local Bridge\"\nbase_url = %q\nenv_key = \"ZCODE_BRIDGE_API_KEY\"\nwire_api = \"responses\"", model, openAIBase),
-				"环境变量":                 fmt.Sprintf("ZCODE_BRIDGE_API_KEY=%s", apiKey),
+				"~/.codex/config.toml": fmt.Sprintf("model = %q\nmodel_provider = \"zcode_bridge\"\n\n[model_providers.zcode_bridge]\nname = \"ZCode Local Bridge\"\nbase_url = %q\nwire_api = \"responses\"\nexperimental_bearer_token = %q", model, openAIBase, apiKey),
 			},
 		},
 		{
 			ID: "claude-code", Name: "Claude Code", Description: "通过 Anthropic 兼容接口连接本地网关",
-			Model: model,
+			Model: model, Action: connectorAction("claude-code"),
 			Snippets: map[string]string{
 				"macOS / Linux":      fmt.Sprintf("export ANTHROPIC_BASE_URL=%q\nexport ANTHROPIC_AUTH_TOKEN=%q\nexport ANTHROPIC_MODEL=%q\nclaude", baseURL, apiKey, model),
 				"Windows PowerShell": fmt.Sprintf("$env:ANTHROPIC_BASE_URL = %q\n$env:ANTHROPIC_AUTH_TOKEN = %q\n$env:ANTHROPIC_MODEL = %q\nclaude", baseURL, apiKey, model),
 			},
 		},
 		{
-			ID: "opencode", Name: "OpenCode", Description: "OpenAI-compatible Provider 配置",
-			Model: model,
+			ID: "gemini-cli", Name: "Gemini CLI", Description: geminiDescription,
+			Model: model, Action: geminiAction,
 			Snippets: map[string]string{
-				"opencode.json": fmt.Sprintf("{\n  \"$schema\": \"https://opencode.ai/config.json\",\n  \"providers\": {\n    \"zcode-bridge\": {\n      \"package\": \"@opencode-ai/ai/providers/openai-compatible\",\n      \"name\": \"ZCode Local Bridge\",\n      \"settings\": {\n        \"baseURL\": %q,\n        \"apiKey\": %q\n      },\n      \"models\": { %q: { \"name\": %q } }\n    }\n  },\n  \"model\": %q\n}", openAIBase, apiKey, model, model, "zcode-bridge/"+model),
+				"~/.gemini/settings.json": "{\n  \"security\": { \"auth\": { \"selectedType\": \"gemini-api-key\" } }\n}",
+				"~/.gemini/.env":          fmt.Sprintf("GEMINI_API_KEY=%s\nGOOGLE_GEMINI_BASE_URL=%s\nGEMINI_MODEL=%s", apiKey, baseURL, model),
+			},
+		},
+		{
+			ID: "qwen-code", Name: "Qwen Code", Description: "添加 OpenAI-compatible Provider 并选中当前模型",
+			Model: model, Action: connectorAction("qwen-code"),
+			Snippets: map[string]string{
+				"~/.qwen/settings.json": fmt.Sprintf("{\n  \"env\": { \"ZCODE_BRIDGE_API_KEY\": %q },\n  \"modelProviders\": { \"zcode-bridge\": [{ \"id\": %q, \"envKey\": \"ZCODE_BRIDGE_API_KEY\", \"baseUrl\": %q }] },\n  \"providerProtocol\": { \"zcode-bridge\": \"openai\" },\n  \"security\": { \"auth\": { \"selectedType\": \"zcode-bridge\" } },\n  \"model\": { \"name\": %q }\n}", apiKey, model, openAIBase, model),
+			},
+		},
+		{
+			ID: "kimi-code", Name: "Kimi Code", Description: "添加 OpenAI-compatible Provider 与默认模型",
+			Model: model, Action: connectorAction("kimi-code"),
+			Snippets: map[string]string{
+				"~/.kimi/config.toml": fmt.Sprintf("default_model = \"zcode-bridge\"\n\n[providers.zcode-bridge]\ntype = \"openai\"\nbase_url = %q\napi_key = %q\n\n[models.zcode-bridge]\nprovider = \"zcode-bridge\"\nmodel = %q\nmax_context_size = 131072", openAIBase, apiKey, model),
+			},
+		},
+		{
+			ID: "opencode", Name: "OpenCode", Description: "OpenAI-compatible Provider 配置",
+			Model: model, Action: connectorAction("opencode"),
+			Snippets: map[string]string{
+				"~/.config/opencode/opencode.json":    fmt.Sprintf("{\n  \"$schema\": \"https://opencode.ai/config.json\",\n  \"provider\": {\n    \"zcode-bridge\": {\n      \"npm\": \"@ai-sdk/openai-compatible\",\n      \"name\": \"ZCode Local Bridge\",\n      \"options\": { \"baseURL\": %q, \"apiKey\": \"{file:~/.config/opencode/zcode-bridge-key}\" },\n      \"models\": { %q: { \"name\": %q } }\n    }\n  },\n  \"model\": %q\n}", openAIBase, model, model, "zcode-bridge/"+model),
+				"~/.config/opencode/zcode-bridge-key": apiKey,
 			},
 		},
 		{
@@ -125,4 +160,32 @@ func buildAgentConnectors(baseURL, apiKey, model string) []agentConnector {
 		},
 	}
 	return connectors
+}
+
+func connectorAction(id string) string {
+	return "connect-agent-" + id
+}
+
+func connectorIDFromAction(action string) (string, bool) {
+	id := strings.TrimPrefix(action, "connect-agent-")
+	if id == action {
+		return "", false
+	}
+	switch id {
+	case "deepseek-harness", "grok-build", "codex", "claude-code", "gemini-cli", "qwen-code", "kimi-code", "opencode":
+		return id, true
+	default:
+		return "", false
+	}
+}
+
+func deepSeekHarnessSnippets(openAIBase, apiKey, model string, imageInput bool) map[string]string {
+	input := "[text]"
+	if imageInput {
+		input = "[text, image]"
+	}
+	return map[string]string{
+		"$DSH_HOME/settings.yaml":     fmt.Sprintf("llm-pi-ai:\n  providers:\n    zcode-bridge:\n      displayName: ZCode Local Bridge\n      apiKeyEnv: ZCODE_BRIDGE_API_KEY\n      api: openai-completions\n      baseURL: %s\n      compat:\n        supportsDeveloperRole: false\n        maxTokensField: max_tokens\n      models:\n        - id: %s\n          name: %s\n          input: %s\nagent-default-model:\n  provider: zcode-bridge\n  model: %s", openAIBase, model, model, input, model),
+		"$DSH_HOME/.credentials.yaml": fmt.Sprintf("version: 1\nrefs:\n  ZCODE_BRIDGE_API_KEY: %s", apiKey),
+	}
 }

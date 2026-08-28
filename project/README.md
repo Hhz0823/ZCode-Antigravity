@@ -10,7 +10,8 @@ bounded config backups/logs, atomic Windows replacement, model synchronization, 
 smoke testing, image/audio/video request translation, safe no-op reuse while ZCode is running,
 PID/path-safe stop, managed-provider removal, a strict Gemini plus Grok-text model selector,
 Grok billing, protocol-derived output-token and token/s metrics, detailed taskbar/menu-bar quota
-menus, Agent connector cards, a hidden native-host API, SwiftUI/AppKit macOS UI, Tauri 2 +
+menus, backed-up one-click configuration for eight Agent/CLI clients, automatic v2rayN/Windows
+system-proxy discovery without TUN, a hidden native-host API, SwiftUI/AppKit macOS UI, Electron 44 +
 React/Tailwind Windows UI, an authenticated manager API for accounts/protocols/routing/retry/UI settings,
 Codex U-inspired liquid-glass native dashboards, and SHA-256 verified Windows installers.
 
@@ -36,19 +37,17 @@ GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build \
   -o ZCode-Antigravity.exe ./cmd/zcode-antigravity
 ```
 
-Build the Tauri 2 Windows control center with the GNU cross target:
+Build the Electron Windows control center from macOS or Windows:
 
 ```bash
-rustup target add x86_64-pc-windows-gnu
-cd native/windows
-npm --prefix ui ci
-npm --prefix ui run build
-cargo check --locked --target x86_64-pc-windows-gnu
-cargo build --release --target x86_64-pc-windows-gnu
+cd native/windows/ui
+npm ci
+npm run test:electron
+npm run package:windows
 ```
 
 On macOS with MinGW installed, `./packaging/windows/Build-Windows-Cross.sh` produces the
-expanded ZIP, Tauri GUI installer, and single-BAT fallback in one flow.
+expanded ZIP, Electron GUI installer, and single-BAT fallback in one flow.
 
 The backend is CLIProxyAPI v7.2.132 with
 [`docs/CLIProxyAPI-v7.2.132-zcode.patch`](docs/CLIProxyAPI-v7.2.132-zcode.patch).
@@ -62,7 +61,7 @@ Build the single-BAT installer from a verified expanded package:
 ```powershell
 .\packaging\windows\Build-Single-Bat.ps1 `
   -PackageDir C:\path\to\expanded-package `
-  -OutputFile C:\path\to\ZCode-Antigravity-OneClick-v0.6.4-test.bat
+  -OutputFile C:\path\to\ZCode-Antigravity-OneClick-v0.6.6-test.bat
 ```
 
 Build the native no-console EXE installer from the same verified package:
@@ -70,5 +69,5 @@ Build the native no-console EXE installer from the same verified package:
 ```powershell
 .\packaging\windows\Build-Exe-Installer.ps1 `
   -PackageDir C:\path\to\expanded-package `
-  -OutputFile C:\path\to\ZCode-Antigravity-Setup-v0.6.4-test.exe
+  -OutputFile C:\path\to\ZCode-Antigravity-Setup-v0.6.6-test.exe
 ```

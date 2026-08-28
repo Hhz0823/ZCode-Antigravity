@@ -3,7 +3,7 @@
 > 在 Windows 与 macOS 上统一接入 Antigravity Gemini 和 xAI Grok，
 > 并把本机安全网关提供给 ZCode、Grok Build、Codex、Claude Code 与 OpenCode。
 
-**当前版本：** Windows / macOS `v0.6.4-test`
+**当前版本：** Windows / macOS `v0.6.6-test`
 **适用系统：** macOS 12+（Apple Silicon / Intel）、Windows 10 / 11 x64
 **项目状态：** 测试版
 
@@ -22,12 +22,13 @@
 - 本地网关按协议返回的真实 usage 数据显示最近输出 Token、推理 Token、生成速度和本地累计输出；有首字节时间时使用“输出 Token ÷ 生成阶段耗时”，否则明确标为“有效吞吐”。统计不保存提示词或回复。
 - Antigravity / Grok 使用独立的原生选择卡、账号数、选中态与切换进度；切换期间保留各自最近成功额度，避免旧请求覆盖新提供商界面。
 - Antigravity 额度请求支持 sandbox / daily / production 端点、HTTP 403 无项目字段重试和逐模型额度降级。
-- 内置 Grok Build、OpenAI Codex、Claude Code、OpenCode、通用 OpenAI / Anthropic 客户端配置卡，可一键复制，不会擅自覆盖外部 Agent 配置文件。
-- Windows 控制中心使用 **Tauri 2 + React + Tailwind CSS / shadcn 风格组件**，Rust 仅负责原生窗口、系统托盘和本地 API 边界；WebView2 随系统缩放并使用原生 Acrylic，子进程全部隐藏。
+- DeepSeek Harness、Grok Build、OpenAI Codex、Claude Code、Gemini CLI、Qwen Code、Kimi Code 与 OpenCode 均支持一键接入；修改前自动备份并只合并本程序管理的 Provider，通用客户端配置仍可复制。
+- Gemini CLI 使用原生 Gemini 协议，因此仅在选择 Antigravity 时启用；Grok 可一键接入其余 OpenAI / Anthropic 兼容客户端。
+- Windows 控制中心使用 **Electron 44 + React + Tailwind CSS / shadcn 风格组件**；Electron 负责窗口、任务栏小组件和受限 IPC，Chromium 随系统 DPI 缩放并叠加原生 DWM Acrylic，子进程全部隐藏。
 - macOS 控制中心使用 **SwiftUI + AppKit** 原生开发，具有真正的 Dock 图标、原生菜单栏额度组件；Universal `.app` 同时兼容 Apple Silicon 与 Intel。
 - 七页控制中心统一提供总览、账号、API 代理、模型路由、Agent 接入、用量统计和设置；右侧操作区始终保留本机 OAuth、网关与 ZCode 接入动作。
-- 控制中心使用系统字体、CSS 响应式布局和页面切换反馈；Windows 使用系统 WebView2 而不是外部 Chrome，macOS 保持原生 SwiftUI，也不会因打开面板弹出终端窗口。
-- 提供 v2rayN TUN / 代理预检、ZCode 配置备份、安全停止与同版本重装保护。
+- 控制中心使用系统字体、响应式布局和页面切换反馈；Windows 自带固定版本 Electron/Chromium，macOS 保持原生 SwiftUI，两端打开面板都不会弹出终端窗口。
+- Windows 会自动使用已启用的系统代理；检测到 v2rayN 时自动探测新版 mixed `10808` 与旧版 HTTP `10809`，无需开启 TUN。手动代理优先，均不可用时才直连。
 - 发布构建会拒绝生成缺少 Antigravity OAuth 桌面配置的安装包；网关进程意外退出时，控制中心会自动用当前版本恢复服务，用户主动停止则不会被重新拉起。
 - 本地密钥随机生成；Windows 使用 DPAPI、macOS 使用登录钥匙串主密钥保护凭据；API 与 OAuth 回调仅监听 loopback。
 
@@ -37,11 +38,11 @@
 
 | 文件 | 用途 | 建议 |
 | --- | --- | --- |
-| `ZCode-Antigravity-macOS-Universal-v0.6.4-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
-| `ZCode-Antigravity-Setup-v0.6.4-test.exe` | Windows 图形化安装器 | **普通用户首选** |
-| `ZCode-Antigravity-OneClick-v0.6.4-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
-| `ZCode-Antigravity-Windows-x64-0.6.4-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
-| `ZCode-Antigravity-Source-v0.6.4-test.zip` | 当前源码快照 | 审计 / 构建 |
+| `ZCode-Antigravity-macOS-Universal-v0.6.6-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
+| `ZCode-Antigravity-Setup-v0.6.6-test.exe` | Windows 图形化安装器 | **普通用户首选** |
+| `ZCode-Antigravity-OneClick-v0.6.6-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
+| `ZCode-Antigravity-Windows-x64-0.6.6-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
+| `ZCode-Antigravity-Source-v0.6.6-test.zip` | 当前源码快照 | 审计 / 构建 |
 
 ## macOS 快速安装
 
@@ -55,7 +56,7 @@
 
 1. 完整解压 macOS Universal ZIP；如需校验，打开 `Terminal Tools` 后双击 `Verify-Package.command`。
 2. 完全退出 ZCode。当前 App 使用临时签名且尚未公证；首次运行请按住 Control 点击 `ZCode Antigravity.app`，选择“打开”。
-3. 双击 `ZCode Antigravity.app`，选择 Antigravity 或 Grok；按需完成 Google OAuth 或 xAI 设备授权，再点击“一键接入 ZCode”。
+3. 双击 `ZCode Antigravity.app`，选择 Antigravity 或 Grok；按需完成 Google OAuth 或 xAI 设备授权，再点击“一键接入 ZCode”。Google OAuth 回调最长等待 30 分钟；超时后应回到程序重新登录，不要刷新旧的 localhost 页面。
 4. 重新打开 ZCode，选择 `Antigravity + Grok (Local Bridge)` 下的目标模型，发送一条短消息验收。关闭原生窗口后菜单栏额度组件仍会保留。
 
 Mac 运行数据位于 `~/Library/Application Support/ZCodeAntigravity`。Google token 使用
@@ -68,19 +69,16 @@ AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切�
 
 - Windows 10 或 Windows 11 x64。
 - 已安装 ZCode 3.7.x，并至少打开过一次。
-- 已启动 v2rayN 并开启 TUN 模式。
-- v2rayN mixed inbound 默认监听 `127.0.0.1:10808`。
-- 可正常打开 Google / xAI 授权页面的浏览器。
+- 当前网络可访问 Google / xAI 授权页和对应模型服务；TUN 与本机代理均为可选。
 
 ### 安装步骤
 
 1. 从 Windows 系统托盘完全退出 ZCode。仅关闭窗口可能仍会留下 `ZCode.exe` 进程。
-2. 确认 v2rayN 已开启 TUN，且本地代理端口与配置一致。
-3. 下载 `ZCode-Antigravity-Setup-v0.6.4-test.exe`，并先校验 SHA-256。请勿使用任务栏点击会同时置顶主窗口的 `v0.6.3-test`、网关启动后可能保留旧额度提示的 `v0.6.2-test` 或更早测试版。
-4. 双击安装器。程序会校验内嵌 ZIP 和三个 EXE，然后安装到当前用户目录。
-5. 在控制中心选择 Antigravity 或 Grok，完成对应授权并等待状态检查通过。Grok 登录时，将软件弹层中的临时验证码输入已打开的 xAI 官方页面；授权后无需再把结果粘贴回软件。
-6. 重新打开 ZCode，选择 Provider `Antigravity + Grok (Local Bridge)`；控制中心会作为任务栏额度小组件继续驻留。
-7. 先发送一条短消息进行小规模验收。账号权限和实时额度以第一次真实请求为准。
+2. 下载 `ZCode-Antigravity-Setup-v0.6.6-test.exe`，并先校验 SHA-256。请勿使用任务栏点击会同时置顶主窗口的 `v0.6.3-test`、网关启动后可能保留旧额度提示的 `v0.6.2-test` 或更早测试版。
+3. 双击安装器。程序会自动使用正在运行的 v2rayN / Windows 系统代理，无需开启 TUN；未发现代理时才直连。
+4. 在控制中心选择 Antigravity 或 Grok，完成对应授权并等待状态检查通过。Grok 登录时，将软件弹层中的临时验证码输入已打开的 xAI 官方页面；授权后无需再把结果粘贴回软件。
+5. 重新打开 ZCode，选择 Provider `Antigravity + Grok (Local Bridge)`；控制中心会作为任务栏额度小组件继续驻留。
+6. 先发送一条短消息进行小规模验收。账号权限和实时额度以第一次真实请求为准。
 
 ## 本地端口与代理
 
@@ -89,12 +87,13 @@ AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切�
 | 本地 API | `127.0.0.1:18080` | 自动扫描 `18081–18180` |
 | OAuth callback | `127.0.0.1:51121` | 自动扫描 `51122–51221` |
 | GUI 控制中心 | `127.0.0.1:18200–18250` | 在范围内选择可用端口 |
-| Windows v2rayN 代理 | `http://127.0.0.1:10808` | 需与 `settings.json` 保持一致 |
+| 自动网络出口 | v2rayN / Windows 系统代理 / 直连 | 无需 TUN；手动 `proxyURL` 优先 |
 
-支持 `http`、`https` 和 `socks5` 代理方案。如果 v2rayN 本地端口已修改，
-请先停止 Bridge，再修改展开包中 `settings.json` 的 `proxyURL`。
+默认 `proxyURL` 为空，表示自动模式：先读取 Windows 当前用户系统代理，再在 v2rayN
+运行时探测 SOCKS5/mixed `127.0.0.1:10808` 与旧版 HTTP `10809`，都不可用才直连。需要固定代理时支持
+`http`、`https` 和 `socks5`；手动 `proxyURL` 始终优先。
 
-macOS 包默认不固定代理端口，可直接使用系统 TUN；也可以在包内 `.env` 设置
+macOS 包同样默认直连且不固定代理端口；也可以使用系统 TUN、在包内 `.env` 设置
 `HTTP_PROXY` / `HTTPS_PROXY`，或修改 App 的 `Contents/Resources/settings.json`。
 
 安装前也可设置自定义代理端口：
@@ -105,7 +104,7 @@ $env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
 
 ## 已验证范围
 
-Windows 基线与 `v0.6.4-test` 新增的构建及实机测试记录包括：
+Windows 基线与 `v0.6.6-test` 的构建测试记录包括：
 
 - 管理器与 CLIProxyAPI 的 Go 测试、Windows x64 构建和静态检查通过。
 - OAuth PKCE / callback、DPAPI 凭据存储、原子替换和 loopback 约束通过。
@@ -116,11 +115,11 @@ Windows 基线与 `v0.6.4-test` 新增的构建及实机测试记录包括：
 - EXE 内嵌 PowerShell 脚本现在由构建器和运行时双重保证 UTF-8 BOM，并加入中文脚本编码回归测试，修复 Windows PowerShell 5.1 的 `ParserError: UnexpectedToken`。
 - 已在构建主机复现中文代码页 936 会产生 `UnexpectedToken`，并确认新 EXE 只内嵌一个 `EF BB BF + param(` 脚本头。
 - Windows 全部 GUI 子进程使用 `CREATE_NO_WINDOW`；Windows x64 测试程序交叉编译通过。
-- Tauri 2 控制中心通过前端生产构建、`cargo check --locked --target x86_64-pc-windows-gnu`、Release 交叉编译、PE32+ GUI 子系统和真实 Windows 启动检查。
-- Windows 控制中心使用 React、Tailwind CSS 4 与 shadcn 风格组件实现七页响应式界面；Segoe UI Variable / 微软雅黑由 WebView2 按系统 DPI 渲染。
-- Windows 11 实机确认原生 Acrylic 会连续模糊窗口后方桌面；7 秒、198 帧拖动录像逐帧抽查没有白屏、黑屏、背景截图撕裂或界面重建闪烁。
+- Electron 控制中心通过前端生产构建、IPC allowlist 测试、Electron 44 Windows x64 交叉打包、ASAR 内容核验和 PE32+ GUI 子系统检查。
+- Windows 控制中心使用 React、Tailwind CSS 4 与 shadcn 风格组件实现七页响应式界面；Segoe UI Variable / 微软雅黑由 Chromium 按系统 DPI 渲染。
+- 历史 `v0.6.4-test` Tauri 基线在 Windows 11 实机确认 Acrylic 会连续模糊窗口后方桌面，且 7 秒、198 帧拖动录像无白屏/黑屏/撕裂；该结果不冒充为 `v0.6.6-test` Electron 目标机验证，新壳仍需 Windows 10/11 复测。
 - 账号、三协议代理、模型路由、会话亲和、重试策略、5/10 分钟刷新与液态玻璃设置均通过带当前用户会话密钥的本机 API 读写；账号 ID 与标签脱敏，接口不返回凭据。
-- 双提供商切换、Grok billing 解析、文本模型过滤和五类 Agent 配置均有单元测试。
+- 双提供商切换、Grok billing 解析、文本模型过滤和八类 Agent 一键配置均有单元测试。
 - Antigravity 额度 HTTP 403 去项目字段重试和 `fetchAvailableModels` 降级路径均有回归测试。
 ## 隐私与安全边界
 
@@ -131,14 +130,14 @@ Windows 基线与 `v0.6.4-test` 新增的构建及实机测试记录包括：
 - API、OAuth callback 和管理路由只监听 `127.0.0.1`，远程管理与 Web 控制面板默认关闭。
 - 每次修改 ZCode 配置前会创建有上限的备份。
 - 发布包不包含 OAuth token、账号 JSON、本地 API key、运行日志或本机 ZCode 配置。
-- Windows Acrylic 由 DWM / WebView2 系统合成器完成；应用不再读取、缓存或上传窗口后方像素。
+- Windows Acrylic 由 DWM / Electron 合成器完成；应用不读取、缓存或上传窗口后方像素。
 - 停止 Bridge 或移除 Provider 不会自动撤销 Google / xAI 授权；如需彻底撤销，请在对应账号中单独操作。
 
 ## 常见问题
 
 ### Windows 提示未知发布者
 
-当前安装器、Tauri 控制中心和 Go Core 均未使用商业代码签名证书。先对照本页或 `SHA256SUMS.txt`
+当前安装器、Electron 控制中心和 Go Core 均未使用商业代码签名证书。先对照本页或 `SHA256SUMS.txt`
 校验哈希；仅在哈希完全一致时选择继续运行。
 
 ### macOS 提示无法验证开发者
@@ -149,9 +148,9 @@ Windows 基线与 `v0.6.4-test` 新增的构建及实机测试记录包括：
 
 ### 一直重连或请求超时
 
-Windows 检查 v2rayN 是否运行、TUN 是否开启及 `settings.json` 的 `proxyURL`；
-macOS 检查系统 TUN，或 `.env` 中的 `HTTP_PROXY` / `HTTPS_PROXY` 是否指向
-真正监听的可信 loopback 端口。
+查看“网络出口”卡片是否显示 `v2rayN 自动代理` 或 `Windows 系统代理`。若显示直连，
+确认 v2rayN 已启动且 mixed/HTTP 本机端口正在监听；无需开启 TUN。显式配置代理时，
+再检查 `proxyURL` 或 `.env` 是否指向真正监听的可信 loopback 端口。
 
 ### 提示 ZCode 仍在运行
 
@@ -170,8 +169,10 @@ billing 配置，面板会明确显示错误，不会沿用 Antigravity 的百�
 
 ### 如何接入其他 Agent
 
-先启动网关，在控制中心切换到目标提供商，再展开“接入更多 Agent 程序”。复制对应的
-Grok Build、Codex、Claude Code 或 OpenCode 配置即可。实现依据为
+先启动网关，在控制中心切换到目标提供商，再展开“接入更多 Agent 程序”。DeepSeek Harness、
+Grok Build、Codex、Claude Code、Gemini CLI、Qwen Code、Kimi Code 与 OpenCode 均可点击
+“一键接入”；程序先备份原文件，再合并 `zcode-bridge` 配置和当前模型，不删除其他 Provider。
+实现依据为
 [Grok Build 自定义模型端点](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-shell/README.md)、
 [Codex 自定义 Provider](https://github.com/openai/codex/blob/main/codex-rs/core/config.schema.json) 与
 [Claude Code LLM Gateway](https://docs.anthropic.com/en/docs/claude-code/llm-gateway)。
@@ -182,7 +183,7 @@ Grok Build、Codex、Claude Code 或 OpenCode 配置即可。实现依据为
 
 ## 从源码构建
 
-源码包含 SwiftUI macOS 客户端、Tauri 2 Windows 客户端、Go 本地 Core、测试、打包脚本、
+源码包含 SwiftUI macOS 客户端、Electron Windows 客户端、Go 本地 Core、测试、打包脚本、
 固定的 CLIProxyAPI v7.2.132 源码和可重放补丁。已验证 Windows x64 交叉编译与 macOS Universal 构建。
 提交修改前请另见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
 
@@ -203,24 +204,24 @@ ANTIGRAVITY_OAUTH_CLIENT_SECRET='<your-client-secret>' \
 ./Build-Universal.sh
 ```
 
-不提供 OAuth 环境变量时仍可构建，但运行时必须通过 `.env` 或进程环境提供它们。
-发布脚本生成双架构 Mach-O、临时签名 `.app`、包内 SHA-256 清单和 ZIP 校验文件。
+构建脚本默认拒绝缺少 OAuth 配置的产物。只有本地开发且确定会在运行时通过
+`.env` 或进程环境提供配置时，才可显式设置 `ALLOW_RUNTIME_OAUTH_CONFIG=1`；这种产物
+不应当作可直接登录的发布包。发布脚本生成双架构 Mach-O、临时签名 `.app`、包内
+SHA-256 清单和 ZIP 校验文件。
 
 公开源码的默认构建从进程环境读取这两个值，不应提交到 Git。发布维护者可在链接时注入；
 两种方式都未配置时，OAuth 登录和 token 刷新会返回明确错误。
 
-Windows 客户端使用 Tauri 2、React 19、Tailwind CSS 4 和 shadcn 风格组件；Rust 2024 Edition 负责原生壳层。交叉编译示例：
+Windows 客户端使用 Electron 44、React 19、Tailwind CSS 4 和 shadcn 风格组件。Windows x64 交叉打包示例：
 
 ```bash
-rustup target add x86_64-pc-windows-gnu
-cd project/native/windows
-npm --prefix ui ci
-npm --prefix ui run build
-cargo check --locked --target x86_64-pc-windows-gnu
-cargo build --release --target x86_64-pc-windows-gnu
+cd project/native/windows/ui
+npm ci
+npm run test:electron
+npm run package:windows
 ```
 
-同一发布包中的 `ZCode-Antigravity.exe` 是隐藏运行的 Go Core，Tauri 客户端通过一次性
+同一发布包中的 `ZCode-Antigravity.exe` 是隐藏运行的 Go Core，Electron 客户端通过一次性
 loopback 会话与它通信；OAuth、token 加密和模型路由仍由经过测试的 Core/后端负责。
 
 ## 免责声明

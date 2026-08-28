@@ -1,7 +1,7 @@
 Windows acceptance checklist
 ============================
 
-[ ] ZCode-Antigravity-Setup-v0.6.4-test.exe opens a native confirmation dialog without a terminal.
+[ ] ZCode-Antigravity-Setup-v0.6.6-test.exe opens a native confirmation dialog without a terminal.
 [ ] Control-center refresh, login, sync, stop, port inspection, and ZCode launch never flash a console window.
 [ ] The native EXE writes install.ps1 with exactly one EF BB BF UTF-8 BOM before Windows PowerShell 5.1 parses it.
 [ ] A release build without injected or verified Antigravity OAuth desktop configuration fails before producing artifacts.
@@ -9,7 +9,7 @@ Windows acceptance checklist
 [ ] The EXE refuses installation while ZCode or the target control center is still running.
 [ ] Successful EXE installation creates current-user Desktop/Start Menu shortcuts, opens the GUI, and automatically begins one-click setup.
 [ ] Verify-Package.bat reports three [OK] lines.
-[ ] WebView2Loader.dll is installed beside ZCode-Antigravity-ControlCenter.exe and the Tauri window opens on a clean target machine.
+[ ] Electron/Chromium runtime files, resources/app.asar, and AppIcon.ico are installed with ZCode-Antigravity-ControlCenter.exe and the window opens on a clean target machine without WebView2.
 [ ] The single BAT --extract-only workflow verifies its embedded ZIP and all three executable hashes.
 [ ] Normal double-click returns immediately without leaving a terminal window and opens the control center.
 [ ] The control center shortcut is created on the Desktop and in the current-user Start Menu.
@@ -26,13 +26,17 @@ Windows acceptance checklist
 [ ] Keep the panel open for at least 15 seconds; connection state may update but quota fetchedAt must not change before the five-minute interval.
 [ ] At 150% display scaling, all four status cards, the quota card, and the full action column remain inside the window.
 [ ] Segoe UI Variable text stays crisp at 100%, 125%, 150%, 200%, and a mixed-DPI monitor move.
-[ ] WebView2 DPI relayout keeps every status tile, action, quota row, and connector control visible.
+[ ] Chromium DPI relayout keeps every status tile, action, quota row, and connector control visible.
+[ ] The packaged renderer has contextIsolation and sandbox enabled, Node integration disabled, fixed API allowlists, blocked navigation/new windows, and an xAI-only external URL allowlist.
 [ ] Cached quota contains no complete email, project ID, access token, or refresh token.
 [ ] With the gateway running and ZCode fully exited, rerunning the same BAT stops the recorded
     backend before deployment and does not report that cli-proxy-api.exe is in use.
 [ ] Doctor.bat finds ZCode config and the backend binary.
-[ ] v2rayN has TUN enabled, its TUN adapter is Up, and settings.json proxyURL matches the
-    active loopback mixed inbound (verified here as http://127.0.0.1:10808).
+[ ] With no TUN adapter, v2rayN running, and an empty settings.json proxyURL, setup automatically
+    selects the enabled Windows proxy or v2rayN mixed port 10808 and both Gemini and Grok work.
+[ ] With v2rayN stopped and no system proxy, an empty proxyURL falls back to direct networking.
+[ ] When ZCODE_ANTIGRAVITY_PROXY_PORT is explicitly set, the installer rejects a closed port and
+    writes the matching loopback proxyURL for a listening port.
 [ ] With port 18080 free, setup reports http://127.0.0.1:18080.
 [ ] With another program listening on 18080, setup chooses 18081 or later.
 [ ] With another program listening on 51121, OAuth chooses 51122 or later.
@@ -42,7 +46,8 @@ Windows acceptance checklist
 [ ] ZCode shows Provider "Antigravity + Grok (Local Bridge)"; Antigravity has exactly the two managed Gemini entries.
 [ ] Grok / xAI login uses browser device authorization, then exposes text models but no Imagine image/video models.
 [ ] The widget's Open Control Center button and tray context-menu item explicitly reopen the panel; provider switch changes quota/model cards; Exit removes the tray and releases the local API.
-[ ] Agent connector cards render for Grok Build, Codex, Claude Code, OpenCode, and generic clients without overwriting external files.
+[ ] One-click setup for DeepSeek Harness, Grok Build, Codex, Claude Code, Gemini CLI, Qwen Code,
+    Kimi Code, and OpenCode preserves unrelated settings, creates backups, and selects the current model.
 [ ] Model list contains gemini-3.7-flash with 1,048,576 context tokens and no redundant -high suffix.
 [ ] Model list contains gemini-3.6-flash and contains no Claude, GPT, agent, image, or other Gemini model.
 [ ] Gemini 3.7 Flash reasoning dropdown contains Low, Medium, and High.

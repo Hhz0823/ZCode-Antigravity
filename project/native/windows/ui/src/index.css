@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import "tailwindcss" source("./");
 
 :root {
   font-family: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
@@ -518,6 +518,32 @@ button { font: inherit; }
 .widget-provider-tabs button em { color: #315fae; background: rgba(62,105,208,.1); }
 .widget-provider-tabs button.active em { color: white; background: rgba(255,255,255,.17); }
 .widget-account strong, .widget-gauge-header strong, .widget-credit > strong, .widget-stats strong { color: #292e37; }
+
+/* Electron delegates the expensive desktop blur to Windows DWM. Keeping the
+   renderer translucent but filter-free prevents repaints while moving/scrolling. */
+.electron-shell .app-shell,
+.electron-shell .widget-shell {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.electron-shell .window-chrome,
+.electron-shell .widget-header {
+  -webkit-app-region: drag;
+}
+.electron-shell button,
+.electron-shell input,
+.electron-shell a,
+.electron-shell .window-controls,
+.electron-shell .widget-header-actions {
+  -webkit-app-region: no-drag;
+}
+.electron-shell .main-panel {
+  transform: translateZ(0);
+}
+.electron-shell .liquid-orb,
+.electron-shell .widget-orb {
+  filter: blur(58px);
+}
 .widget-gauge-header > span, .widget-credit > span, .widget-stats span { color: #707885; }
 .widget-footer button { color: white; border-color: rgba(255,255,255,.52); background: linear-gradient(120deg, #367cf0, #5964e7); }
 
