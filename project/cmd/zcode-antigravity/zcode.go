@@ -13,9 +13,12 @@ import (
 	"strings"
 )
 
+const zcodeWebSearchModelID = "gemini-web-search"
+
 var zcodeModelAllowlist = []string{
 	"gemini-3.7-flash",
 	"gemini-3.6-flash",
+	zcodeWebSearchModelID,
 }
 
 type zcodeModelAlias struct {
@@ -27,6 +30,7 @@ type zcodeModelAlias struct {
 var zcodeModelAliases = []zcodeModelAlias{
 	{UpstreamID: "gemini-3.7-flash-high", ClientID: "gemini-3.7-flash", DisplayName: "Gemini 3.7 Flash"},
 	{UpstreamID: "gemini-3.6-flash-high", ClientID: "gemini-3.6-flash", DisplayName: "Gemini 3.6 Flash"},
+	{UpstreamID: "gemini-3.1-flash-lite", ClientID: zcodeWebSearchModelID, DisplayName: "Gemini Web Search (Google)"},
 }
 
 func (a *app) configureZCode(port int, models []modelInfo) (backup string, changed bool, err error) {
@@ -162,7 +166,7 @@ func selectAgentModels(catalog []modelInfo, includeAntigravity, includeXAI bool)
 			selected = append(selected, model)
 		}
 		if len(missing) > 0 {
-			return nil, fmt.Errorf("Antigravity 当前账号缺少必须模型: %s；请确认客户端已更新并且账号具有 Gemini 3.7/3.6 Flash 权限", strings.Join(missing, ", "))
+			return nil, fmt.Errorf("Antigravity 当前账号缺少必须模型: %s；请更新本程序、重启网关并确认账号具有对应模型权限", strings.Join(missing, ", "))
 		}
 	}
 	if includeXAI {

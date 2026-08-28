@@ -10,7 +10,9 @@ import (
 	"time"
 
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
+	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/executor"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v7/sdk/translator"
+	"github.com/tidwall/gjson"
 )
 
 func TestAntigravityBuildRequest_SanitizesGeminiToolSchema(t *testing.T) {
@@ -222,6 +224,33 @@ func TestShouldResolveAntigravityWebSearchGroundingURLsRequiresTypedWebSearchAnd
 	}
 	if shouldResolveAntigravityWebSearchGroundingURLs(sdktranslator.FormatOpenAI, original, translatedWithGoogleSearch) {
 		t.Fatal("expected non-Claude source format to skip grounding URL resolution")
+	}
+}
+
+func TestShouldResolveAntigravityWebSearchGroundingURLsForWebSearchClientModel(t *testing.T) {
+	original := []byte(`{"model":"gemini-web-search","messages":[{"role":"user","content":"latest news"}]}`)
+	translated := []byte(`{"requestType":"web_search","request":{"tools":[{"googleSearch":{}}]}}`)
+
+	if !shouldResolveAntigravityWebSearchGroundingURLs(sdktranslator.FormatClaude, original, translated) {
+		t.Fatal("expected Gemini web-search client model to resolve grounding URLs")
+	}
+}
+
+func TestPrepareAntigravityWebSearchClientPayloadUsesRequestedAliasMetadata(t *testing.T) {
+	original := []byte(`{"model":"gemini-3.1-flash-lite","messages":[{"role":"user","content":"latest news"}]}`)
+	opts := cliproxyexecutor.Options{Metadata: map[string]any{
+		cliproxyexecutor.RequestedModelMetadataKey: "gemini-web-search",
+	}}
+
+	marked, ok := prepareAntigravityWebSearchClientPayload(opts, "gemini-3.1-flash-lite", original)
+	if !ok {
+		t.Fatal("expected requested alias metadata to mark web-search payload")
+	}
+	if got := gjson.GetBytes(marked, "model").String(); got != "gemini-web-search" {
+		t.Fatalf("marked model = %q, want gemini-web-search: %s", got, marked)
+	}
+	if got := antigravityRouteModelForRequestedAlias(opts, "gemini-web-search", "gemini-web-search"); got != "gemini-3.1-flash-lite" {
+		t.Fatalf("route model = %q, want gemini-3.1-flash-lite", got)
 	}
 }
 

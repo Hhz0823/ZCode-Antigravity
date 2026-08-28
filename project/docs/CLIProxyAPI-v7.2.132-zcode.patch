@@ -1,3 +1,25 @@
+diff --git a/.env.example b/.env.example
+index 5b0546f4c593988e75667205089f6f1ac3f21c8b..f56cacdf6e52718fd42a615b6dd790afa01c489f 100644
+--- a/.env.example
++++ b/.env.example
+@@ -1,8 +1,15 @@
+ # Example environment configuration for CLIProxyAPI.
+ # Copy this file to `.env` and uncomment the variables you need.
+ #
+-# NOTE: Environment variables are only required when using remote storage options.
+-# For local file-based storage (default), no environment variables need to be set.
++# NOTE: Local file-based storage does not require environment variables. The
++# Antigravity provider and optional remote storage features have their own
++# configuration below.
++
++# ------------------------------------------------------------------------------
++# Antigravity OAuth desktop client (required only for the Antigravity provider)
++# ------------------------------------------------------------------------------
++# ANTIGRAVITY_OAUTH_CLIENT_ID=your-authorized-client-id
++# ANTIGRAVITY_OAUTH_CLIENT_SECRET=your-authorized-client-secret
+ 
+ # ------------------------------------------------------------------------------
+ # Management Web UI
 diff --git a/cmd/server/main.go b/cmd/server/main.go
 index 0d8cdececede6f43d04c5bf1e4363edfdbec7065..30fb3fb15771aef6d18a27458ee3610ad5f947c0 100644
 --- a/cmd/server/main.go
@@ -40,6 +62,46 @@ index 0d8cdececede6f43d04c5bf1e4363edfdbec7065..30fb3fb15771aef6d18a27458ee3610a
  			startModelCatalogUpdaters(localModel, cfg.Home.Enabled)
  			cmd.StartServiceWithPluginHost(cfg, configFilePath, password, pluginHost, serverOptions...)
  		}
+diff --git a/internal/api/handlers/management/api_tools.go b/internal/api/handlers/management/api_tools.go
+index f6fb3f6b571b06b1b1dfd739010fcc4fcec9e920..fc0d243b1169174231dda647c4588fbd86201d34 100644
+--- a/internal/api/handlers/management/api_tools.go
++++ b/internal/api/handlers/management/api_tools.go
+@@ -11,6 +11,7 @@ import (
+ 	"time"
+ 
+ 	"github.com/gin-gonic/gin"
++	"github.com/router-for-me/CLIProxyAPI/v7/internal/auth/antigravitycredentials"
+ 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
+ 	coreauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
+ 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/proxyutil"
+@@ -19,11 +20,6 @@ import (
+ 
+ const defaultAPICallTimeout = 60 * time.Second
+ 
+-const (
+-	antigravityOAuthClientID     = "ZCODE_REDACTED_GOOGLE_OAUTH_CLIENT_ID"
+-	antigravityOAuthClientSecret = "ZCODE_REDACTED_GOOGLE_OAUTH_CLIENT_SECRET"
+-)
+-
+ var antigravityOAuthTokenURL = "https://oauth2.googleapis.com/token"
+ 
+ type apiCallRequest struct {
+@@ -281,9 +277,13 @@ func (h *Handler) refreshAntigravityOAuthAccessToken(ctx context.Context, auth *
+ 	if tokenURL == "" {
+ 		tokenURL = "https://oauth2.googleapis.com/token"
+ 	}
++	oauthClient, errCredentials := antigravitycredentials.Load()
++	if errCredentials != nil {
++		return "", errCredentials
++	}
+ 	form := url.Values{}
+-	form.Set("client_id", antigravityOAuthClientID)
+-	form.Set("client_secret", antigravityOAuthClientSecret)
++	form.Set("client_id", oauthClient.ID)
++	form.Set("client_secret", oauthClient.Secret)
+ 	form.Set("grant_type", "refresh_token")
+ 	form.Set("refresh_token", refreshToken)
+ 
 diff --git a/internal/api/handlers/management/auth_files_provider_oauth.go b/internal/api/handlers/management/auth_files_provider_oauth.go
 index 3928d605198e73644ef32a20cce567be8916b3bd..d6e217042f1c4628997b4c804328203fda04bd7f 100644
 --- a/internal/api/handlers/management/auth_files_provider_oauth.go
@@ -76,10 +138,18 @@ index 3928d605198e73644ef32a20cce567be8916b3bd..d6e217042f1c4628997b4c804328203f
  			log.Errorf("Failed to exchange token: %v", errToken)
  			SetOAuthSessionError(state, "Failed to exchange token")
 diff --git a/internal/auth/antigravity/auth.go b/internal/auth/antigravity/auth.go
-index 489d796f1fedde2cb9994a013a54d8fef0f6bce8..f2663c69654fc0e9bb8af3190b7cebc8d92e8e73 100644
+index 489d796f1fedde2cb9994a013a54d8fef0f6bce8..670bc7ac7c30a40ac9ec43381c9afc2355f67634 100644
 --- a/internal/auth/antigravity/auth.go
 +++ b/internal/auth/antigravity/auth.go
-@@ -119,7 +119,10 @@ func defaultAntigravityTierID(loadResp map[string]any) string {
+@@ -11,6 +11,7 @@ import (
+ 	"strings"
+ 	"time"
+ 
++	"github.com/router-for-me/CLIProxyAPI/v7/internal/auth/antigravitycredentials"
+ 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
+ 	"github.com/router-for-me/CLIProxyAPI/v7/internal/misc"
+ 	"github.com/router-for-me/CLIProxyAPI/v7/internal/util"
+@@ -119,29 +120,46 @@ func defaultAntigravityTierID(loadResp map[string]any) string {
  }
  
  // BuildAuthURL generates the OAuth authorization URL.
@@ -88,10 +158,19 @@ index 489d796f1fedde2cb9994a013a54d8fef0f6bce8..f2663c69654fc0e9bb8af3190b7cebc8
 +	if pkceCodes == nil || strings.TrimSpace(pkceCodes.CodeChallenge) == "" {
 +		return "", fmt.Errorf("antigravity auth URL: PKCE challenge is required")
 +	}
++	oauthClient, errCredentials := antigravitycredentials.Load()
++	if errCredentials != nil {
++		return "", errCredentials
++	}
  	if strings.TrimSpace(redirectURI) == "" {
  		redirectURI = fmt.Sprintf("http://localhost:%d/oauth-callback", CallbackPort)
  	}
-@@ -131,17 +134,23 @@ func (o *AntigravityAuth) BuildAuthURL(state, redirectURI string) string {
+ 	params := url.Values{}
+ 	params.Set("access_type", "offline")
+-	params.Set("client_id", ClientID)
++	params.Set("client_id", oauthClient.ID)
+ 	params.Set("prompt", "consent")
+ 	params.Set("redirect_uri", redirectURI)
  	params.Set("response_type", "code")
  	params.Set("scope", strings.Join(Scopes, " "))
  	params.Set("state", state)
@@ -107,17 +186,23 @@ index 489d796f1fedde2cb9994a013a54d8fef0f6bce8..f2663c69654fc0e9bb8af3190b7cebc8
 +	if pkceCodes == nil || strings.TrimSpace(pkceCodes.CodeVerifier) == "" {
 +		return nil, fmt.Errorf("antigravity token exchange: PKCE verifier is required")
 +	}
++	oauthClient, errCredentials := antigravitycredentials.Load()
++	if errCredentials != nil {
++		return nil, errCredentials
++	}
  	data := url.Values{}
  	data.Set("code", code)
- 	data.Set("client_id", ClientID)
- 	data.Set("client_secret", ClientSecret)
+-	data.Set("client_id", ClientID)
+-	data.Set("client_secret", ClientSecret)
++	data.Set("client_id", oauthClient.ID)
++	data.Set("client_secret", oauthClient.Secret)
  	data.Set("redirect_uri", redirectURI)
  	data.Set("grant_type", "authorization_code")
 +	data.Set("code_verifier", pkceCodes.CodeVerifier)
  
  	req, err := http.NewRequestWithContext(ctx, http.MethodPost, TokenEndpoint, strings.NewReader(data.Encode()))
  	if err != nil {
-@@ -355,7 +364,12 @@ func (o *AntigravityAuth) OnboardUser(ctx context.Context, accessToken, tierID s
+@@ -355,7 +373,12 @@ func (o *AntigravityAuth) OnboardUser(ctx context.Context, accessToken, tierID s
  					return projectID, nil
  				}
  
@@ -169,6 +254,255 @@ index 7e8112ad0ed268342266ea492aba1cc253046550..d54943a43323ff7b3f5f8106ef09975a
  func assertLoadCodeAssistHeaders(t *testing.T, req *http.Request) {
  	t.Helper()
  	if got := req.Header.Get("Authorization"); got != "Bearer access-token" {
+diff --git a/internal/auth/antigravity/constants.go b/internal/auth/antigravity/constants.go
+index f193b523cb5f180d5a8e51b328c394a4c324c3ad..14e607441c6abf5d14690b9c7341a74397dbb265 100644
+--- a/internal/auth/antigravity/constants.go
++++ b/internal/auth/antigravity/constants.go
+@@ -1,12 +1,8 @@
+ // Package antigravity provides OAuth2 authentication functionality for the Antigravity provider.
+ package antigravity
+ 
+-// OAuth client credentials and configuration
+-const (
+-	ClientID     = "ZCODE_REDACTED_GOOGLE_OAUTH_CLIENT_ID"
+-	ClientSecret = "ZCODE_REDACTED_GOOGLE_OAUTH_CLIENT_SECRET"
+-	CallbackPort = 51121
+-)
++// CallbackPort is the preferred local OAuth callback port.
++const CallbackPort = 51121
+ 
+ // Scopes defines the OAuth scopes required for Antigravity authentication
+ var Scopes = []string{
+diff --git a/internal/auth/antigravity/pkce.go b/internal/auth/antigravity/pkce.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..3201d3eb2965675dd59a7e48fcfe8c855f1dcd4c
+--- /dev/null
++++ b/internal/auth/antigravity/pkce.go
+@@ -0,0 +1,28 @@
++package antigravity
++
++import (
++	"crypto/rand"
++	"crypto/sha256"
++	"encoding/base64"
++	"fmt"
++)
++
++// PKCECodes holds the verifier and S256 challenge for an OAuth authorization flow.
++type PKCECodes struct {
++	CodeVerifier  string
++	CodeChallenge string
++}
++
++// GeneratePKCECodes creates an RFC 7636 verifier/challenge pair.
++func GeneratePKCECodes() (*PKCECodes, error) {
++	random := make([]byte, 64)
++	if _, err := rand.Read(random); err != nil {
++		return nil, fmt.Errorf("antigravity pkce: generate verifier: %w", err)
++	}
++	verifier := base64.RawURLEncoding.EncodeToString(random)
++	digest := sha256.Sum256([]byte(verifier))
++	return &PKCECodes{
++		CodeVerifier:  verifier,
++		CodeChallenge: base64.RawURLEncoding.EncodeToString(digest[:]),
++	}, nil
++}
+diff --git a/internal/auth/antigravity/pkce_zcode_test.go b/internal/auth/antigravity/pkce_zcode_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..6d02bb9b4df1929e87303ad84a9fd8c66bf43bc7
+--- /dev/null
++++ b/internal/auth/antigravity/pkce_zcode_test.go
+@@ -0,0 +1,66 @@
++package antigravity
++
++import (
++	"context"
++	"io"
++	"net/http"
++	"net/url"
++	"strings"
++	"testing"
++)
++
++type roundTripFunc func(*http.Request) (*http.Response, error)
++
++func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
++
++func TestAntigravityOAuthUsesPKCE(t *testing.T) {
++	t.Setenv("ANTIGRAVITY_OAUTH_CLIENT_ID", "development-client-id")
++	t.Setenv("ANTIGRAVITY_OAUTH_CLIENT_SECRET", "development-client-secret")
++	pkce := &PKCECodes{CodeVerifier: "verifier-value", CodeChallenge: "challenge-value"}
++	auth := NewAntigravityAuth(nil, &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
++		body, errRead := io.ReadAll(req.Body)
++		if errRead != nil {
++			t.Fatalf("read token request: %v", errRead)
++		}
++		values, errParse := url.ParseQuery(string(body))
++		if errParse != nil {
++			t.Fatalf("parse token request: %v", errParse)
++		}
++		if got := values.Get("code_verifier"); got != pkce.CodeVerifier {
++			t.Fatalf("code_verifier = %q, want %q", got, pkce.CodeVerifier)
++		}
++		return &http.Response{
++			StatusCode: http.StatusOK,
++			Body:       io.NopCloser(strings.NewReader(`{"access_token":"access","refresh_token":"refresh","expires_in":3600}`)),
++			Header:     make(http.Header),
++		}, nil
++	})})
++
++	authURL, errURL := auth.BuildAuthURL("state-value", "http://localhost:51121/oauth-callback", pkce)
++	if errURL != nil {
++		t.Fatalf("BuildAuthURL: %v", errURL)
++	}
++	parsed, errParse := url.Parse(authURL)
++	if errParse != nil {
++		t.Fatalf("parse auth URL: %v", errParse)
++	}
++	if got := parsed.Query().Get("code_challenge"); got != pkce.CodeChallenge {
++		t.Fatalf("code_challenge = %q, want %q", got, pkce.CodeChallenge)
++	}
++	if got := parsed.Query().Get("code_challenge_method"); got != "S256" {
++		t.Fatalf("code_challenge_method = %q, want S256", got)
++	}
++	if _, errExchange := auth.ExchangeCodeForTokens(context.Background(), "code", "http://localhost:51121/oauth-callback", pkce); errExchange != nil {
++		t.Fatalf("ExchangeCodeForTokens: %v", errExchange)
++	}
++}
++
++func TestAntigravityOAuthRejectsMissingPKCE(t *testing.T) {
++	auth := NewAntigravityAuth(nil, &http.Client{})
++	if _, err := auth.BuildAuthURL("state", "", nil); err == nil {
++		t.Fatal("BuildAuthURL accepted missing PKCE")
++	}
++	if _, err := auth.ExchangeCodeForTokens(context.Background(), "code", "redirect", nil); err == nil {
++		t.Fatal("ExchangeCodeForTokens accepted missing PKCE")
++	}
++}
+diff --git a/internal/auth/antigravitycredentials/credentials.go b/internal/auth/antigravitycredentials/credentials.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..3c77d525177f333e3c367729faf4ce3e724bcbd6
+--- /dev/null
++++ b/internal/auth/antigravitycredentials/credentials.go
+@@ -0,0 +1,59 @@
++// Package antigravitycredentials loads the OAuth client configuration used by
++// the Antigravity provider. The public source tree intentionally contains no
++// embedded OAuth client identity or secret.
++package antigravitycredentials
++
++import (
++	"fmt"
++	"os"
++	"strings"
++)
++
++const (
++	// ClientIDEnvironmentVariable is the environment variable containing the
++	// OAuth desktop client ID used for Antigravity authorization.
++	ClientIDEnvironmentVariable = "ANTIGRAVITY_OAUTH_CLIENT_ID"
++	// ClientSecretEnvironmentVariable is the environment variable containing
++	// the matching OAuth desktop client secret.
++	ClientSecretEnvironmentVariable = "ANTIGRAVITY_OAUTH_CLIENT_SECRET"
++)
++
++// OAuthClient contains the configured OAuth desktop client credentials.
++type OAuthClient struct {
++	ID     string
++	Secret string
++}
++
++// Release maintainers may inject these values at link time with -X. Public
++// source builds leave both empty and continue to require the environment.
++var (
++	embeddedClientID     string
++	embeddedClientSecret string
++)
++
++// Load reads and validates the Antigravity OAuth client configuration.
++func Load() (OAuthClient, error) {
++	client := OAuthClient{
++		ID:     strings.TrimSpace(os.Getenv(ClientIDEnvironmentVariable)),
++		Secret: strings.TrimSpace(os.Getenv(ClientSecretEnvironmentVariable)),
++	}
++	if client.ID == "" {
++		client.ID = strings.TrimSpace(embeddedClientID)
++	}
++	if client.Secret == "" {
++		client.Secret = strings.TrimSpace(embeddedClientSecret)
++	}
++
++	missing := make([]string, 0, 2)
++	if client.ID == "" {
++		missing = append(missing, ClientIDEnvironmentVariable)
++	}
++	if client.Secret == "" {
++		missing = append(missing, ClientSecretEnvironmentVariable)
++	}
++	if len(missing) > 0 {
++		return OAuthClient{}, fmt.Errorf("antigravity OAuth client is not configured; set %s", strings.Join(missing, " and "))
++	}
++
++	return client, nil
++}
+diff --git a/internal/auth/antigravitycredentials/credentials_test.go b/internal/auth/antigravitycredentials/credentials_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..6526dd2f3bfda95d28694c0d652977d359e416e2
+--- /dev/null
++++ b/internal/auth/antigravitycredentials/credentials_test.go
+@@ -0,0 +1,53 @@
++package antigravitycredentials
++
++import (
++	"strings"
++	"testing"
++)
++
++func TestLoadTrimsConfiguredValues(t *testing.T) {
++	t.Setenv(ClientIDEnvironmentVariable, "  development-client-id  ")
++	t.Setenv(ClientSecretEnvironmentVariable, "  development-client-secret  ")
++
++	client, errLoad := Load()
++	if errLoad != nil {
++		t.Fatalf("Load: %v", errLoad)
++	}
++	if client.ID != "development-client-id" || client.Secret != "development-client-secret" {
++		t.Fatalf("unexpected client: %#v", client)
++	}
++}
++
++func TestLoadReportsEveryMissingVariable(t *testing.T) {
++	t.Setenv(ClientIDEnvironmentVariable, "")
++	t.Setenv(ClientSecretEnvironmentVariable, "")
++
++	_, errLoad := Load()
++	if errLoad == nil {
++		t.Fatal("Load accepted missing OAuth client configuration")
++	}
++	message := errLoad.Error()
++	for _, variable := range []string{ClientIDEnvironmentVariable, ClientSecretEnvironmentVariable} {
++		if !strings.Contains(message, variable) {
++			t.Fatalf("error %q does not mention %s", message, variable)
++		}
++	}
++}
++
++func TestLoadUsesLinkTimeFallback(t *testing.T) {
++	t.Setenv(ClientIDEnvironmentVariable, "")
++	t.Setenv(ClientSecretEnvironmentVariable, "")
++	previousID, previousSecret := embeddedClientID, embeddedClientSecret
++	embeddedClientID, embeddedClientSecret = "release-client-id", "release-client-secret"
++	t.Cleanup(func() {
++		embeddedClientID, embeddedClientSecret = previousID, previousSecret
++	})
++
++	client, errLoad := Load()
++	if errLoad != nil {
++		t.Fatalf("Load: %v", errLoad)
++	}
++	if client.ID != "release-client-id" || client.Secret != "release-client-secret" {
++		t.Fatalf("unexpected client: %#v", client)
++	}
++}
 diff --git a/internal/browser/browser.go b/internal/browser/browser.go
 index b24dc5e112a9704b87585d22489c2e88f8022282..fa2e1fcc5d220ebc6f40c0fe28ae35cec3bbca43 100644
 --- a/internal/browser/browser.go
@@ -286,11 +620,200 @@ index ed904bc2716743a1b4b8ca290e91e3cd64f8cd48..1768d6ab09602e419894cff6033edf61
  // CleanupExpiredQuotas removes expired quota tracking entries
  func (r *ModelRegistry) CleanupExpiredQuotas() {
  	r.mutex.Lock()
+diff --git a/internal/registry/model_registry_zcode_test.go b/internal/registry/model_registry_zcode_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef3fce534690213b728f10519f9505e2d97f77b8
+--- /dev/null
++++ b/internal/registry/model_registry_zcode_test.go
+@@ -0,0 +1,45 @@
++package registry
++
++import "testing"
++
++func TestClaudeCatalogIncludesZCodeCapabilities(t *testing.T) {
++	const clientID = "zcode-capability-test-client"
++	const modelID = "zcode-capability-test-model"
++	registry := GetGlobalRegistry()
++	registry.RegisterClient(clientID, "antigravity", []*ModelInfo{{
++		ID:                        modelID,
++		DisplayName:               "ZCode Capability Test",
++		ContextLength:             1048576,
++		MaxCompletionTokens:       65536,
++		Thinking:                  &ThinkingSupport{Min: 1, Max: 65535, DynamicAllowed: true, Levels: []string{"minimal", "low", "medium", "high"}},
++		SupportedInputModalities:  []string{"text", "image", "audio", "video"},
++		SupportedOutputModalities: []string{"text"},
++	}})
++	t.Cleanup(func() { registry.UnregisterClient(clientID) })
++
++	for _, model := range registry.GetAvailableModels("claude") {
++		if model["id"] != modelID {
++			continue
++		}
++		if model["max_input_tokens"] != 1048576 || model["max_tokens"] != 65536 {
++			t.Fatalf("unexpected token limits: %+v", model)
++		}
++		inputs, ok := model["supportedInputModalities"].([]string)
++		if !ok || len(inputs) != 4 {
++			t.Fatalf("unexpected input modalities: %#v", model["supportedInputModalities"])
++		}
++		thinking, ok := model["thinking"].(map[string]any)
++		if !ok {
++			t.Fatalf("unexpected thinking metadata: %#v", model["thinking"])
++		}
++		levels, ok := thinking["levels"].([]string)
++		if !ok || len(levels) != 4 || levels[1] != "low" || levels[3] != "high" {
++			t.Fatalf("unexpected thinking levels: %#v", thinking["levels"])
++		}
++		if thinking["min"] != 1 || thinking["max"] != 65535 || thinking["dynamic_allowed"] != true {
++			t.Fatalf("unexpected thinking range: %#v", thinking)
++		}
++		return
++	}
++	t.Fatalf("model %q not found", modelID)
++}
+diff --git a/internal/runtime/executor/antigravity_executor.go b/internal/runtime/executor/antigravity_executor.go
+index 733a6acfd9a3811c612164ed2949cbb056493ea6..1114d9762b5bcdfd455d7559f6250cbf6ed8dec4 100644
+--- a/internal/runtime/executor/antigravity_executor.go
++++ b/internal/runtime/executor/antigravity_executor.go
+@@ -22,6 +22,7 @@ import (
+ 	antigravityclaude "github.com/router-for-me/CLIProxyAPI/v7/internal/translator/antigravity/claude"
+ 	"github.com/router-for-me/CLIProxyAPI/v7/internal/util"
+ 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
++	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/executor"
+ 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/proxyutil"
+ 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v7/sdk/translator"
+ 	log "github.com/sirupsen/logrus"
+@@ -36,14 +37,14 @@ const (
+ 	antigravityCountTokensPath             = "/v1internal:countTokens"
+ 	antigravityStreamPath                  = "/v1internal:streamGenerateContent"
+ 	antigravityGeneratePath                = "/v1internal:generateContent"
+-	antigravityClientID                    = "ZCODE_REDACTED_GOOGLE_OAUTH_CLIENT_ID"
+-	antigravityClientSecret                = "ZCODE_REDACTED_GOOGLE_OAUTH_CLIENT_SECRET"
+ 	antigravityAuthType                    = "antigravity"
+ 	refreshSkew                            = 3000 * time.Second
+ 	antigravityCreditsHintRefreshInterval  = 10 * time.Minute
+ 	antigravityCreditsHintRefreshTimeout   = 5 * time.Second
+ 	antigravityShortQuotaCooldownThreshold = 5 * time.Minute
+ 	antigravityInstantRetryThreshold       = 3 * time.Second
++	antigravityWebSearchClientModelName    = "gemini-web-search"
++	antigravityWebSearchUpstreamModelName  = "gemini-3.1-flash-lite"
+ 	// systemInstruction              = "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Absolute paths only****Proactiveness**"
+ )
+ 
+@@ -625,9 +626,35 @@ func hasAntigravityGoogleSearchTool(payload []byte) bool {
+ 	return false
+ }
+ 
++func hasAntigravityWebSearchClientModel(payload []byte) bool {
++	return strings.EqualFold(strings.TrimSpace(util.GetGJSONBytesNoCopy(payload, "model").String()), antigravityWebSearchClientModelName)
++}
++
++func antigravityWebSearchClientModelRequested(opts cliproxyexecutor.Options, fallbackModel string) bool {
++	return strings.EqualFold(strings.TrimSpace(helps.PayloadRequestedModel(opts, fallbackModel)), antigravityWebSearchClientModelName)
++}
++
++func antigravityRouteModelForRequestedAlias(opts cliproxyexecutor.Options, fallbackModel, baseModel string) string {
++	if antigravityWebSearchClientModelRequested(opts, fallbackModel) {
++		return antigravityWebSearchUpstreamModelName
++	}
++	return baseModel
++}
++
++func prepareAntigravityWebSearchClientPayload(opts cliproxyexecutor.Options, fallbackModel string, payload []byte) ([]byte, bool) {
++	if !antigravityWebSearchClientModelRequested(opts, fallbackModel) {
++		return payload, false
++	}
++	marked, err := sjson.SetBytes(payload, "model", antigravityWebSearchClientModelName)
++	if err != nil {
++		return payload, false
++	}
++	return marked, true
++}
++
+ func shouldResolveAntigravityWebSearchGroundingURLs(from sdktranslator.Format, originalRequestRawJSON, requestRawJSON []byte) bool {
+ 	return from.String() == "claude" &&
+-		hasAntigravityClaudeTypedWebSearchTool(originalRequestRawJSON) &&
++		(hasAntigravityWebSearchClientModel(originalRequestRawJSON) || hasAntigravityClaudeTypedWebSearchTool(originalRequestRawJSON)) &&
+ 		hasAntigravityGoogleSearchTool(requestRawJSON)
+ }
+ 
+diff --git a/internal/runtime/executor/antigravity_executor_auth.go b/internal/runtime/executor/antigravity_executor_auth.go
+index 108eb914e7aec4e7011a1fe18b10cae19394bf52..82bde6f50a2cc69bbdfaa90820ee5e387c169024 100644
+--- a/internal/runtime/executor/antigravity_executor_auth.go
++++ b/internal/runtime/executor/antigravity_executor_auth.go
+@@ -11,6 +11,7 @@ import (
+ 	"strings"
+ 	"time"
+ 
++	"github.com/router-for-me/CLIProxyAPI/v7/internal/auth/antigravitycredentials"
+ 	"github.com/router-for-me/CLIProxyAPI/v7/internal/runtime/executor/helps"
+ 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v7/sdk/auth"
+ 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
+@@ -146,9 +147,13 @@ func (e *AntigravityExecutor) refreshToken(ctx context.Context, auth *cliproxyau
+ }
+ 
+ func (e *AntigravityExecutor) refreshTokenSingleFlight(ctx context.Context, auth *cliproxyauth.Auth, refreshToken string) (*antigravityTokenRefreshData, error) {
++	oauthClient, errCredentials := antigravitycredentials.Load()
++	if errCredentials != nil {
++		return nil, errCredentials
++	}
+ 	form := url.Values{}
+-	form.Set("client_id", antigravityClientID)
+-	form.Set("client_secret", antigravityClientSecret)
++	form.Set("client_id", oauthClient.ID)
++	form.Set("client_secret", oauthClient.Secret)
+ 	form.Set("grant_type", "refresh_token")
+ 	form.Set("refresh_token", refreshToken)
+ 
 diff --git a/internal/runtime/executor/antigravity_executor_buildrequest_test.go b/internal/runtime/executor/antigravity_executor_buildrequest_test.go
-index 66390cba3010862b24f446d042c140c460b51095..6a802b882965d36083fb0e66d8cb8733b5feac07 100644
+index 66390cba3010862b24f446d042c140c460b51095..8d0a0e1a275e83e84e395596c277d0baac351cc9 100644
 --- a/internal/runtime/executor/antigravity_executor_buildrequest_test.go
 +++ b/internal/runtime/executor/antigravity_executor_buildrequest_test.go
-@@ -322,6 +322,23 @@ func assertNonSchemaRequestPreserved(t *testing.T, body map[string]any) {
+@@ -10,7 +10,9 @@ import (
+ 	"time"
+ 
+ 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
++	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/executor"
+ 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v7/sdk/translator"
++	"github.com/tidwall/gjson"
+ )
+ 
+ func TestAntigravityBuildRequest_SanitizesGeminiToolSchema(t *testing.T) {
+@@ -225,6 +227,33 @@ func TestShouldResolveAntigravityWebSearchGroundingURLsRequiresTypedWebSearchAnd
+ 	}
+ }
+ 
++func TestShouldResolveAntigravityWebSearchGroundingURLsForWebSearchClientModel(t *testing.T) {
++	original := []byte(`{"model":"gemini-web-search","messages":[{"role":"user","content":"latest news"}]}`)
++	translated := []byte(`{"requestType":"web_search","request":{"tools":[{"googleSearch":{}}]}}`)
++
++	if !shouldResolveAntigravityWebSearchGroundingURLs(sdktranslator.FormatClaude, original, translated) {
++		t.Fatal("expected Gemini web-search client model to resolve grounding URLs")
++	}
++}
++
++func TestPrepareAntigravityWebSearchClientPayloadUsesRequestedAliasMetadata(t *testing.T) {
++	original := []byte(`{"model":"gemini-3.1-flash-lite","messages":[{"role":"user","content":"latest news"}]}`)
++	opts := cliproxyexecutor.Options{Metadata: map[string]any{
++		cliproxyexecutor.RequestedModelMetadataKey: "gemini-web-search",
++	}}
++
++	marked, ok := prepareAntigravityWebSearchClientPayload(opts, "gemini-3.1-flash-lite", original)
++	if !ok {
++		t.Fatal("expected requested alias metadata to mark web-search payload")
++	}
++	if got := gjson.GetBytes(marked, "model").String(); got != "gemini-web-search" {
++		t.Fatalf("marked model = %q, want gemini-web-search: %s", got, marked)
++	}
++	if got := antigravityRouteModelForRequestedAlias(opts, "gemini-web-search", "gemini-web-search"); got != "gemini-3.1-flash-lite" {
++		t.Fatalf("route model = %q, want gemini-3.1-flash-lite", got)
++	}
++}
++
+ func TestAntigravityPrepareRequestAuth_FetchesMissingProjectID(t *testing.T) {
+ 	executor := &AntigravityExecutor{}
+ 	auth := &cliproxyauth.Auth{Metadata: map[string]any{
+@@ -322,6 +351,23 @@ func assertNonSchemaRequestPreserved(t *testing.T, body map[string]any) {
  	}
  }
  
@@ -314,6 +837,39 @@ index 66390cba3010862b24f446d042c140c460b51095..6a802b882965d36083fb0e66d8cb8733
  func buildRequestBodyFromPayload(t *testing.T, modelName string) map[string]any {
  	t.Helper()
  	return buildRequestBodyFromRawPayload(t, modelName, []byte(`{
+diff --git a/internal/runtime/executor/antigravity_executor_execute.go b/internal/runtime/executor/antigravity_executor_execute.go
+index 4fd9c6dbc83408046203b1bcf2c371a22b4b8fda..2ee423770e4d39148ace08c53fb1b64b34d4a680 100644
+--- a/internal/runtime/executor/antigravity_executor_execute.go
++++ b/internal/runtime/executor/antigravity_executor_execute.go
+@@ -28,6 +28,7 @@ func (e *AntigravityExecutor) Execute(ctx context.Context, auth *cliproxyauth.Au
+ 		return resp, statusErr{code: http.StatusNotImplemented, msg: "/responses/compact not supported"}
+ 	}
+ 	baseModel := thinking.ParseSuffix(req.Model).ModelName
++	baseModel = antigravityRouteModelForRequestedAlias(opts, req.Model, baseModel)
+ 	if inCooldown, remaining, errCooldown := antigravityIsInShortCooldownRequired(ctx, auth, baseModel, time.Now()); errCooldown != nil {
+ 		return resp, homeKVUnavailableStatusErr(errCooldown)
+ 	} else if inCooldown && !antigravityShouldBypassShortCooldown(ctx, e.cfg) {
+@@ -57,6 +58,11 @@ func (e *AntigravityExecutor) Execute(ctx context.Context, auth *cliproxyauth.Au
+ 	if errValidate != nil {
+ 		return resp, errValidate
+ 	}
++	responseOriginalRequest := opts.OriginalRequest
++	if markedPayload, marked := prepareAntigravityWebSearchClientPayload(opts, req.Model, originalPayload); marked {
++		originalPayload = markedPayload
++		responseOriginalRequest = markedPayload
++	}
+ 	req.Payload = originalPayload
+ 	token, updatedAuth, errToken := e.ensureAccessToken(ctx, auth)
+ 	if errToken != nil {
+@@ -233,7 +239,7 @@ attemptLoop:
+ 			bodyBytes = e.resolveWebSearchGroundingURLs(ctx, auth, from, originalPayload, translated, bodyBytes)
+ 			reporter.Publish(ctx, helps.ParseAntigravityUsage(bodyBytes))
+ 			var param any
+-			converted := sdktranslator.TranslateNonStream(ctx, to, responseFormat, req.Model, opts.OriginalRequest, translated, bodyBytes, &param)
++			converted := sdktranslator.TranslateNonStream(ctx, to, responseFormat, req.Model, responseOriginalRequest, translated, bodyBytes, &param)
+ 			resp = cliproxyexecutor.Response{Payload: converted, Headers: httpResp.Header.Clone()}
+ 			reporter.EnsurePublished(ctx)
+ 			return resp, nil
 diff --git a/internal/runtime/executor/antigravity_executor_request.go b/internal/runtime/executor/antigravity_executor_request.go
 index c8d3141a69d0bb0b2b883559ea008c29eb333478..fdba310a183fc39a34fff8bb47168c9db3fb59df 100644
 --- a/internal/runtime/executor/antigravity_executor_request.go
@@ -347,6 +903,74 @@ index c8d3141a69d0bb0b2b883559ea008c29eb333478..fdba310a183fc39a34fff8bb47168c9d
  // sanitizeAntigravityRequestSchemas cleans the JSON schemas carried by an Antigravity request.
  //
  // Cleaning is applied only to the payload locations that actually hold a JSON schema. The schema
+diff --git a/internal/runtime/executor/antigravity_executor_stream.go b/internal/runtime/executor/antigravity_executor_stream.go
+index 30b6d4a6b155ce1d5d7b35302e835967c10e43b0..7cc40684aa5fd1a5e099e841d067a67d3b891aa4 100644
+--- a/internal/runtime/executor/antigravity_executor_stream.go
++++ b/internal/runtime/executor/antigravity_executor_stream.go
+@@ -25,6 +25,7 @@ func (e *AntigravityExecutor) ExecuteStream(ctx context.Context, auth *cliproxya
+ 		return nil, statusErr{code: http.StatusNotImplemented, msg: "/responses/compact not supported"}
+ 	}
+ 	baseModel := thinking.ParseSuffix(req.Model).ModelName
++	baseModel = antigravityRouteModelForRequestedAlias(opts, req.Model, baseModel)
+ 
+ 	ctx = context.WithValue(ctx, "alt", "")
+ 	if inCooldown, remaining, errCooldown := antigravityIsInShortCooldownRequired(ctx, auth, baseModel, time.Now()); errCooldown != nil {
+@@ -51,6 +52,11 @@ func (e *AntigravityExecutor) ExecuteStream(ctx context.Context, auth *cliproxya
+ 	if errValidate != nil {
+ 		return nil, errValidate
+ 	}
++	responseOriginalRequest := opts.OriginalRequest
++	if markedPayload, marked := prepareAntigravityWebSearchClientPayload(opts, req.Model, originalPayload); marked {
++		originalPayload = markedPayload
++		responseOriginalRequest = markedPayload
++	}
+ 	req.Payload = originalPayload
+ 	token, updatedAuth, errToken := e.ensureAccessToken(ctx, auth)
+ 	if errToken != nil {
+@@ -271,7 +277,7 @@ attemptLoop:
+ 					}
+ 
+ 					payload = e.resolveWebSearchGroundingURLs(ctx, auth, from, originalPayload, translated, payload)
+-					chunks := helps.TranslateStreamWithClaudeInputTokens(ctx, to, responseFormat, req.Model, opts.OriginalRequest, translated, bytes.Clone(payload), &param, claudeInputTokens)
++					chunks := helps.TranslateStreamWithClaudeInputTokens(ctx, to, responseFormat, req.Model, responseOriginalRequest, translated, bytes.Clone(payload), &param, claudeInputTokens)
+ 					for i := range chunks {
+ 						select {
+ 						case out <- cliproxyexecutor.StreamChunk{Payload: chunks[i]}:
+@@ -280,7 +286,7 @@ attemptLoop:
+ 						}
+ 					}
+ 				}
+-				tail := helps.TranslateStreamWithClaudeInputTokens(ctx, to, responseFormat, req.Model, opts.OriginalRequest, translated, []byte("[DONE]"), &param, claudeInputTokens)
++				tail := helps.TranslateStreamWithClaudeInputTokens(ctx, to, responseFormat, req.Model, responseOriginalRequest, translated, []byte("[DONE]"), &param, claudeInputTokens)
+ 				for i := range tail {
+ 					select {
+ 					case out <- cliproxyexecutor.StreamChunk{Payload: tail[i]}:
+diff --git a/internal/runtime/executor/antigravity_refresh_test.go b/internal/runtime/executor/antigravity_refresh_test.go
+index 647b69960321f287661c525fd02c135c1434ef0c..4eb9df622b3004a2cded53bd6fffaa9fc48be345 100644
+--- a/internal/runtime/executor/antigravity_refresh_test.go
++++ b/internal/runtime/executor/antigravity_refresh_test.go
+@@ -43,6 +43,8 @@ func useAntigravityRefreshTestTransport(t *testing.T, targetHost string) {
+ }
+ 
+ func TestAntigravityRefresh_DeduplicatesConcurrentRefresh(t *testing.T) {
++	t.Setenv("ANTIGRAVITY_OAUTH_CLIENT_ID", "development-client-id")
++	t.Setenv("ANTIGRAVITY_OAUTH_CLIENT_SECRET", "development-client-secret")
+ 	resetAntigravityRefreshGroupForTest()
+ 	t.Cleanup(resetAntigravityRefreshGroupForTest)
+ 	resetAntigravityCreditsRetryState()
+@@ -112,7 +114,11 @@ func TestAntigravityRefresh_DeduplicatesConcurrentRefresh(t *testing.T) {
+ 	}
+ 
+ 	go runRefresh(authA, nil)
+-	<-started
++	select {
++	case <-started:
++	case <-time.After(2 * time.Second):
++		t.Fatal("first refresh did not reach the token endpoint")
++	}
+ 
+ 	secondLaunched := make(chan struct{})
+ 	go runRefresh(authB, secondLaunched)
 diff --git a/internal/runtime/executor/claude_executor_test.go b/internal/runtime/executor/claude_executor_test.go
 index 1a0582387c78fb658f8173c41d86f1baf6ba8a6f..cf2ab0a8466fadb76c49f636974af151731edcd8 100644
 --- a/internal/runtime/executor/claude_executor_test.go
@@ -731,10 +1355,38 @@ index 4cb8cefda1228f3d461fbc6f5c7e42e659a6c89a..2a09c70a9f42f1af530e663d4fe60121
  						if sourceResult.Get("type").String() == "base64" {
  							inlineDataJSON := []byte(`{}`)
 diff --git a/internal/translator/antigravity/claude/antigravity_claude_request_test.go b/internal/translator/antigravity/claude/antigravity_claude_request_test.go
-index 7344ff6127993c09a2c50ea59362204f8e23303b..a99bfc57dffff57fe510a87af4c840b16aef0fb2 100644
+index 7344ff6127993c09a2c50ea59362204f8e23303b..44ef04fe57785c2addd0d23cddc89650b9de79a0 100644
 --- a/internal/translator/antigravity/claude/antigravity_claude_request_test.go
 +++ b/internal/translator/antigravity/claude/antigravity_claude_request_test.go
-@@ -2334,6 +2334,46 @@ func TestConvertClaudeRequestToAntigravity_ImageContent(t *testing.T) {
+@@ -217,6 +217,27 @@ func TestConvertClaudeRequestToAntigravity_MapsTypedWebSearchToIndependentSearch
+ 	}
+ }
+ 
++func TestConvertClaudeRequestToAntigravity_WebSearchClientModelAlwaysSearches(t *testing.T) {
++	inputJSON := []byte(`{
++		"model": "gemini-web-search",
++		"messages": [{"role": "user", "content": "OpenAI 官网今天的标题是什么？"}]
++	}`)
++
++	output := ConvertClaudeRequestToAntigravity("gemini-3.1-flash-lite", inputJSON, true)
++	if got := gjson.GetBytes(output, "requestType").String(); got != "web_search" {
++		t.Fatalf("requestType = %q, want web_search: %s", got, output)
++	}
++	if got := gjson.GetBytes(output, "model").String(); got != "gemini-3.1-flash-lite" {
++		t.Fatalf("upstream search model = %q, want gemini-3.1-flash-lite: %s", got, output)
++	}
++	if got := gjson.GetBytes(output, "request.contents.0.parts.0.text").String(); got != "OpenAI 官网今天的标题是什么？" {
++		t.Fatalf("search query = %q: %s", got, output)
++	}
++	if !gjson.GetBytes(output, "request.tools.0.googleSearch").Exists() {
++		t.Fatalf("search client model must add native googleSearch: %s", output)
++	}
++}
++
+ func TestConvertClaudeRequestToAntigravity_UsesDefaultWebSearchMaxResultCountWithoutMaxUses(t *testing.T) {
+ 	registry.GetGlobalRegistry().RegisterClient("test-antigravity-claude-websearch-default-max", "antigravity", []*registry.ModelInfo{
+ 		{ID: "gemini-3.1-flash-lite", SupportsWebSearch: true},
+@@ -2334,6 +2355,46 @@ func TestConvertClaudeRequestToAntigravity_ImageContent(t *testing.T) {
  	}
  }
  
@@ -781,6 +1433,95 @@ index 7344ff6127993c09a2c50ea59362204f8e23303b..a99bfc57dffff57fe510a87af4c840b1
  func TestConvertClaudeRequestToAntigravity_GenerationConfig(t *testing.T) {
  	inputJSON := []byte(`{
  		"model": "claude-3-5-sonnet-20240620",
+diff --git a/internal/translator/antigravity/claude/antigravity_claude_response_test.go b/internal/translator/antigravity/claude/antigravity_claude_response_test.go
+index 2702ad824a027b77a22fee4107fef97955beaf48..2cf5957eae554bc56d45424dce1d247622a89cca 100644
+--- a/internal/translator/antigravity/claude/antigravity_claude_response_test.go
++++ b/internal/translator/antigravity/claude/antigravity_claude_response_test.go
+@@ -46,6 +46,28 @@ func TestConvertAntigravityResponseToClaudeNonStream_WebSearchGrounding(t *testi
+ 	}
+ }
+ 
++func TestConvertAntigravityResponseToClaudeNonStream_WebSearchClientModelGrounding(t *testing.T) {
++	requestJSON := []byte(`{
++		"model": "gemini-web-search",
++		"messages": [{"role": "user", "content": "Search the current OpenAI homepage"}]
++	}`)
++	translatedRequestJSON := []byte(`{"model":"gemini-3.1-flash-lite","request":{"tools":[{"googleSearch":{}}]}}`)
++
++	output := ConvertAntigravityResponseToClaudeNonStream(context.Background(), "gemini-3.1-flash-lite", requestJSON, translatedRequestJSON, testAntigravityGroundingResponse(), nil)
++	if got := gjson.GetBytes(output, "content.0.type").String(); got != "server_tool_use" {
++		t.Fatalf("first content block = %q, want server_tool_use: %s", got, output)
++	}
++	if got := gjson.GetBytes(output, "content.1.type").String(); got != "web_search_tool_result" {
++		t.Fatalf("second content block = %q, want web_search_tool_result: %s", got, output)
++	}
++	if got := gjson.GetBytes(output, "content.2.citations.0.url").String(); got != "https://example.com/weather" {
++		t.Fatalf("citation url = %q: %s", got, output)
++	}
++	if got := gjson.GetBytes(output, "usage.server_tool_use.web_search_requests").Int(); got != 1 {
++		t.Fatalf("web_search_requests = %d, want 1: %s", got, output)
++	}
++}
++
+ func TestConvertAntigravityResponseToClaudeNonStream_WebSearchGroundingRequiresNativeGoogleSearch(t *testing.T) {
+ 	requestJSON := []byte(`{
+ 		"model": "gemini-3-flash-agent",
+diff --git a/internal/translator/antigravity/claude/web_search.go b/internal/translator/antigravity/claude/web_search.go
+index e524abe33375cb0f030070c2b1d8e2cd398a9847..ef0abb1a775d706e17700ae10ceae841dcd054f0 100644
+--- a/internal/translator/antigravity/claude/web_search.go
++++ b/internal/translator/antigravity/claude/web_search.go
+@@ -24,12 +24,20 @@ type webSearchCitedTextBlock struct {
+ 	Citations []map[string]any
+ }
+ 
+-const antigravityWebSearchSystemInstruction = "You are a search engine bot. You will be given a query from a user. Your task is to search the web for relevant information that will help the user. You MUST perform a web search. Do not respond or interact with the user, please respond as if they typed the query into a search bar."
++const (
++	antigravityWebSearchSystemInstruction = "You are a search engine bot. You will be given a query from a user. Your task is to search the web for relevant information that will help the user. You MUST perform a web search. Do not respond or interact with the user, please respond as if they typed the query into a search bar."
++	antigravityWebSearchClientModel       = "gemini-web-search"
++	antigravityWebSearchUpstreamModel     = "gemini-3.1-flash-lite"
++)
+ 
+ func antigravitySupportsNativeGoogleSearch(model string) bool {
+ 	return registry.AntigravityWebSearchModelFor(model) != ""
+ }
+ 
++func isAntigravityWebSearchClientModel(payload []byte) bool {
++	return strings.EqualFold(strings.TrimSpace(gjson.GetBytes(payload, "model").String()), antigravityWebSearchClientModel)
++}
++
+ func isClaudeTypedWebSearchToolType(toolType string) bool {
+ 	return toolType == "web_search_20250305" || toolType == "web_search_20260209"
+ }
+@@ -92,9 +100,16 @@ func allowsClaudeWebSearchToolChoice(payload []byte) bool {
+ }
+ 
+ func shouldBuildAntigravityWebSearchRequest(model string, payload []byte) bool {
+-	return antigravitySupportsNativeGoogleSearch(model) &&
+-		hasOnlyClaudeTypedWebSearchTools(payload) &&
+-		allowsClaudeWebSearchToolChoice(payload)
++	if isAntigravityWebSearchClientModel(payload) {
++		// Force mapping hides the upstream ID from the public registry, so its
++		// capability bit is unavailable here. Keep this dedicated alias pinned to
++		// the Antigravity route verified to support native Google Search.
++		return strings.EqualFold(strings.TrimSpace(model), antigravityWebSearchUpstreamModel)
++	}
++	if !antigravitySupportsNativeGoogleSearch(model) {
++		return false
++	}
++	return hasOnlyClaudeTypedWebSearchTools(payload) && allowsClaudeWebSearchToolChoice(payload)
+ }
+ 
+ func buildAntigravityWebSearchRequest(model string, payload []byte) []byte {
+@@ -211,7 +226,8 @@ func hasAntigravityGoogleSearchTool(payload []byte) bool {
+ }
+ 
+ func shouldTranslateWebSearchGrounding(originalRequestRawJSON, requestRawJSON []byte) bool {
+-	return hasClaudeTypedWebSearchTool(originalRequestRawJSON) && hasAntigravityGoogleSearchTool(requestRawJSON)
++	return (isAntigravityWebSearchClientModel(originalRequestRawJSON) || hasClaudeTypedWebSearchTool(originalRequestRawJSON)) &&
++		hasAntigravityGoogleSearchTool(requestRawJSON)
+ }
+ 
+ func antigravityGroundingMetadata(root gjson.Result) gjson.Result {
 diff --git a/internal/watcher/synthesizer/file.go b/internal/watcher/synthesizer/file.go
 index dad21bd1c407aa9a4e2ccbd13b160443bd1bd469..e38888fc9184eb7b89ed79cd277778c8d25f0373 100644
 --- a/internal/watcher/synthesizer/file.go
@@ -888,10 +1629,21 @@ index 20026080605b60a688a20926667328b05b0784eb..ffbb1ee1d6b4aab073be54da2a5c90f0
  	synth := NewFileSynthesizer()
  	ctx := &SynthesisContext{
 diff --git a/sdk/auth/antigravity.go b/sdk/auth/antigravity.go
-index ee41cbdbd257a4cce05eaf797a0bce120ef4da06..47e8f2d12df2c57eea24e9a252ac4f801095c9a2 100644
+index ee41cbdbd257a4cce05eaf797a0bce120ef4da06..93c277d6c6242aa51ab1aeef26dd0e7e2021c738 100644
 --- a/sdk/auth/antigravity.go
 +++ b/sdk/auth/antigravity.go
-@@ -54,8 +54,12 @@ func (AntigravityAuthenticator) Login(ctx context.Context, cfg *config.Config, o
+@@ -20,6 +20,10 @@ import (
+ // AntigravityAuthenticator implements OAuth login for the antigravity provider.
+ type AntigravityAuthenticator struct{}
+ 
++// Keep the loopback callback alive long enough for users who must complete
++// account selection, consent, or a second-factor challenge in the browser.
++const antigravityOAuthCallbackTimeout = 30 * time.Minute
++
+ // NewAntigravityAuthenticator constructs a new authenticator instance.
+ func NewAntigravityAuthenticator() Authenticator { return &AntigravityAuthenticator{} }
+ 
+@@ -54,8 +58,12 @@ func (AntigravityAuthenticator) Login(ctx context.Context, cfg *config.Config, o
  	if err != nil {
  		return nil, fmt.Errorf("antigravity: failed to generate state: %w", err)
  	}
@@ -905,7 +1657,7 @@ index ee41cbdbd257a4cce05eaf797a0bce120ef4da06..47e8f2d12df2c57eea24e9a252ac4f80
  	if errServer != nil {
  		return nil, fmt.Errorf("antigravity: failed to start callback server: %w", errServer)
  	}
-@@ -66,7 +70,10 @@ func (AntigravityAuthenticator) Login(ctx context.Context, cfg *config.Config, o
+@@ -66,7 +74,10 @@ func (AntigravityAuthenticator) Login(ctx context.Context, cfg *config.Config, o
  	}()
  
  	redirectURI := fmt.Sprintf("http://localhost:%d/oauth-callback", port)
@@ -917,7 +1669,25 @@ index ee41cbdbd257a4cce05eaf797a0bce120ef4da06..47e8f2d12df2c57eea24e9a252ac4f80
  
  	if !opts.NoBrowser {
  		fmt.Println("Opening browser for antigravity authentication")
-@@ -153,7 +160,7 @@ waitForCallback:
+@@ -87,7 +98,7 @@ func (AntigravityAuthenticator) Login(ctx context.Context, cfg *config.Config, o
+ 	fmt.Println("Waiting for antigravity authentication callback...")
+ 
+ 	var cbRes callbackResult
+-	timeoutTimer := time.NewTimer(5 * time.Minute)
++	timeoutTimer := time.NewTimer(antigravityOAuthCallbackTimeout)
+ 	defer timeoutTimer.Stop()
+ 
+ 	var manualPromptTimer *time.Timer
+@@ -139,7 +150,7 @@ waitForCallback:
+ 		case errManual := <-manualInputErrCh:
+ 			return nil, errManual
+ 		case <-timeoutTimer.C:
+-			return nil, fmt.Errorf("antigravity: authentication timed out")
++			return nil, fmt.Errorf("antigravity: authentication timed out after %s; start login again", antigravityOAuthCallbackTimeout)
+ 		}
+ 	}
+ 
+@@ -153,7 +164,7 @@ waitForCallback:
  		return nil, fmt.Errorf("antigravity: missing authorization code")
  	}
  
@@ -926,7 +1696,7 @@ index ee41cbdbd257a4cce05eaf797a0bce120ef4da06..47e8f2d12df2c57eea24e9a252ac4f80
  	if errToken != nil {
  		return nil, fmt.Errorf("antigravity: token exchange failed: %w", errToken)
  	}
-@@ -228,12 +235,12 @@ type callbackResult struct {
+@@ -228,12 +239,12 @@ type callbackResult struct {
  	State string
  }
  
@@ -942,7 +1712,7 @@ index ee41cbdbd257a4cce05eaf797a0bce120ef4da06..47e8f2d12df2c57eea24e9a252ac4f80
  	if err != nil {
  		return nil, 0, nil, err
  	}
-@@ -242,13 +249,32 @@ func startAntigravityCallbackServer(port int) (*http.Server, int, <-chan callbac
+@@ -242,13 +253,32 @@ func startAntigravityCallbackServer(port int) (*http.Server, int, <-chan callbac
  
  	mux := http.NewServeMux()
  	mux.HandleFunc("/oauth-callback", func(w http.ResponseWriter, r *http.Request) {
@@ -976,6 +1746,536 @@ index ee41cbdbd257a4cce05eaf797a0bce120ef4da06..47e8f2d12df2c57eea24e9a252ac4f80
  		if res.Code != "" && res.Error == "" {
  			_, _ = w.Write([]byte("<h1>Login successful</h1><p>You can close this window.</p>"))
  		} else {
+diff --git a/sdk/auth/antigravity_zcode_test.go b/sdk/auth/antigravity_zcode_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..4d082aeeac85e561f2f610c31f9a2ba091e3a406
+--- /dev/null
++++ b/sdk/auth/antigravity_zcode_test.go
+@@ -0,0 +1,71 @@
++package auth
++
++import (
++	"fmt"
++	"net"
++	"net/http"
++	"testing"
++	"time"
++)
++
++func TestAntigravityCallbackIsLoopbackAndRejectsInvalidRequests(t *testing.T) {
++	probe, errListen := net.Listen("tcp4", "127.0.0.1:0")
++	if errListen != nil {
++		t.Fatalf("choose callback port: %v", errListen)
++	}
++	port := probe.Addr().(*net.TCPAddr).Port
++	_ = probe.Close()
++
++	const state = "expected-state"
++	server, actualPort, results, errStart := startAntigravityCallbackServer(port, state)
++	if errStart != nil {
++		t.Fatalf("start callback server: %v", errStart)
++	}
++	defer server.Close()
++	baseURL := fmt.Sprintf("http://127.0.0.1:%d/oauth-callback", actualPort)
++
++	postReq, _ := http.NewRequest(http.MethodPost, baseURL, nil)
++	postResp, errPost := http.DefaultClient.Do(postReq)
++	if errPost != nil || postResp.StatusCode != http.StatusMethodNotAllowed {
++		t.Fatalf("POST callback status=%v err=%v", responseStatus(postResp), errPost)
++	}
++	_ = postResp.Body.Close()
++
++	invalidResp, errInvalid := http.Get(baseURL + "?state=wrong&code=code")
++	if errInvalid != nil || invalidResp.StatusCode != http.StatusBadRequest {
++		t.Fatalf("invalid state status=%v err=%v", responseStatus(invalidResp), errInvalid)
++	}
++	_ = invalidResp.Body.Close()
++	select {
++	case <-results:
++		t.Fatal("invalid state reached callback channel")
++	default:
++	}
++
++	validResp, errValid := http.Get(baseURL + "?state=" + state + "&code=code")
++	if errValid != nil || validResp.StatusCode != http.StatusOK {
++		t.Fatalf("valid callback status=%v err=%v", responseStatus(validResp), errValid)
++	}
++	_ = validResp.Body.Close()
++	select {
++	case result := <-results:
++		if result.Code != "code" || result.State != state {
++			t.Fatalf("unexpected callback: %+v", result)
++		}
++	case <-time.After(time.Second):
++		t.Fatal("valid callback was not delivered")
++	}
++}
++
++func TestAntigravityOAuthCallbackTimeoutAllowsInteractiveLogin(t *testing.T) {
++	if antigravityOAuthCallbackTimeout < 15*time.Minute {
++		t.Fatalf("OAuth callback timeout is too short: %s", antigravityOAuthCallbackTimeout)
++	}
++}
++
++func responseStatus(resp *http.Response) int {
++	if resp == nil {
++		return 0
++	}
++	return resp.StatusCode
++}
+diff --git a/sdk/auth/atomic_file_other.go b/sdk/auth/atomic_file_other.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..483aec1708b1a35b55d65d80e9e9badbf6dd6168
+--- /dev/null
++++ b/sdk/auth/atomic_file_other.go
+@@ -0,0 +1,37 @@
++//go:build !windows
++
++package auth
++
++import (
++	"io/fs"
++	"os"
++	"path/filepath"
++)
++
++func writeAuthFileAtomic(path string, data []byte, mode fs.FileMode) error {
++	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
++		return err
++	}
++	tmp, err := os.CreateTemp(filepath.Dir(path), ".auth-*.tmp")
++	if err != nil {
++		return err
++	}
++	tmpPath := tmp.Name()
++	defer func() { _ = os.Remove(tmpPath) }()
++	if err = tmp.Chmod(mode); err != nil {
++		_ = tmp.Close()
++		return err
++	}
++	if _, err = tmp.Write(data); err != nil {
++		_ = tmp.Close()
++		return err
++	}
++	if err = tmp.Sync(); err != nil {
++		_ = tmp.Close()
++		return err
++	}
++	if err = tmp.Close(); err != nil {
++		return err
++	}
++	return os.Rename(tmpPath, path)
++}
+diff --git a/sdk/auth/atomic_file_windows.go b/sdk/auth/atomic_file_windows.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..aaaa518e1a8f3167ad54acb30072d92580dcdca2
+--- /dev/null
++++ b/sdk/auth/atomic_file_windows.go
+@@ -0,0 +1,114 @@
++//go:build windows
++
++package auth
++
++import (
++	"errors"
++	"fmt"
++	"io/fs"
++	"os"
++	"path/filepath"
++	"syscall"
++	"unsafe"
++)
++
++var (
++	authKernel32     = syscall.NewLazyDLL("kernel32.dll")
++	authReplaceFileW = authKernel32.NewProc("ReplaceFileW")
++	authMoveFileExW  = authKernel32.NewProc("MoveFileExW")
++)
++
++const (
++	authReplaceWriteThrough = 0x00000001
++	authMoveReplaceExisting = 0x00000001
++	authMoveWriteThrough    = 0x00000008
++)
++
++func writeAuthFileAtomic(path string, data []byte, mode fs.FileMode) error {
++	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
++		return err
++	}
++	tmp, err := os.CreateTemp(filepath.Dir(path), ".auth-*.tmp")
++	if err != nil {
++		return err
++	}
++	tmpPath := tmp.Name()
++	cleanup := true
++	defer func() {
++		_ = tmp.Close()
++		if cleanup {
++			_ = os.Remove(tmpPath)
++		}
++	}()
++	if err = tmp.Chmod(mode); err != nil {
++		return err
++	}
++	if _, err = tmp.Write(data); err != nil {
++		return err
++	}
++	if err = tmp.Sync(); err != nil {
++		return err
++	}
++	if err = tmp.Close(); err != nil {
++		return err
++	}
++	if _, statErr := os.Stat(path); statErr == nil {
++		err = replaceAuthFile(path, tmpPath)
++	} else if errors.Is(statErr, fs.ErrNotExist) {
++		err = moveAuthFile(tmpPath, path, false)
++	} else {
++		return statErr
++	}
++	if err != nil {
++		return err
++	}
++	cleanup = false
++	return nil
++}
++
++func replaceAuthFile(target, replacement string) error {
++	targetPtr, err := syscall.UTF16PtrFromString(target)
++	if err != nil {
++		return err
++	}
++	replacementPtr, err := syscall.UTF16PtrFromString(replacement)
++	if err != nil {
++		return err
++	}
++	r1, _, callErr := authReplaceFileW.Call(
++		uintptr(unsafe.Pointer(targetPtr)),
++		uintptr(unsafe.Pointer(replacementPtr)),
++		0,
++		authReplaceWriteThrough,
++		0,
++		0,
++	)
++	if r1 == 0 {
++		return fmt.Errorf("ReplaceFileW: %w", callErr)
++	}
++	return nil
++}
++
++func moveAuthFile(source, target string, replace bool) error {
++	sourcePtr, err := syscall.UTF16PtrFromString(source)
++	if err != nil {
++		return err
++	}
++	targetPtr, err := syscall.UTF16PtrFromString(target)
++	if err != nil {
++		return err
++	}
++	flags := uintptr(authMoveWriteThrough)
++	if replace {
++		flags |= authMoveReplaceExisting
++	}
++	r1, _, callErr := authMoveFileExW.Call(
++		uintptr(unsafe.Pointer(sourcePtr)),
++		uintptr(unsafe.Pointer(targetPtr)),
++		flags,
++	)
++	if r1 == 0 {
++		return fmt.Errorf("MoveFileExW: %w", callErr)
++	}
++	return nil
++}
+diff --git a/sdk/auth/credential_protection.go b/sdk/auth/credential_protection.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..2f89687359959abe98043e45485764a350750bcd
+--- /dev/null
++++ b/sdk/auth/credential_protection.go
+@@ -0,0 +1,6 @@
++package auth
++
++// protectedCredentialPrefix identifies current-user DPAPI values on Windows.
++// Keeping the marker platform-neutral lets shared validation and tests inspect
++// the serialized format without requiring the Windows implementation.
++const protectedCredentialPrefix = "dpapi:v1:"
+diff --git a/sdk/auth/credential_protection_darwin.go b/sdk/auth/credential_protection_darwin.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..23b24d60ccdb9e4e94f563971ba3cab045239d7e
+--- /dev/null
++++ b/sdk/auth/credential_protection_darwin.go
+@@ -0,0 +1,123 @@
++//go:build darwin
++
++package auth
++
++import (
++	"crypto/aes"
++	"crypto/cipher"
++	"crypto/rand"
++	"encoding/base64"
++	"errors"
++	"fmt"
++	"os/exec"
++	"strings"
++)
++
++const (
++	keychainCredentialPrefix      = "keychain:v1:"
++	keychainService               = "io.github.hhz0823.zcode-antigravity"
++	keychainAccount               = "credential-master-key"
++	credentialProtectionAvailable = true
++	platformCredentialPrefix      = keychainCredentialPrefix
++)
++
++var credentialEncryptionKey = keychainMasterKey
++
++func protectCredentialString(value string) (string, error) {
++	if value == "" || strings.HasPrefix(value, keychainCredentialPrefix) {
++		return value, nil
++	}
++	key, errKey := credentialEncryptionKey(true)
++	if errKey != nil {
++		return "", errKey
++	}
++	gcm, errGCM := credentialGCM(key)
++	if errGCM != nil {
++		return "", errGCM
++	}
++	nonce := make([]byte, gcm.NonceSize())
++	if _, errRandom := rand.Read(nonce); errRandom != nil {
++		return "", fmt.Errorf("generate Keychain credential nonce: %w", errRandom)
++	}
++	payload := gcm.Seal(nonce, nonce, []byte(value), []byte(keychainService))
++	return keychainCredentialPrefix + base64.RawStdEncoding.EncodeToString(payload), nil
++}
++
++func unprotectCredentialString(value string) (string, error) {
++	if !strings.HasPrefix(value, keychainCredentialPrefix) {
++		return value, nil
++	}
++	payload, errDecode := base64.RawStdEncoding.DecodeString(strings.TrimPrefix(value, keychainCredentialPrefix))
++	if errDecode != nil {
++		return "", fmt.Errorf("decode Keychain credential: %w", errDecode)
++	}
++	key, errKey := credentialEncryptionKey(false)
++	if errKey != nil {
++		return "", errKey
++	}
++	gcm, errGCM := credentialGCM(key)
++	if errGCM != nil {
++		return "", errGCM
++	}
++	if len(payload) < gcm.NonceSize() {
++		return "", fmt.Errorf("Keychain credential payload is truncated")
++	}
++	nonce, ciphertext := payload[:gcm.NonceSize()], payload[gcm.NonceSize():]
++	plain, errOpen := gcm.Open(nil, nonce, ciphertext, []byte(keychainService))
++	if errOpen != nil {
++		return "", fmt.Errorf("decrypt Keychain credential: %w", errOpen)
++	}
++	return string(plain), nil
++}
++
++func credentialStringNeedsProtection(value string) bool {
++	return value != "" && !strings.HasPrefix(value, keychainCredentialPrefix)
++}
++
++func credentialGCM(key []byte) (cipher.AEAD, error) {
++	if len(key) != 32 {
++		return nil, fmt.Errorf("Keychain credential key has invalid length %d", len(key))
++	}
++	block, errCipher := aes.NewCipher(key)
++	if errCipher != nil {
++		return nil, errCipher
++	}
++	return cipher.NewGCM(block)
++}
++
++func keychainMasterKey(create bool) ([]byte, error) {
++	find := exec.Command("/usr/bin/security", "find-generic-password", "-w", "-s", keychainService, "-a", keychainAccount)
++	stored, errFind := find.CombinedOutput()
++	if errFind == nil {
++		return decodeKeychainMasterKey(stored)
++	}
++	if !create {
++		return nil, fmt.Errorf("read macOS Keychain credential key: %w", errFind)
++	}
++	var exitErr *exec.ExitError
++	if !errors.As(errFind, &exitErr) || exitErr.ExitCode() != 44 {
++		return nil, fmt.Errorf("read macOS Keychain credential key: %w", errFind)
++	}
++
++	key := make([]byte, 32)
++	if _, errRandom := rand.Read(key); errRandom != nil {
++		return nil, fmt.Errorf("generate macOS Keychain credential key: %w", errRandom)
++	}
++	encoded := base64.RawStdEncoding.EncodeToString(key)
++	add := exec.Command("/usr/bin/security", "add-generic-password", "-U", "-s", keychainService, "-a", keychainAccount, "-w", encoded)
++	if output, errAdd := add.CombinedOutput(); errAdd != nil {
++		return nil, fmt.Errorf("store macOS Keychain credential key: %w (%s)", errAdd, strings.TrimSpace(string(output)))
++	}
++	return key, nil
++}
++
++func decodeKeychainMasterKey(stored []byte) ([]byte, error) {
++	key, errDecode := base64.RawStdEncoding.DecodeString(strings.TrimSpace(string(stored)))
++	if errDecode != nil {
++		return nil, fmt.Errorf("decode macOS Keychain credential key: %w", errDecode)
++	}
++	if len(key) != 32 {
++		return nil, fmt.Errorf("macOS Keychain credential key has invalid length %d", len(key))
++	}
++	return key, nil
++}
+diff --git a/sdk/auth/credential_protection_darwin_test.go b/sdk/auth/credential_protection_darwin_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..dc5d6188a75ea37cb8e9f26e69a9e6d01712a004
+--- /dev/null
++++ b/sdk/auth/credential_protection_darwin_test.go
+@@ -0,0 +1,50 @@
++//go:build darwin
++
++package auth
++
++import (
++	"bytes"
++	"encoding/base64"
++	"strings"
++	"testing"
++)
++
++func init() {
++	testKey := bytes.Repeat([]byte{0x42}, 32)
++	credentialEncryptionKey = func(bool) ([]byte, error) {
++		return append([]byte(nil), testKey...), nil
++	}
++}
++
++func TestDarwinCredentialProtectionRoundTrip(t *testing.T) {
++	protected, errProtect := protectCredentialString("mac-secret-token")
++	if errProtect != nil {
++		t.Fatalf("protectCredentialString: %v", errProtect)
++	}
++	if !strings.HasPrefix(protected, keychainCredentialPrefix) || strings.Contains(protected, "mac-secret-token") {
++		t.Fatalf("unexpected protected credential: %q", protected)
++	}
++	plain, errUnprotect := unprotectCredentialString(protected)
++	if errUnprotect != nil {
++		t.Fatalf("unprotectCredentialString: %v", errUnprotect)
++	}
++	if plain != "mac-secret-token" {
++		t.Fatalf("unprotected credential = %q", plain)
++	}
++}
++
++func TestDarwinCredentialProtectionRejectsTampering(t *testing.T) {
++	protected, errProtect := protectCredentialString("mac-secret-token")
++	if errProtect != nil {
++		t.Fatal(errProtect)
++	}
++	payload, errDecode := base64.RawStdEncoding.DecodeString(strings.TrimPrefix(protected, keychainCredentialPrefix))
++	if errDecode != nil {
++		t.Fatal(errDecode)
++	}
++	payload[len(payload)/2] ^= 0x01
++	protected = keychainCredentialPrefix + base64.RawStdEncoding.EncodeToString(payload)
++	if _, errUnprotect := unprotectCredentialString(protected); errUnprotect == nil {
++		t.Fatal("tampered credential decrypted successfully")
++	}
++}
+diff --git a/sdk/auth/credential_protection_other.go b/sdk/auth/credential_protection_other.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..4b4a3d7626c4859dfce5e848933a4118a9512f4d
+--- /dev/null
++++ b/sdk/auth/credential_protection_other.go
+@@ -0,0 +1,12 @@
++//go:build !windows && !darwin
++
++package auth
++
++const (
++	credentialProtectionAvailable = false
++	platformCredentialPrefix      = ""
++)
++
++func protectCredentialString(value string) (string, error)   { return value, nil }
++func unprotectCredentialString(value string) (string, error) { return value, nil }
++func credentialStringNeedsProtection(string) bool            { return false }
+diff --git a/sdk/auth/credential_protection_windows.go b/sdk/auth/credential_protection_windows.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..512f134737b7a06ce6899690d3cda1f6e5997fd8
+--- /dev/null
++++ b/sdk/auth/credential_protection_windows.go
+@@ -0,0 +1,69 @@
++//go:build windows
++
++package auth
++
++import (
++	"encoding/base64"
++	"fmt"
++	"strings"
++	"unsafe"
++
++	"golang.org/x/sys/windows"
++)
++
++const (
++	credentialProtectionAvailable = true
++	platformCredentialPrefix      = protectedCredentialPrefix
++)
++
++func protectCredentialString(value string) (string, error) {
++	if value == "" || len(value) >= len(protectedCredentialPrefix) && value[:len(protectedCredentialPrefix)] == protectedCredentialPrefix {
++		return value, nil
++	}
++	in := bytesToDataBlob([]byte(value))
++	var out windows.DataBlob
++	if err := windows.CryptProtectData(in, nil, nil, 0, nil, windows.CRYPTPROTECT_UI_FORBIDDEN, &out); err != nil {
++		return "", fmt.Errorf("DPAPI protect credential: %w", err)
++	}
++	defer func() {
++		if out.Data != nil {
++			_, _ = windows.LocalFree(windows.Handle(uintptr(unsafe.Pointer(out.Data))))
++		}
++	}()
++	protected := unsafe.Slice(out.Data, out.Size)
++	return protectedCredentialPrefix + base64.RawStdEncoding.EncodeToString(protected), nil
++}
++
++func unprotectCredentialString(value string) (string, error) {
++	if len(value) < len(protectedCredentialPrefix) || value[:len(protectedCredentialPrefix)] != protectedCredentialPrefix {
++		return value, nil
++	}
++	ciphertext, errDecode := base64.RawStdEncoding.DecodeString(value[len(protectedCredentialPrefix):])
++	if errDecode != nil {
++		return "", fmt.Errorf("DPAPI decode credential: %w", errDecode)
++	}
++	in := bytesToDataBlob(ciphertext)
++	var out windows.DataBlob
++	if err := windows.CryptUnprotectData(in, nil, nil, 0, nil, windows.CRYPTPROTECT_UI_FORBIDDEN, &out); err != nil {
++		return "", fmt.Errorf("DPAPI unprotect credential: %w", err)
++	}
++	defer func() {
++		if out.Data != nil {
++			_, _ = windows.LocalFree(windows.Handle(uintptr(unsafe.Pointer(out.Data))))
++		}
++	}()
++	plain := unsafe.Slice(out.Data, out.Size)
++	return string(plain), nil
++}
++
++func credentialStringNeedsProtection(value string) bool {
++	return value != "" && !strings.HasPrefix(value, protectedCredentialPrefix)
++}
++
++func bytesToDataBlob(data []byte) *windows.DataBlob {
++	blob := &windows.DataBlob{Size: uint32(len(data))}
++	if len(data) > 0 {
++		blob.Data = &data[0]
++	}
++	return blob
++}
 diff --git a/sdk/auth/filestore.go b/sdk/auth/filestore.go
 index 8abef89e153725dce3dde8ab16fb42a4aa91b71a..14ed67b7f04e4aaeb7f2015587528e88d0947da4 100644
 --- a/sdk/auth/filestore.go
@@ -1107,6 +2407,109 @@ index 8abef89e153725dce3dde8ab16fb42a4aa91b71a..14ed67b7f04e4aaeb7f2015587528e88
  	info, errStat = os.Stat(path)
  	if errStat != nil {
  		return nil, fmt.Errorf("stat file: %w", errStat)
+diff --git a/sdk/auth/filestore_metadata.go b/sdk/auth/filestore_metadata.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..3fe38bcb4cb20a2cefebdd2a8f5baab4c2773977
+--- /dev/null
++++ b/sdk/auth/filestore_metadata.go
+@@ -0,0 +1,97 @@
++package auth
++
++import (
++	"encoding/json"
++	"fmt"
++	"strings"
++)
++
++var antigravitySensitiveFields = []string{"access_token", "refresh_token"}
++
++func marshalAuthMetadataForStorage(metadata map[string]any) ([]byte, error) {
++	stored := cloneMetadataMap(metadata)
++	provider, _ := stored["type"].(string)
++	if strings.EqualFold(strings.TrimSpace(provider), "antigravity") {
++		if err := transformSensitiveFields(stored, protectCredentialString); err != nil {
++			return nil, err
++		}
++	}
++	return json.Marshal(stored)
++}
++
++func unmarshalAuthMetadataFromStorage(data []byte) (map[string]any, error) {
++	metadata := make(map[string]any)
++	if err := json.Unmarshal(data, &metadata); err != nil {
++		return nil, err
++	}
++	provider, _ := metadata["type"].(string)
++	if strings.EqualFold(strings.TrimSpace(provider), "antigravity") {
++		if err := transformSensitiveFields(metadata, unprotectCredentialString); err != nil {
++			return nil, err
++		}
++	}
++	return metadata, nil
++}
++
++// UnmarshalStoredMetadata decodes auth metadata exactly as FileTokenStore persists it.
++// On Windows and macOS this also unprotects platform-backed Antigravity credentials
++// for the current user so runtime consumers never mistake ciphertext for an access token.
++func UnmarshalStoredMetadata(data []byte) (map[string]any, error) {
++	return unmarshalAuthMetadataFromStorage(data)
++}
++
++func authMetadataStorageNeedsMigration(data []byte) (bool, error) {
++	stored := make(map[string]any)
++	if err := json.Unmarshal(data, &stored); err != nil {
++		return false, err
++	}
++	provider, _ := stored["type"].(string)
++	if !strings.EqualFold(strings.TrimSpace(provider), "antigravity") {
++		return false, nil
++	}
++	for _, key := range antigravitySensitiveFields {
++		value, _ := stored[key].(string)
++		if credentialStringNeedsProtection(value) {
++			return true, nil
++		}
++	}
++	return false, nil
++}
++
++func transformSensitiveFields(metadata map[string]any, transform func(string) (string, error)) error {
++	for _, key := range antigravitySensitiveFields {
++		value, ok := metadata[key].(string)
++		if !ok || value == "" {
++			continue
++		}
++		updated, err := transform(value)
++		if err != nil {
++			return fmt.Errorf("auth filestore: transform %s: %w", key, err)
++		}
++		metadata[key] = updated
++	}
++	return nil
++}
++
++func cloneMetadataMap(metadata map[string]any) map[string]any {
++	copyMap := make(map[string]any, len(metadata))
++	for key, value := range metadata {
++		copyMap[key] = cloneMetadataValue(value)
++	}
++	return copyMap
++}
++
++func cloneMetadataValue(value any) any {
++	switch typed := value.(type) {
++	case map[string]any:
++		return cloneMetadataMap(typed)
++	case []any:
++		copySlice := make([]any, len(typed))
++		for i, entry := range typed {
++			copySlice[i] = cloneMetadataValue(entry)
++		}
++		return copySlice
++	default:
++		return value
++	}
++}
 diff --git a/sdk/auth/filestore_test.go b/sdk/auth/filestore_test.go
 index e638ffee744f7a301ada8a085c8306aef456f1a7..b29d75f0f1451b6643c1435aeb00700c5ed0e922 100644
 --- a/sdk/auth/filestore_test.go
@@ -1139,6 +2542,108 @@ index e638ffee744f7a301ada8a085c8306aef456f1a7..b29d75f0f1451b6643c1435aeb00700c
  			}
  		})
  	}
+diff --git a/sdk/auth/filestore_zcode_test.go b/sdk/auth/filestore_zcode_test.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..6017a38b3966b2ccfdaec1792581dabb94a076fa
+--- /dev/null
++++ b/sdk/auth/filestore_zcode_test.go
+@@ -0,0 +1,96 @@
++package auth
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
++)
++
++func TestAntigravityFileStoreProtectsTokensAndReadsThemBack(t *testing.T) {
++	dir := t.TempDir()
++	store := NewFileTokenStore()
++	store.SetBaseDir(dir)
++	auth := &cliproxyauth.Auth{
++		ID:       "antigravity-test.json",
++		Provider: "antigravity",
++		Metadata: map[string]any{
++			"type":          "antigravity",
++			"access_token":  "plain-access-secret",
++			"refresh_token": "plain-refresh-secret",
++			"project_id":    "test-project",
++			"email":         "test@example.invalid",
++		},
++	}
++	path, errSave := store.Save(t.Context(), auth)
++	if errSave != nil {
++		t.Fatalf("Save: %v", errSave)
++	}
++	raw, errRead := os.ReadFile(path)
++	if errRead != nil {
++		t.Fatalf("read saved auth: %v", errRead)
++	}
++	if credentialProtectionAvailable {
++		if strings.Contains(string(raw), "plain-access-secret") || strings.Contains(string(raw), "plain-refresh-secret") {
++			t.Fatalf("saved auth contains plaintext token: %s", raw)
++		}
++		if !strings.Contains(string(raw), platformCredentialPrefix) {
++			t.Fatalf("saved auth lacks platform protection marker: %s", raw)
++		}
++	}
++	listed, errList := store.List(t.Context())
++	if errList != nil {
++		t.Fatalf("List: %v", errList)
++	}
++	if len(listed) != 1 {
++		t.Fatalf("listed auth count=%d, want 1", len(listed))
++	}
++	if got := listed[0].Metadata["access_token"]; got != "plain-access-secret" {
++		t.Fatalf("decrypted access token=%v", got)
++	}
++}
++
++func TestFileStoreFailsOnMalformedAuthJSON(t *testing.T) {
++	dir := t.TempDir()
++	if err := os.WriteFile(filepath.Join(dir, "broken.json"), []byte("{"), 0o600); err != nil {
++		t.Fatalf("write malformed auth: %v", err)
++	}
++	store := NewFileTokenStore()
++	store.SetBaseDir(dir)
++	if _, err := store.List(t.Context()); err == nil {
++		t.Fatal("List silently ignored malformed auth JSON")
++	}
++}
++
++func TestAntigravityFileStoreMigratesLegacyPlaintextTokens(t *testing.T) {
++	if !credentialProtectionAvailable {
++		t.Skip("credential migration is not enabled on this platform")
++	}
++	dir := t.TempDir()
++	path := filepath.Join(dir, "legacy.json")
++	legacy := `{"type":"antigravity","access_token":"legacy-access","refresh_token":"legacy-refresh","project_id":"test-project"}`
++	if err := os.WriteFile(path, []byte(legacy), 0o600); err != nil {
++		t.Fatalf("write legacy auth: %v", err)
++	}
++	store := NewFileTokenStore()
++	store.SetBaseDir(dir)
++	listed, errList := store.List(t.Context())
++	if errList != nil {
++		t.Fatalf("List: %v", errList)
++	}
++	if len(listed) != 1 || listed[0].Metadata["access_token"] != "legacy-access" {
++		t.Fatalf("legacy auth was not returned decrypted: %#v", listed)
++	}
++	raw, errRead := os.ReadFile(path)
++	if errRead != nil {
++		t.Fatalf("read migrated auth: %v", errRead)
++	}
++	if strings.Contains(string(raw), "legacy-access") || strings.Contains(string(raw), "legacy-refresh") {
++		t.Fatalf("legacy auth remained plaintext: %s", raw)
++	}
++	if !strings.Contains(string(raw), platformCredentialPrefix) {
++		t.Fatalf("migrated auth lacks platform protection marker: %s", raw)
++	}
++}
 diff --git a/sdk/cliproxy/antigravity_models.go b/sdk/cliproxy/antigravity_models.go
 index 11f7c408d9aa95fe6988006e81054cda3c8e4fad..b9cdce63fda90dcafd6cf05326827c8cf1448122 100644
 --- a/sdk/cliproxy/antigravity_models.go

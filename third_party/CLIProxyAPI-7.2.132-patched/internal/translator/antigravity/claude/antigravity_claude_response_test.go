@@ -46,6 +46,28 @@ func TestConvertAntigravityResponseToClaudeNonStream_WebSearchGrounding(t *testi
 	}
 }
 
+func TestConvertAntigravityResponseToClaudeNonStream_WebSearchClientModelGrounding(t *testing.T) {
+	requestJSON := []byte(`{
+		"model": "gemini-web-search",
+		"messages": [{"role": "user", "content": "Search the current OpenAI homepage"}]
+	}`)
+	translatedRequestJSON := []byte(`{"model":"gemini-3.1-flash-lite","request":{"tools":[{"googleSearch":{}}]}}`)
+
+	output := ConvertAntigravityResponseToClaudeNonStream(context.Background(), "gemini-3.1-flash-lite", requestJSON, translatedRequestJSON, testAntigravityGroundingResponse(), nil)
+	if got := gjson.GetBytes(output, "content.0.type").String(); got != "server_tool_use" {
+		t.Fatalf("first content block = %q, want server_tool_use: %s", got, output)
+	}
+	if got := gjson.GetBytes(output, "content.1.type").String(); got != "web_search_tool_result" {
+		t.Fatalf("second content block = %q, want web_search_tool_result: %s", got, output)
+	}
+	if got := gjson.GetBytes(output, "content.2.citations.0.url").String(); got != "https://example.com/weather" {
+		t.Fatalf("citation url = %q: %s", got, output)
+	}
+	if got := gjson.GetBytes(output, "usage.server_tool_use.web_search_requests").Int(); got != 1 {
+		t.Fatalf("web_search_requests = %d, want 1: %s", got, output)
+	}
+}
+
 func TestConvertAntigravityResponseToClaudeNonStream_WebSearchGroundingRequiresNativeGoogleSearch(t *testing.T) {
 	requestJSON := []byte(`{
 		"model": "gemini-3-flash-agent",

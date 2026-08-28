@@ -25,6 +25,7 @@ func (e *AntigravityExecutor) ExecuteStream(ctx context.Context, auth *cliproxya
 		return nil, statusErr{code: http.StatusNotImplemented, msg: "/responses/compact not supported"}
 	}
 	baseModel := thinking.ParseSuffix(req.Model).ModelName
+	baseModel = antigravityRouteModelForRequestedAlias(opts, req.Model, baseModel)
 
 	ctx = context.WithValue(ctx, "alt", "")
 	if inCooldown, remaining, errCooldown := antigravityIsInShortCooldownRequired(ctx, auth, baseModel, time.Now()); errCooldown != nil {
@@ -50,6 +51,11 @@ func (e *AntigravityExecutor) ExecuteStream(ctx context.Context, auth *cliproxya
 	originalPayload, errValidate := validateAntigravityRequestSignatures(ctx, baseModel, from, originalPayload)
 	if errValidate != nil {
 		return nil, errValidate
+	}
+	responseOriginalRequest := opts.OriginalRequest
+	if markedPayload, marked := prepareAntigravityWebSearchClientPayload(opts, req.Model, originalPayload); marked {
+		originalPayload = markedPayload
+		responseOriginalRequest = markedPayload
 	}
 	req.Payload = originalPayload
 	token, updatedAuth, errToken := e.ensureAccessToken(ctx, auth)
@@ -271,7 +277,7 @@ attemptLoop:
 					}
 
 					payload = e.resolveWebSearchGroundingURLs(ctx, auth, from, originalPayload, translated, payload)
-					chunks := helps.TranslateStreamWithClaudeInputTokens(ctx, to, responseFormat, req.Model, opts.OriginalRequest, translated, bytes.Clone(payload), &param, claudeInputTokens)
+					chunks := helps.TranslateStreamWithClaudeInputTokens(ctx, to, responseFormat, req.Model, responseOriginalRequest, translated, bytes.Clone(payload), &param, claudeInputTokens)
 					for i := range chunks {
 						select {
 						case out <- cliproxyexecutor.StreamChunk{Payload: chunks[i]}:
@@ -280,7 +286,7 @@ attemptLoop:
 						}
 					}
 				}
-				tail := helps.TranslateStreamWithClaudeInputTokens(ctx, to, responseFormat, req.Model, opts.OriginalRequest, translated, []byte("[DONE]"), &param, claudeInputTokens)
+				tail := helps.TranslateStreamWithClaudeInputTokens(ctx, to, responseFormat, req.Model, responseOriginalRequest, translated, []byte("[DONE]"), &param, claudeInputTokens)
 				for i := range tail {
 					select {
 					case out <- cliproxyexecutor.StreamChunk{Payload: tail[i]}:

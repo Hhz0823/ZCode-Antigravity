@@ -28,6 +28,7 @@ state.json
 **/target/
 **/node_modules/
 **/dist/
+**/electron-dist/
 **/gen/
 *.tsbuildinfo
 **/.playwright-cli/

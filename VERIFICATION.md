@@ -2,6 +2,21 @@
 
 最新验证日期：2026-08-28（Asia/Shanghai）
 
+## v0.6.8-test Gemini 原生 Google Search
+
+- 直接复现 ZCode 的 Anthropic 请求路径：`gemini-3.7-flash` 虽返回 HTTP 200，但不会生成搜索结果或引用；
+  Antigravity 当前标记为可搜索的 `gemini-3.1-flash-lite` 路由能返回完整搜索结果。
+- 新增客户端别名 `gemini-web-search`（`Gemini Web Search (Google)`），固定映射到可搜索路由；
+  普通 Gemini 3.7/3.6 模型不做提示词猜测，避免将编程请求误转成独立搜索。
+- 真实本机账号的 Anthropic `/v1/messages` 验证通过：HTTP 200，内容包含
+  `server_tool_use` / `web_search_tool_result`，`usage.server_tool_use.web_search_requests=1`，并返回 13 条来源引用。
+- 为排除“仅由提示词触发”，又使用 3 条完全不含“联网/搜索”字样的问题连续请求；
+  3 条均为 `web_search_requests=1`，并分别返回 2、7、3 条引用。
+- CLIProxyAPI 搜索请求、响应、流式响应和 OAuth 别名执行器回归测试通过；Go Core 模型选择、
+  配置生成和别名清单测试通过。
+- 从 SHA-256 固定的官方 CLIProxyAPI `v7.2.132` 源码重新生成无 OAuth 字面量的可重放补丁；
+  先运行 `sanitize_upstream_oauth.go`，再执行 `git apply --check --whitespace=error-all`，应用后源树对比通过。
+
 ## v0.6.7-test 单层原生玻璃、高对比内容与滚动优化
 
 - 两端统一为“只有窗口底板是白色液态玻璃”：Windows 由 DWM Acrylic
@@ -227,7 +242,8 @@
 - CLIProxyAPI `go mod verify`、`go test ./...`、Windows x64 构建：通过。
 - OAuth PKCE/callback、DPAPI/原子凭据存储、watcher 运行时解密、Antigravity auth、模型注册、
   Gemini 3.7 `maxOutputTokens`、Windows Git corruption recovery、TTFT 和管理器回归：通过。
-- `git apply --check --whitespace=error-all project/docs/CLIProxyAPI-v7.2.132-zcode.patch`：通过。
+- 对固定上游先执行 `go run project/tools/sanitize_upstream_oauth.go <upstream>`，再执行
+  `git apply --check --whitespace=error-all project/docs/CLIProxyAPI-v7.2.132-zcode.patch`：通过。
 - Chrome Google OAuth：成功；获得可用 project ID，账号文件仅保留 DPAPI 字段，无明文 token。
 - 当前 `0.2.3-test` 网关仅监听 `127.0.0.1:18080`；ZCode Provider 已切换为两个干净模型 ID。
 - v2rayN：`EnableTun=true`，`xray_tun` 网卡为 `Up` 并持有 `0.0.0.0/0` 路由；桥接运行配置

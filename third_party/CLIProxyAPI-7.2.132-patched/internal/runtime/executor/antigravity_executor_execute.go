@@ -28,6 +28,7 @@ func (e *AntigravityExecutor) Execute(ctx context.Context, auth *cliproxyauth.Au
 		return resp, statusErr{code: http.StatusNotImplemented, msg: "/responses/compact not supported"}
 	}
 	baseModel := thinking.ParseSuffix(req.Model).ModelName
+	baseModel = antigravityRouteModelForRequestedAlias(opts, req.Model, baseModel)
 	if inCooldown, remaining, errCooldown := antigravityIsInShortCooldownRequired(ctx, auth, baseModel, time.Now()); errCooldown != nil {
 		return resp, homeKVUnavailableStatusErr(errCooldown)
 	} else if inCooldown && !antigravityShouldBypassShortCooldown(ctx, e.cfg) {
@@ -56,6 +57,11 @@ func (e *AntigravityExecutor) Execute(ctx context.Context, auth *cliproxyauth.Au
 	originalPayload, errValidate := validateAntigravityRequestSignatures(ctx, baseModel, from, originalPayload)
 	if errValidate != nil {
 		return resp, errValidate
+	}
+	responseOriginalRequest := opts.OriginalRequest
+	if markedPayload, marked := prepareAntigravityWebSearchClientPayload(opts, req.Model, originalPayload); marked {
+		originalPayload = markedPayload
+		responseOriginalRequest = markedPayload
 	}
 	req.Payload = originalPayload
 	token, updatedAuth, errToken := e.ensureAccessToken(ctx, auth)
@@ -233,7 +239,7 @@ attemptLoop:
 			bodyBytes = e.resolveWebSearchGroundingURLs(ctx, auth, from, originalPayload, translated, bodyBytes)
 			reporter.Publish(ctx, helps.ParseAntigravityUsage(bodyBytes))
 			var param any
-			converted := sdktranslator.TranslateNonStream(ctx, to, responseFormat, req.Model, opts.OriginalRequest, translated, bodyBytes, &param)
+			converted := sdktranslator.TranslateNonStream(ctx, to, responseFormat, req.Model, responseOriginalRequest, translated, bodyBytes, &param)
 			resp = cliproxyexecutor.Response{Payload: converted, Headers: httpResp.Header.Clone()}
 			reporter.EnsurePublished(ctx)
 			return resp, nil

@@ -217,6 +217,27 @@ func TestConvertClaudeRequestToAntigravity_MapsTypedWebSearchToIndependentSearch
 	}
 }
 
+func TestConvertClaudeRequestToAntigravity_WebSearchClientModelAlwaysSearches(t *testing.T) {
+	inputJSON := []byte(`{
+		"model": "gemini-web-search",
+		"messages": [{"role": "user", "content": "OpenAI 官网今天的标题是什么？"}]
+	}`)
+
+	output := ConvertClaudeRequestToAntigravity("gemini-3.1-flash-lite", inputJSON, true)
+	if got := gjson.GetBytes(output, "requestType").String(); got != "web_search" {
+		t.Fatalf("requestType = %q, want web_search: %s", got, output)
+	}
+	if got := gjson.GetBytes(output, "model").String(); got != "gemini-3.1-flash-lite" {
+		t.Fatalf("upstream search model = %q, want gemini-3.1-flash-lite: %s", got, output)
+	}
+	if got := gjson.GetBytes(output, "request.contents.0.parts.0.text").String(); got != "OpenAI 官网今天的标题是什么？" {
+		t.Fatalf("search query = %q: %s", got, output)
+	}
+	if !gjson.GetBytes(output, "request.tools.0.googleSearch").Exists() {
+		t.Fatalf("search client model must add native googleSearch: %s", output)
+	}
+}
+
 func TestConvertClaudeRequestToAntigravity_UsesDefaultWebSearchMaxResultCountWithoutMaxUses(t *testing.T) {
 	registry.GetGlobalRegistry().RegisterClient("test-antigravity-claude-websearch-default-max", "antigravity", []*registry.ModelInfo{
 		{ID: "gemini-3.1-flash-lite", SupportsWebSearch: true},

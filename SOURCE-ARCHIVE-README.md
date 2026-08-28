@@ -31,8 +31,17 @@ Antigravity 桌面版从 2.2.1 更新到 2.8.1 后，同一账户的实时目录
 
 ## 本地修改
 
-可重放补丁：`project/docs/CLIProxyAPI-v7.2.132-zcode.patch`，已对干净 v7.2.132 源码执行
-`git apply --check --whitespace=error-all`。
+可重放补丁：`project/docs/CLIProxyAPI-v7.2.132-zcode.patch`。为避免 Git 补丁的“被删除行”重新携带上游
+OAuth 字面量，重放前先用随库工具将干净 v7.2.132 源码中的这些值替换为无密钥占位符，再应用补丁：
+
+```bash
+go run project/tools/sanitize_upstream_oauth.go /path/to/CLIProxyAPI-7.2.132
+cd /path/to/CLIProxyAPI-7.2.132
+git apply --check --whitespace=error-all /path/to/ZCode-Antigravity/project/docs/CLIProxyAPI-v7.2.132-zcode.patch
+git apply --whitespace=error-all /path/to/ZCode-Antigravity/project/docs/CLIProxyAPI-v7.2.132-zcode.patch
+```
+
+该顺序已用上游 source ZIP 的固定 SHA-256 重放，并在应用后与随库第三方源树逐文件对比通过。
 
 主要修改包括：
 

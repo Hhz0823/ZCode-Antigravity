@@ -3,7 +3,7 @@
 > 在 Windows 与 macOS 上统一接入 Antigravity Gemini 和 xAI Grok，
 > 并把本机安全网关提供给 ZCode、Grok Build、Codex、Claude Code 与 OpenCode。
 
-**当前版本：** Windows / macOS `v0.6.7-test`
+**当前版本：** Windows / macOS `v0.6.8-test`
 **适用系统：** macOS 12+（Apple Silicon / Intel）、Windows 10 / 11 x64
 **项目状态：** 测试版
 
@@ -12,7 +12,8 @@
 
 - 可在控制中心切换 **Antigravity** 与 **Grok / xAI**；账号、模型、额度和 Agent 配置跟随切换。
 - Windows 的 Grok 设备登录会把 xAI 生成的临时验证码直接显示在软件内，支持选中、复制和重新打开官方授权页；用户把该码输入 `accounts.x.ai` 页面后，软件自动检测授权结果。
-- Antigravity 精确写入 `gemini-3.7-flash` / `gemini-3.6-flash`；Grok 只同步 xAI 返回的文本模型，自动排除 Imagine 图片和视频模型。
+- Antigravity 精确写入 `gemini-3.7-flash` / `gemini-3.6-flash`，并提供独立的 `gemini-web-search`（**Gemini Web Search (Google)**）联网搜索模型；Grok 只同步 xAI 返回的文本模型，自动排除 Imagine 图片和视频模型。
+- 选择 `Gemini Web Search (Google)` 后，每次提问都会调用 Antigravity 原生 Google Search，并向 ZCode 返回搜索结果、网页引用和 `web_search_requests`；普通 Gemini 3.7/3.6 对话不会被强制联网。
 - 支持 Low / Medium / High 思考等级，并转换为 Gemini `thinkingLevel`。
 - 支持文本、图片、音频和视频输入转换；当前 Gemini 3.7 Flash 声明输出仅为文本。
 - Windows 任务栏与 macOS 菜单栏提供常驻额度小组件；可切换 Antigravity / Grok、刷新额度、打开面板或退出。
@@ -39,11 +40,11 @@
 
 | 文件 | 用途 | 建议 |
 | --- | --- | --- |
-| `ZCode-Antigravity-macOS-Universal-v0.6.7-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
-| `ZCode-Antigravity-Setup-v0.6.7-test.exe` | Windows 图形化安装器 | **普通用户首选** |
-| `ZCode-Antigravity-OneClick-v0.6.7-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
-| `ZCode-Antigravity-Windows-x64-0.6.7-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
-| `ZCode-Antigravity-Source-v0.6.7-test.zip` | 当前源码快照 | 审计 / 构建 |
+| `ZCode-Antigravity-macOS-Universal-v0.6.8-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
+| `ZCode-Antigravity-Setup-v0.6.8-test.exe` | Windows 图形化安装器 | **普通用户首选** |
+| `ZCode-Antigravity-OneClick-v0.6.8-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
+| `ZCode-Antigravity-Windows-x64-0.6.8-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
+| `ZCode-Antigravity-Source-v0.6.8-test.zip` | 当前源码快照 | 审计 / 构建 |
 
 ## macOS 快速安装
 
@@ -58,7 +59,7 @@
 1. 完整解压 macOS Universal ZIP；如需校验，打开 `Terminal Tools` 后双击 `Verify-Package.command`。
 2. 完全退出 ZCode。当前 App 使用临时签名且尚未公证；首次运行请按住 Control 点击 `ZCode Antigravity.app`，选择“打开”。
 3. 双击 `ZCode Antigravity.app`，选择 Antigravity 或 Grok；按需完成 Google OAuth 或 xAI 设备授权，再点击“一键接入 ZCode”。Google OAuth 回调最长等待 30 分钟；超时后应回到程序重新登录，不要刷新旧的 localhost 页面。
-4. 重新打开 ZCode，选择 `Antigravity + Grok (Local Bridge)` 下的目标模型，发送一条短消息验收。关闭原生窗口后菜单栏额度组件仍会保留。
+4. 重新打开 ZCode，选择 `Antigravity + Grok (Local Bridge)` 下的目标模型；需要实时网页信息时选择 `Gemini Web Search (Google)`。发送一条短消息验收，搜索回答应包含来源引用。关闭原生窗口后菜单栏额度组件仍会保留。
 
 Mac 运行数据位于 `~/Library/Application Support/ZCodeAntigravity`。Google token 使用
 AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切片已完成交叉编译和
@@ -75,10 +76,10 @@ AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切�
 ### 安装步骤
 
 1. 从 Windows 系统托盘完全退出 ZCode。仅关闭窗口可能仍会留下 `ZCode.exe` 进程。
-2. 下载 `ZCode-Antigravity-Setup-v0.6.7-test.exe`，并先校验 SHA-256。请勿使用任务栏点击会同时置顶主窗口的 `v0.6.3-test`、网关启动后可能保留旧额度提示的 `v0.6.2-test` 或更早测试版。
+2. 下载 `ZCode-Antigravity-Setup-v0.6.8-test.exe`，并先校验 SHA-256。请勿使用任务栏点击会同时置顶主窗口的 `v0.6.3-test`、网关启动后可能保留旧额度提示的 `v0.6.2-test` 或更早测试版。
 3. 双击安装器。程序会自动使用正在运行的 v2rayN / Windows 系统代理，无需开启 TUN；未发现代理时才直连。
 4. 在控制中心选择 Antigravity 或 Grok，完成对应授权并等待状态检查通过。Grok 登录时，将软件弹层中的临时验证码输入已打开的 xAI 官方页面；授权后无需再把结果粘贴回软件。
-5. 重新打开 ZCode，选择 Provider `Antigravity + Grok (Local Bridge)`；控制中心会作为任务栏额度小组件继续驻留。
+5. 重新打开 ZCode，选择 Provider `Antigravity + Grok (Local Bridge)`；常规对话选 Gemini 3.7/3.6，需要联网时选 `Gemini Web Search (Google)`。控制中心会作为任务栏额度小组件继续驻留。
 6. 先发送一条短消息进行小规模验收。账号权限和实时额度以第一次真实请求为准。
 
 ## 本地端口与代理
@@ -105,11 +106,12 @@ $env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
 
 ## 已验证范围
 
-Windows 基线与 `v0.6.7-test` 的构建测试记录包括：
+Windows 基线与 `v0.6.8-test` 的构建测试记录包括：
 
 - 管理器与 CLIProxyAPI 的 Go 测试、Windows x64 构建和静态检查通过。
 - OAuth PKCE / callback、DPAPI 凭据存储、原子替换和 loopback 约束通过。
 - Gemini 3.7 Flash High 与 Gemini 3.6 Flash High 的真实文本请求通过。
+- `Gemini Web Search (Google)` 在真实 Antigravity 账号上完成联网搜索：返回 `server_tool_use` / `web_search_tool_result`、`web_search_requests=1` 和可解析来源引用。
 - 图片理解与视频时序理解通过；当前不宣称支持原生位图生成。
 - 单 BAT 自解包、载荷和三 EXE 哈希校验、同版本重装通过。
 - 原生 EXE 安装器的隔离安装、再安装与无终端 GUI 行为通过。
@@ -162,6 +164,12 @@ Windows 基线与 `v0.6.7-test` 的构建测试记录包括：
 
 在控制中心确认当前选择了正确的提供商。Antigravity 可运行 `Login-Antigravity`，
 Grok 可运行 `Login-Grok`，然后重新启动并同步网关。
+
+### Gemini 为什么没有联网搜索
+
+`gemini-3.7-flash` 和 `gemini-3.6-flash` 是普通对话/编程模型，不会仅因为提示词写了“搜索”就伪装成已联网。
+需要当前网页信息时，在 ZCode 模型选择器中改选 `Gemini Web Search (Google)`。该模型固定路由到
+Antigravity 支持原生 Google Search 的搜索通道，并会返回可检查的来源引用。更新后如果看不到该模型，请完全退出 ZCode，再点击“修复并重新同步”。
 
 ### Grok 额度为什么只有一条周/月额度
 

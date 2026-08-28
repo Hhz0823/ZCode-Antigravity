@@ -30,20 +30,20 @@ Requirements
 First test
 ----------
 Recommended: fully exit ZCode from the tray and double-click
-ZCode-Antigravity-Setup-v0.6.7-test.exe. This is a native Windows GUI installer: it shows no
+ZCode-Antigravity-Setup-v0.6.8-test.exe. This is a native Windows GUI installer: it shows no
 terminal, verifies the embedded ZIP plus all three executables, installs only for the current
 user, creates Desktop/Start Menu shortcuts, and opens the control center after completion.
 Do not use v0.4.0-test on Windows; its Rust client expected baseUrl while the Go Core correctly
 emitted baseURL, so startup stopped before the control center could open.
 Do not use v0.5.2-test for a fresh Antigravity login; that release was packaged without the
-required OAuth desktop configuration. v0.6.7-test also repairs a recorded gateway automatically
+required OAuth desktop configuration. v0.6.8-test also repairs a recorded gateway automatically
 when its process exits unexpectedly, while preserving an intentional Stop. It also queues a quota
 refresh that overlaps the five-second status poll, so Grok quota appears automatically after the
 gateway comes online. Its tray click now opens an independent Acrylic quota widget and never raises
 the main control-center window unless the user explicitly asks to open it.
 
 For the single-BAT fallback, fully exit ZCode from the tray and double-click
-ZCode-Antigravity-OneClick-v0.6.7-test.bat. It verifies and extracts its embedded package,
+ZCode-Antigravity-OneClick-v0.6.8-test.bat. It verifies and extracts its embedded package,
 then opens the graphical control center without leaving a terminal window. The control center
 opens OAuth when needed, writes the verified ZCode Provider directly, and starts ZCode after
 successful readback.
@@ -169,6 +169,8 @@ Available scripts
 - resources/app.asar                  Packaged local renderer and restricted preload bridge
 - LICENSE.electron.txt                Electron MIT license
 - LICENSES.chromium.html              Chromium third-party license notices
+- CLIProxyAPI-v7.2.132-zcode.patch    Sanitized replay patch for the pinned upstream source
+- sanitize_upstream_oauth.go          Preprocess clean upstream before applying the replay patch
 - Run-Menu.bat                  Interactive menu
 - Setup-and-Start.bat           Open the GUI and start first-time setup
 - Login-Antigravity.bat         Add or refresh an Antigravity account
@@ -185,9 +187,9 @@ Available scripts
 
 Installer formats
 -----------------
-- ZCode-Antigravity-Setup-v0.6.7-test.exe: recommended no-terminal current-user installer.
-- ZCode-Antigravity-OneClick-v0.6.7-test.bat: fallback single-file installer.
-- ZCode-Antigravity-Windows-x64-0.6.7-test.zip: manually verifiable expanded package.
+- ZCode-Antigravity-Setup-v0.6.8-test.exe: recommended no-terminal current-user installer.
+- ZCode-Antigravity-OneClick-v0.6.8-test.bat: fallback single-file installer.
+- ZCode-Antigravity-Windows-x64-0.6.8-test.zip: manually verifiable expanded package.
 - The EXE installer is custom-built and unsigned. It does not require administrator rights or
   7-Zip on the target computer; Windows SmartScreen may still require manual confirmation.
 
@@ -254,17 +256,19 @@ maps them to the exact upstream High catalog entries before inference and maps r
 
 ZCode model selection
 ---------------------
-Antigravity exposes exactly gemini-3.7-flash and gemini-3.6-flash, mapped to their exact upstream
-High entries. Grok exposes the text models returned for the logged-in xAI account. Imagine image
+Antigravity exposes gemini-3.7-flash and gemini-3.6-flash, mapped to their exact upstream High
+entries, plus gemini-web-search (Gemini Web Search (Google)) for native Google Search with source
+citations. Use the dedicated search model for current web information; ordinary Gemini 3.7/3.6
+requests remain normal chat/coding requests. Grok exposes the text models returned for the logged-in xAI account. Imagine image
 and video models and unrelated providers are excluded. Missing required Gemini or Grok text models
 cause a clear setup error instead of silently substituting another model.
 
 Build versions
 --------------
-- ZCode Antigravity Bridge: 0.6.7-test
+- ZCode Antigravity Bridge: 0.6.8-test
 - Control center: Electron 44.0.0, Chromium, React 19.2.8, Tailwind CSS 4.3.3
 - CLIProxyAPI base: v7.2.132, commit 78f0c4079e3e6273d65d03b5549cffc898703264
-- Local build: 7.2.132-zcode.12
+- Local build: 7.2.132-zcode.13
 
 Read THIRD-PARTY-NOTICES.txt, WEB-DEPENDENCIES.txt, LICENSE.electron.txt,
 LICENSES.chromium.html, and LICENSE-CLIProxyAPI.txt for upstream details.

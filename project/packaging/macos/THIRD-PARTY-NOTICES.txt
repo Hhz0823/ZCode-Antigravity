@@ -10,7 +10,8 @@ License: MIT
 
 The packaged backend includes local compatibility, loopback, model-routing,
 macOS Keychain credential-protection, and ZCode integration changes. See the
-repository source tree and project/docs/CLIProxyAPI-v7.2.132-zcode.patch.
+repository source tree, project/tools/sanitize_upstream_oauth.go, and the sanitized
+project/docs/CLIProxyAPI-v7.2.132-zcode.patch.
 
 System tray
 -----------

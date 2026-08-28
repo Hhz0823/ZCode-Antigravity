@@ -66,6 +66,12 @@ func requiredTestModels() []modelInfo {
 		Thinking:                  &thinkingSupport{Levels: []string{"low", "medium", "high"}},
 		SupportedInputModalities:  []string{"text", "image", "audio", "video"},
 		SupportedOutputModalities: []string{"text"},
+	}, {
+		ID:                        zcodeWebSearchModelID,
+		DisplayName:               "Gemini Web Search (Google)",
+		MaxInputTokens:            1048576,
+		SupportedInputModalities:  []string{"text", "image", "audio", "video"},
+		SupportedOutputModalities: []string{"text"},
 	}}
 }
 
@@ -97,6 +103,9 @@ func TestWriteBackendConfigRestrictsNetworkAndCredits(t *testing.T) {
 		`name: "gemini-3.6-flash-high"`,
 		`alias: "gemini-3.6-flash"`,
 		`display-name: "Gemini 3.6 Flash"`,
+		`name: "gemini-3.1-flash-lite"`,
+		`alias: "gemini-web-search"`,
+		`display-name: "Gemini Web Search (Google)"`,
 		"force-mapping: true",
 		a.apiKey,
 	}
@@ -105,8 +114,8 @@ func TestWriteBackendConfigRestrictsNetworkAndCredits(t *testing.T) {
 			t.Errorf("config missing %q", check)
 		}
 	}
-	if got := strings.Count(text, "force-mapping: true"); got != 2 {
-		t.Fatalf("force-mapping entry count = %d, want 2", got)
+	if got := strings.Count(text, "force-mapping: true"); got != 3 {
+		t.Fatalf("force-mapping entry count = %d, want 3", got)
 	}
 	if strings.Contains(text, "fork: true") {
 		t.Fatal("upstream IDs must not remain client-visible")
@@ -262,7 +271,7 @@ func TestWaitForModelsAllowsDelayedRegistration(t *testing.T) {
 	}
 }
 
-func TestSelectZCodeModelsAllowsOnlyGemini37And36Flash(t *testing.T) {
+func TestSelectZCodeModelsAllowsGeminiFlashAndWebSearch(t *testing.T) {
 	catalog := append(requiredTestModels(),
 		modelInfo{ID: "claude-opus-4-6-thinking"},
 		modelInfo{ID: "gemini-3.7-flash-low"},
@@ -272,10 +281,10 @@ func TestSelectZCodeModelsAllowsOnlyGemini37And36Flash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := fmt.Sprint(modelIDs(models)); got != "[gemini-3.6-flash gemini-3.7-flash]" {
+	if got := fmt.Sprint(modelIDs(models)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-web-search]" {
 		t.Fatalf("selected models = %s", got)
 	}
-	if isAllowedZCodeModel("claude-opus-4-6-thinking") || isAllowedZCodeModel("gemini-3.7-flash-high") || !isAllowedZCodeModel("gemini-3.7-flash") {
+	if isAllowedZCodeModel("claude-opus-4-6-thinking") || isAllowedZCodeModel("gemini-3.7-flash-high") || !isAllowedZCodeModel("gemini-3.7-flash") || !isAllowedZCodeModel(zcodeWebSearchModelID) {
 		t.Fatal("model allowlist decision is incorrect")
 	}
 }
@@ -286,7 +295,9 @@ func TestZCodeModelAliasesMatchClientAllowlist(t *testing.T) {
 	}
 	seen := make(map[string]bool, len(zcodeModelAliases))
 	for _, alias := range zcodeModelAliases {
-		if alias.UpstreamID == alias.ClientID || !strings.HasSuffix(alias.UpstreamID, "-high") || strings.HasSuffix(alias.ClientID, "-high") {
+		isSearchAlias := alias.ClientID == zcodeWebSearchModelID && alias.UpstreamID == "gemini-3.1-flash-lite"
+		isCleanFlashAlias := strings.HasSuffix(alias.UpstreamID, "-high") && !strings.HasSuffix(alias.ClientID, "-high")
+		if alias.UpstreamID == alias.ClientID || (!isSearchAlias && !isCleanFlashAlias) {
 			t.Fatalf("invalid clean model alias: %#v", alias)
 		}
 		seen[alias.ClientID] = true
@@ -322,14 +333,14 @@ func TestSelectAgentModelsSeparatesGrokFromMedia(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := fmt.Sprint(modelIDs(combined)); got != "[gemini-3.6-flash gemini-3.7-flash grok-4.5 grok-build-0.1]" {
+	if got := fmt.Sprint(modelIDs(combined)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-web-search grok-4.5 grok-build-0.1]" {
 		t.Fatalf("combined models = %s", got)
 	}
 }
 
 func TestSelectAvailableAgentModelsIsolatesProviderFailure(t *testing.T) {
 	models, warnings := selectAvailableAgentModels(requiredTestModels(), true, true)
-	if got := fmt.Sprint(modelIDs(models)); got != "[gemini-3.6-flash gemini-3.7-flash]" {
+	if got := fmt.Sprint(modelIDs(models)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-web-search]" {
 		t.Fatalf("unexpected surviving provider models: %s", got)
 	}
 	if len(warnings) != 1 || !strings.Contains(warnings[0].Error(), "Grok") {
@@ -382,7 +393,7 @@ func TestConfigureZCodeBacksUpAndPreservesOtherProviders(t *testing.T) {
 	if !ok {
 		t.Fatal("our provider missing")
 	}
-	if got := fmt.Sprint(sortedProviderModelIDs(ours)); got != "[gemini-3.6-flash gemini-3.7-flash]" {
+	if got := fmt.Sprint(sortedProviderModelIDs(ours)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-web-search]" {
 		t.Fatalf("model ids = %s", got)
 	}
 	configuredModels := ours["models"].(map[string]any)
@@ -401,6 +412,9 @@ func TestConfigureZCodeBacksUpAndPreservesOtherProviders(t *testing.T) {
 	}
 	if _, ok := configuredModels["gemini-3.6-flash"]; !ok {
 		t.Fatal("Gemini 3.6 Flash is missing")
+	}
+	if _, ok := configuredModels[zcodeWebSearchModelID]; !ok {
+		t.Fatal("Gemini Web Search is missing")
 	}
 	if _, ok := configuredModels["claude-opus-4-6-thinking"]; ok {
 		t.Fatal("non-allowlisted Claude model was written")

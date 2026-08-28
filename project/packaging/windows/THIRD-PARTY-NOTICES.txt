@@ -16,7 +16,9 @@ Windows credentials with current-user DPAPI and atomic writes, bounds optional n
 disables package-managed background version lookup, preserves Gemini 3.7 output limits, reports
 accurate model capabilities, and retries project propagation without unbounded auth-file reads.
 
-The exact redistributable patch is included as CLIProxyAPI-v7.2.132-zcode.patch.
+The sanitized redistributable patch is included as CLIProxyAPI-v7.2.132-zcode.patch.
+Run sanitize_upstream_oauth.go against a clean v7.2.132 tree before applying that patch;
+the preprocessing step keeps removed upstream OAuth literals out of the patch text.
 
 The API service is configured with host 127.0.0.1, plugins disabled, remote management and
 its control panel disabled, and detailed request logging disabled. A random per-user key protects
@@ -25,7 +27,7 @@ the loopback-only management calls used by the local quota dashboard.
 Windows Electron control center
 ===============================
 
-The v0.6.7 control center uses Electron 44, React, Tailwind CSS, and lucide-react.
+The v0.6.8 control center uses Electron 44, React, Tailwind CSS, and lucide-react.
 Exact JavaScript versions and integrity hashes are recorded in ui/package-lock.json.
 Electron's MIT license and Chromium third-party notices are shipped beside the executable
 as LICENSE.electron.txt and LICENSES.chromium.html.

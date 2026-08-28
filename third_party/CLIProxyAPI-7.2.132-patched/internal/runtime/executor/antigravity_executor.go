@@ -22,6 +22,7 @@ import (
 	antigravityclaude "github.com/router-for-me/CLIProxyAPI/v7/internal/translator/antigravity/claude"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/util"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
+	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/executor"
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/proxyutil"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v7/sdk/translator"
 	log "github.com/sirupsen/logrus"
@@ -42,6 +43,8 @@ const (
 	antigravityCreditsHintRefreshTimeout   = 5 * time.Second
 	antigravityShortQuotaCooldownThreshold = 5 * time.Minute
 	antigravityInstantRetryThreshold       = 3 * time.Second
+	antigravityWebSearchClientModelName    = "gemini-web-search"
+	antigravityWebSearchUpstreamModelName  = "gemini-3.1-flash-lite"
 	// systemInstruction              = "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Absolute paths only****Proactiveness**"
 )
 
@@ -623,9 +626,35 @@ func hasAntigravityGoogleSearchTool(payload []byte) bool {
 	return false
 }
 
+func hasAntigravityWebSearchClientModel(payload []byte) bool {
+	return strings.EqualFold(strings.TrimSpace(util.GetGJSONBytesNoCopy(payload, "model").String()), antigravityWebSearchClientModelName)
+}
+
+func antigravityWebSearchClientModelRequested(opts cliproxyexecutor.Options, fallbackModel string) bool {
+	return strings.EqualFold(strings.TrimSpace(helps.PayloadRequestedModel(opts, fallbackModel)), antigravityWebSearchClientModelName)
+}
+
+func antigravityRouteModelForRequestedAlias(opts cliproxyexecutor.Options, fallbackModel, baseModel string) string {
+	if antigravityWebSearchClientModelRequested(opts, fallbackModel) {
+		return antigravityWebSearchUpstreamModelName
+	}
+	return baseModel
+}
+
+func prepareAntigravityWebSearchClientPayload(opts cliproxyexecutor.Options, fallbackModel string, payload []byte) ([]byte, bool) {
+	if !antigravityWebSearchClientModelRequested(opts, fallbackModel) {
+		return payload, false
+	}
+	marked, err := sjson.SetBytes(payload, "model", antigravityWebSearchClientModelName)
+	if err != nil {
+		return payload, false
+	}
+	return marked, true
+}
+
 func shouldResolveAntigravityWebSearchGroundingURLs(from sdktranslator.Format, originalRequestRawJSON, requestRawJSON []byte) bool {
 	return from.String() == "claude" &&
-		hasAntigravityClaudeTypedWebSearchTool(originalRequestRawJSON) &&
+		(hasAntigravityWebSearchClientModel(originalRequestRawJSON) || hasAntigravityClaudeTypedWebSearchTool(originalRequestRawJSON)) &&
 		hasAntigravityGoogleSearchTool(requestRawJSON)
 }
 

@@ -9,6 +9,7 @@ authentication, API and OAuth callback port scanning, ZCode data-directory resol
 bounded config backups/logs, atomic Windows replacement, model synchronization, real-model
 smoke testing, image/audio/video request translation, safe no-op reuse while ZCode is running,
 PID/path-safe stop, managed-provider removal, a strict Gemini plus Grok-text model selector,
+an explicit Gemini Web Search model with grounded Google Search citations,
 Grok billing, protocol-derived output-token and token/s metrics, detailed taskbar/menu-bar quota
 menus, backed-up one-click configuration for eight Agent/CLI clients, automatic v2rayN/Windows
 system-proxy discovery without TUN, a hidden native-host API, SwiftUI/AppKit macOS UI, Electron 44 +
@@ -51,6 +52,8 @@ expanded ZIP, Electron GUI installer, and single-BAT fallback in one flow.
 
 The backend is CLIProxyAPI v7.2.132 with
 [`docs/CLIProxyAPI-v7.2.132-zcode.patch`](docs/CLIProxyAPI-v7.2.132-zcode.patch).
+Replay the patch only after running `go run tools/sanitize_upstream_oauth.go <upstream-dir>`;
+this keeps removed upstream OAuth literals out of the redistributable patch.
 See the Windows package README for the risk boundary and test workflow.
 The quota-card reference boundary is documented in
 [`docs/ANTIGRAVITY-MANAGER-REFERENCE.md`](docs/ANTIGRAVITY-MANAGER-REFERENCE.md); the taskbar and
@@ -61,7 +64,7 @@ Build the single-BAT installer from a verified expanded package:
 ```powershell
 .\packaging\windows\Build-Single-Bat.ps1 `
   -PackageDir C:\path\to\expanded-package `
-  -OutputFile C:\path\to\ZCode-Antigravity-OneClick-v0.6.7-test.bat
+  -OutputFile C:\path\to\ZCode-Antigravity-OneClick-v0.6.8-test.bat
 ```
 
 Build the native no-console EXE installer from the same verified package:
@@ -69,5 +72,5 @@ Build the native no-console EXE installer from the same verified package:
 ```powershell
 .\packaging\windows\Build-Exe-Installer.ps1 `
   -PackageDir C:\path\to\expanded-package `
-  -OutputFile C:\path\to\ZCode-Antigravity-Setup-v0.6.7-test.exe
+  -OutputFile C:\path\to\ZCode-Antigravity-Setup-v0.6.8-test.exe
 ```

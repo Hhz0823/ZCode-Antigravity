@@ -24,10 +24,18 @@ type webSearchCitedTextBlock struct {
 	Citations []map[string]any
 }
 
-const antigravityWebSearchSystemInstruction = "You are a search engine bot. You will be given a query from a user. Your task is to search the web for relevant information that will help the user. You MUST perform a web search. Do not respond or interact with the user, please respond as if they typed the query into a search bar."
+const (
+	antigravityWebSearchSystemInstruction = "You are a search engine bot. You will be given a query from a user. Your task is to search the web for relevant information that will help the user. You MUST perform a web search. Do not respond or interact with the user, please respond as if they typed the query into a search bar."
+	antigravityWebSearchClientModel       = "gemini-web-search"
+	antigravityWebSearchUpstreamModel     = "gemini-3.1-flash-lite"
+)
 
 func antigravitySupportsNativeGoogleSearch(model string) bool {
 	return registry.AntigravityWebSearchModelFor(model) != ""
+}
+
+func isAntigravityWebSearchClientModel(payload []byte) bool {
+	return strings.EqualFold(strings.TrimSpace(gjson.GetBytes(payload, "model").String()), antigravityWebSearchClientModel)
 }
 
 func isClaudeTypedWebSearchToolType(toolType string) bool {
@@ -92,9 +100,16 @@ func allowsClaudeWebSearchToolChoice(payload []byte) bool {
 }
 
 func shouldBuildAntigravityWebSearchRequest(model string, payload []byte) bool {
-	return antigravitySupportsNativeGoogleSearch(model) &&
-		hasOnlyClaudeTypedWebSearchTools(payload) &&
-		allowsClaudeWebSearchToolChoice(payload)
+	if isAntigravityWebSearchClientModel(payload) {
+		// Force mapping hides the upstream ID from the public registry, so its
+		// capability bit is unavailable here. Keep this dedicated alias pinned to
+		// the Antigravity route verified to support native Google Search.
+		return strings.EqualFold(strings.TrimSpace(model), antigravityWebSearchUpstreamModel)
+	}
+	if !antigravitySupportsNativeGoogleSearch(model) {
+		return false
+	}
+	return hasOnlyClaudeTypedWebSearchTools(payload) && allowsClaudeWebSearchToolChoice(payload)
 }
 
 func buildAntigravityWebSearchRequest(model string, payload []byte) []byte {
@@ -211,7 +226,8 @@ func hasAntigravityGoogleSearchTool(payload []byte) bool {
 }
 
 func shouldTranslateWebSearchGrounding(originalRequestRawJSON, requestRawJSON []byte) bool {
-	return hasClaudeTypedWebSearchTool(originalRequestRawJSON) && hasAntigravityGoogleSearchTool(requestRawJSON)
+	return (isAntigravityWebSearchClientModel(originalRequestRawJSON) || hasClaudeTypedWebSearchTool(originalRequestRawJSON)) &&
+		hasAntigravityGoogleSearchTool(requestRawJSON)
 }
 
 func antigravityGroundingMetadata(root gjson.Result) gjson.Result {
