@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "0.6.11-test"
+private let appVersion = "0.6.12-test"
 
 private extension Notification.Name {
     static let selectBridgeProvider = Notification.Name("ZCodeSelectBridgeProvider")
@@ -673,6 +673,7 @@ private struct StatusPopoverView: View {
         .padding(18)
         .frame(width: 430)
         .background(.ultraThinMaterial)
+        .environment(\.controlActiveState, .key)
     }
 
     private func widgetProviderButton(_ title: String, provider: String) -> some View {

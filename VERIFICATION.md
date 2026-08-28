@@ -2,6 +2,18 @@
 
 最新验证日期：2026-08-28（Asia/Shanghai）
 
+## v0.6.12-test macOS 状态栏首次弹出即显示完整配色
+
+- 复现确认：状态栏 `NSPopover` 首次出现时不是 key window，SwiftUI 会把内部原生控件视作非关键窗口；
+  因此两条带 `.tint(...)` 的 `ProgressView` 首帧被系统降成灰色，点击 Popover 后才切换为彩色。
+- `StatusPopoverView` 根视图现在固定注入 `controlActiveState = .key`，让第一次弹出直接使用与点击后相同的
+  蓝色 / 紫色额度条。这只是 SwiftUI 视觉环境值，没有调用 `NSApp.activate`、`makeKeyAndOrderFront` 或抬起主窗口。
+- 改动只有一行原生 SwiftUI 配置；arm64 / x86_64 macOS 12 类型检查和 Universal 构建通过。
+- 0.6.12 候选 App 已在 Apple Silicon Mac 安装；主窗口关闭后后台进程与网关继续驻留，网关 HTTP 200，
+  0.6.11 App 保留在可恢复备份目录。Windows 功能代码无改动，Electron 生产构建与 5 项 IPC 回归通过。
+- macOS Universal ZIP 与 Windows ZIP / EXE / BAT 已重新生成；逐文件哈希、签名/架构、ASAR 与 PE 结构
+  检查通过后才进入发布。
+
 ## v0.6.11-test Gemini-only 默认模型与新组合图标
 
 - 新安装与旧设置缺省值均为 Gemini-only：`enableGrokModels=false`、
