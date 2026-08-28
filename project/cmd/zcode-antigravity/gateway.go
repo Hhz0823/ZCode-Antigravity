@@ -365,14 +365,18 @@ func (a *app) startAndConfigure() (returnErr error) {
 	if err != nil {
 		return err
 	}
-	models, warnings := selectAvailableAgentModels(catalog, accounts.Antigravity > 0, accounts.XAI > 0)
+	models, warnings := selectAvailableAgentModels(catalog,
+		accounts.Antigravity > 0,
+		accounts.XAI > 0 && cfg.EnableGrokModels,
+		accounts.Antigravity > 0 && cfg.EnableOtherModels,
+	)
 	for _, warning := range warnings {
 		fmt.Printf("模型提供商警告: %v\n", warning)
 	}
 	if len(models) == 0 {
 		return fmt.Errorf("没有可同步的 Gemini / Grok 文本模型: %w", errors.Join(warnings...))
 	}
-	backup, changed, err := a.configureZCode(port, models)
+	backup, changed, err := a.configureZCodeWithAccess(port, models, cfg.EnableGrokModels, cfg.EnableOtherModels)
 	if err != nil {
 		return err
 	}
@@ -632,6 +636,7 @@ func hasRecentProviderAccount(dir, prefix string, since time.Time) bool {
 }
 
 func (a *app) syncZCode() error {
+	cfg := a.currentSettings()
 	current, err := a.loadState()
 	if err != nil {
 		return err
@@ -653,14 +658,18 @@ func (a *app) syncZCode() error {
 	if err != nil {
 		return err
 	}
-	models, warnings := selectAvailableAgentModels(catalog, accounts.Antigravity > 0, accounts.XAI > 0)
+	models, warnings := selectAvailableAgentModels(catalog,
+		accounts.Antigravity > 0,
+		accounts.XAI > 0 && cfg.EnableGrokModels,
+		accounts.Antigravity > 0 && cfg.EnableOtherModels,
+	)
 	for _, warning := range warnings {
 		fmt.Printf("模型提供商警告: %v\n", warning)
 	}
 	if len(models) == 0 {
 		return fmt.Errorf("没有可同步的 Gemini / Grok 文本模型: %w", errors.Join(warnings...))
 	}
-	backup, changed, err := a.configureZCode(current.Port, models)
+	backup, changed, err := a.configureZCodeWithAccess(current.Port, models, cfg.EnableGrokModels, cfg.EnableOtherModels)
 	if err != nil {
 		return err
 	}
@@ -683,6 +692,7 @@ func (a *app) syncZCode() error {
 }
 
 func (a *app) status() error {
+	cfg := a.currentSettings()
 	current, err := a.loadState()
 	if err != nil {
 		return err
@@ -707,7 +717,11 @@ func (a *app) status() error {
 	if err != nil {
 		return err
 	}
-	models, warnings := selectAvailableAgentModels(catalog, accounts.Antigravity > 0, accounts.XAI > 0)
+	models, warnings := selectAvailableAgentModels(catalog,
+		accounts.Antigravity > 0,
+		accounts.XAI > 0 && cfg.EnableGrokModels,
+		accounts.Antigravity > 0 && cfg.EnableOtherModels,
+	)
 	for _, warning := range warnings {
 		fmt.Printf("模型提供商警告: %v\n", warning)
 	}

@@ -354,18 +354,13 @@ button { font: inherit; }
 }
 .mac-brand-identity { display: flex; min-width: 0; align-items: center; gap: 14px; }
 .mac-brand-logo {
-  display: grid;
   width: 54px;
   height: 54px;
   flex: none;
-  place-items: center;
   border: 1px solid rgba(255,255,255,.84);
   border-radius: 17px;
-  color: white;
-  background: linear-gradient(145deg, #69a3ff, #2668f5 72%);
-  box-shadow: inset 0 1px rgba(255,255,255,.45), 0 12px 26px -15px rgba(44,104,245,.7);
-  font-size: 18px;
-  font-weight: 760;
+  object-fit: cover;
+  box-shadow: inset 0 1px rgba(255,255,255,.45), 0 12px 26px -15px rgba(114,83,8,.52);
 }
 .mac-brand-identity h1 { color: #212329; font-size: 24px; font-weight: 720; letter-spacing: -.035em; }
 .mac-brand-identity p { margin-top: 2px; color: #707580; font-size: 11px; }

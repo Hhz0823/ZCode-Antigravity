@@ -62,6 +62,8 @@ type managerRouting struct {
 type managerPublicSettings struct {
 	AutoRefreshMinutes  int    `json:"autoRefreshMinutes"`
 	QuotaWarningPercent int    `json:"quotaWarningPercent"`
+	EnableGrokModels    bool   `json:"enableGrokModels"`
+	EnableOtherModels   bool   `json:"enableOtherModels"`
 	ProxyURL            string `json:"proxyURL"`
 	Theme               string `json:"theme"`
 	LiquidGlass         bool   `json:"liquidGlass"`
@@ -84,6 +86,8 @@ type managerSettingsUpdate struct {
 	MaxRetryInterval    *int    `json:"maxRetryInterval,omitempty"`
 	AutoRefreshMinutes  *int    `json:"autoRefreshMinutes,omitempty"`
 	QuotaWarningPercent *int    `json:"quotaWarningPercent,omitempty"`
+	EnableGrokModels    *bool   `json:"enableGrokModels,omitempty"`
+	EnableOtherModels   *bool   `json:"enableOtherModels,omitempty"`
 	BackgroundModel     *string `json:"backgroundModel,omitempty"`
 	Theme               *string `json:"theme,omitempty"`
 	LiquidGlass         *bool   `json:"liquidGlass,omitempty"`
@@ -119,6 +123,7 @@ func (g *guiRuntime) managerReport() managerReport {
 		},
 		Settings: managerPublicSettings{
 			AutoRefreshMinutes: cfg.AutoRefreshMinutes, QuotaWarningPercent: cfg.QuotaWarningPercent,
+			EnableGrokModels: cfg.EnableGrokModels, EnableOtherModels: cfg.EnableOtherModels,
 			ProxyURL: redactURLUserinfo(cfg.ProxyURL), Theme: cfg.Theme, LiquidGlass: cfg.LiquidGlass,
 			SettingsPath: g.app.paths.UserSettings,
 		},
@@ -178,6 +183,12 @@ func (g *guiRuntime) serveManagerSettings(w http.ResponseWriter, r *http.Request
 	}
 	if update.QuotaWarningPercent != nil {
 		cfg.QuotaWarningPercent = *update.QuotaWarningPercent
+	}
+	if update.EnableGrokModels != nil {
+		cfg.EnableGrokModels = *update.EnableGrokModels
+	}
+	if update.EnableOtherModels != nil {
+		cfg.EnableOtherModels = *update.EnableOtherModels
 	}
 	if update.BackgroundModel != nil {
 		cfg.BackgroundModel = *update.BackgroundModel

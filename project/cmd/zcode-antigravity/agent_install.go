@@ -80,15 +80,23 @@ func (g *guiRuntime) connectorInstallContext() (connectorInstallContext, error) 
 		return ctx, err
 	}
 	ctx.Provider = g.currentProvider()
+	cfg := g.app.currentSettings()
+	if ctx.Provider == "xai" && !cfg.EnableGrokModels {
+		return ctx, errors.New("Grok 模型默认关闭；请先在设置中开启 Grok 模型")
+	}
 	catalog, err := g.app.fetchModels(current.Port)
 	if err != nil {
 		return ctx, err
 	}
-	models, err := selectAgentModels(catalog, ctx.Provider == "antigravity" && counts.Antigravity > 0, ctx.Provider == "xai" && counts.XAI > 0)
+	models, err := selectAgentModels(catalog,
+		ctx.Provider == "antigravity" && counts.Antigravity > 0,
+		ctx.Provider == "xai" && counts.XAI > 0 && cfg.EnableGrokModels,
+		ctx.Provider == "antigravity" && counts.Antigravity > 0 && cfg.EnableOtherModels,
+	)
 	if err != nil {
 		return ctx, err
 	}
-	ctx.Model = preferredConnectorModel(ctx.Provider, models, g.app.currentSettings().BackgroundModel)
+	ctx.Model = preferredConnectorModel(ctx.Provider, models, cfg.BackgroundModel)
 	ctx.ContextWindow = 131072
 	for _, model := range models {
 		if model.ID == ctx.Model && model.MaxInputTokens > 0 {

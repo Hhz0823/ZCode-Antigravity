@@ -39,17 +39,22 @@ func (g *guiRuntime) serveConnectors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	provider := g.currentProvider()
+	cfg := g.app.currentSettings()
 	catalog, errModels := g.app.fetchModels(current.Port)
 	if errModels != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": errModels.Error()})
 		return
 	}
-	models, errSelect := selectAgentModels(catalog, provider == "antigravity" && counts.Antigravity > 0, provider == "xai" && counts.XAI > 0)
+	models, errSelect := selectAgentModels(catalog,
+		provider == "antigravity" && counts.Antigravity > 0,
+		provider == "xai" && counts.XAI > 0 && cfg.EnableGrokModels,
+		provider == "antigravity" && counts.Antigravity > 0 && cfg.EnableOtherModels,
+	)
 	if errSelect != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": errSelect.Error()})
 		return
 	}
-	model := preferredConnectorModel(provider, models, g.app.currentSettings().BackgroundModel)
+	model := preferredConnectorModel(provider, models, cfg.BackgroundModel)
 	baseURL := g.app.gatewayURL(current.Port)
 	writeJSON(w, http.StatusOK, connectorResponse{
 		Provider:   provider,

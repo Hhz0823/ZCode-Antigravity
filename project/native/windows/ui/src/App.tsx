@@ -30,6 +30,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import brandMark from "./assets/BrandMark.png";
 import { Badge, Button, Card, CardHeader, Progress, Switch } from "./components/ui";
 import { cn } from "./lib/utils";
 import { mockGet, mockPost } from "./lib/mock-api";
@@ -64,7 +65,7 @@ interface ManagerReport {
   accounts: Array<{ id: string; provider: Provider; label: string; plan?: string; status: string; updatedAt: string }>;
   proxy: { running: boolean; baseURL?: string; port?: number; protocols: Array<{ name: string; path: string; description: string }> };
   routing: { strategy: string; sessionAffinity: boolean; sessionAffinityTTL: string; requestRetry: number; credentialRetry: number; retryInterval: number; backgroundModel: string };
-  settings: { autoRefreshMinutes: number; quotaWarningPercent: number; proxyURL: string; theme: string; liquidGlass: boolean; settingsPath: string };
+  settings: { autoRefreshMinutes: number; quotaWarningPercent: number; enableGrokModels: boolean; enableOtherModels: boolean; proxyURL: string; theme: string; liquidGlass: boolean; settingsPath: string };
   features: Array<{ id: string; name: string; description: string; available: boolean }>;
 }
 interface ConnectorResponse { provider: Provider; baseURL: string; model: string; connectors: Array<{ id: string; name: string; description: string; model: string; action?: string; snippets: Record<string, string> }> }
@@ -123,7 +124,7 @@ function WindowChrome() {
   return (
     <div className="window-chrome">
       <div className="flex items-center gap-2.5 pointer-events-none">
-        <span className="grid size-6 place-items-center rounded-lg border border-sky-300/30 bg-sky-400/15 text-[9px] font-bold text-sky-100">ZA</span>
+        <img src={brandMark} alt="" className="size-6 rounded-lg" />
         <span className="text-xs font-medium tracking-wide text-slate-200">ZCode · Antigravity</span>
         <Badge tone="blue">Electron</Badge>
       </div>
@@ -163,10 +164,11 @@ function HorizontalNavigation({ section, setSection }: { section: Section; setSe
   );
 }
 
-function ProviderTabs({ provider, counts, busy, onSelect }: { provider: Provider; counts?: DashboardStatus["providerAccounts"]; busy: boolean; onSelect: (provider: Provider) => void }) {
+function ProviderTabs({ provider, counts, busy, grokEnabled, onSelect }: { provider: Provider; counts?: DashboardStatus["providerAccounts"]; busy: boolean; grokEnabled: boolean; onSelect: (provider: Provider) => void }) {
+  const providers: Provider[] = grokEnabled ? ["antigravity", "xai"] : ["antigravity"];
   return (
     <div className="provider-tabs">
-      {(["antigravity", "xai"] as Provider[]).map((item) => (
+      {providers.map((item) => (
         <button key={item} disabled={busy} onClick={() => onSelect(item)} className={cn("provider-tab", provider === item && "active")}>
           {item === "antigravity" ? <Sparkles /> : <Zap />}
           <span>{providerName(item)}</span>
@@ -214,7 +216,7 @@ function QuotaHero({ quota, provider, warningPercent = 20 }: { quota?: QuotaRepo
   );
 }
 
-function ActionPanel({ busy, onAction }: { busy: boolean; onAction: (action: string) => void }) {
+function ActionPanel({ busy, grokEnabled, onAction }: { busy: boolean; grokEnabled: boolean; onAction: (action: string) => void }) {
   const actions = [
     ["setup", "一键接入 ZCode", "启动网关并同步当前提供商", Sparkles, "primary"],
     ["login", "登录 Antigravity", "通过浏览器完成 Google OAuth", KeyRound, "secondary"],
@@ -223,7 +225,8 @@ function ActionPanel({ busy, onAction }: { busy: boolean; onAction: (action: str
     ["open-zcode", "打开 ZCode", "接入完成后开始使用", ExternalLink, "secondary"],
     ["stop", "停止本地网关", "保留账号和聊天记录", Power, "danger"],
   ] as const;
-  return <div className="space-y-2.5">{actions.map(([id, title, description, Icon, variant]) => <button key={id} disabled={busy} onClick={() => onAction(id)} className={cn("action-row", variant === "primary" && "primary", variant === "danger" && "danger")}><span className="action-icon"><Icon /></span><span className="min-w-0 flex-1 text-left"><strong>{title}</strong><small>{description}</small></span><ChevronRight /></button>)}</div>;
+  const visibleActions = actions.filter(([id]) => id !== "login-grok" || grokEnabled);
+  return <div className="space-y-2.5">{visibleActions.map(([id, title, description, Icon, variant]) => <button key={id} disabled={busy} onClick={() => onAction(id)} className={cn("action-row", variant === "primary" && "primary", variant === "danger" && "danger")}><span className="action-icon"><Icon /></span><span className="min-w-0 flex-1 text-left"><strong>{title}</strong><small>{description}</small></span><ChevronRight /></button>)}</div>;
 }
 
 function AuthenticationOverlay({ operation, provider, onCopy, onError }: { operation?: DashboardOperation; provider: Provider; onCopy: (value: string) => void; onError: (message: string) => void }) {
@@ -287,7 +290,7 @@ function Overview({ status, quota, usage, manager, provider, busy, onAction }: {
           {quota?.warning && <p className="mt-3 text-xs leading-5 text-amber-200/80">{quota.warning}</p>}
         </div>
       </Card>
-      <Card><CardHeader eyebrow="LOCAL ACTIONS" title="接入控制" description={status?.operation.message || status?.operation.error || "所有操作均在本机完成"} action={busy ? <LoaderCircle className="size-4 animate-spin text-sky-300" /> : undefined} /><div className="p-5"><ActionPanel busy={busy} onAction={onAction} /></div></Card>
+      <Card><CardHeader eyebrow="LOCAL ACTIONS" title="接入控制" description={status?.operation.message || status?.operation.error || "所有操作均在本机完成"} action={busy ? <LoaderCircle className="size-4 animate-spin text-sky-300" /> : undefined} /><div className="p-5"><ActionPanel busy={busy} grokEnabled={manager?.settings.enableGrokModels ?? false} onAction={onAction} /></div></Card>
     </div>
   );
 }
@@ -319,8 +322,8 @@ function AnalyticsView({ usage }: { usage?: UsageReport }) {
   return <div className="space-y-4"><div className="grid gap-3 md:grid-cols-4"><StatCard icon={Zap} label="输出 Token" value={formatNumber(usage?.total.outputTokens)} /><StatCard icon={Sparkles} label="推理 Token" value={formatNumber(usage?.total.reasoningTokens)} /><StatCard icon={Gauge} label="平均速度" value={`${(usage?.total.averageTokensPerSecond ?? 0).toFixed(1)} tok/s`} /><StatCard icon={Activity} label="请求数量" value={formatNumber(usage?.total.requests)} /></div><Card><CardHeader eyebrow="THROUGHPUT" title="Token 输出速度" description="按生成阶段耗时计算，不把首 Token 等待时间混入速度" /><div className="p-5"><div className="chart-grid">{(usage?.recent.slice(-18) ?? []).map((sample, index) => <div className="chart-column" key={`${sample.timestamp}-${index}`} title={`${sample.model}: ${sample.outputTokensPerSecond.toFixed(1)} tok/s`}><span style={{ height: `${Math.max(5, sample.outputTokensPerSecond / maxSpeed * 100)}%` }} /></div>)}</div>{!usage?.recent.length && <Empty icon={BarChart3} title="暂无 Token 记录" text="通过本地网关调用模型后会自动统计" />}</div></Card><Card><CardHeader title="最近请求" /><div className="divide-y divide-white/[.06] px-5 pb-4">{usage?.recent.slice(-8).reverse().map((sample, index) => <div className="usage-row" key={`${sample.timestamp}-${index}`}><div className="min-w-0"><p className="truncate">{sample.model}</p><small>{formatTime(sample.timestamp)} · {sample.latencyMs} ms</small></div><span>{formatNumber(sample.outputTokens)} tok</span><strong>{sample.outputTokensPerSecond.toFixed(1)} tok/s</strong></div>)}</div></Card></div>;
 }
 
-function SettingsView({ manager, saveSetting, saving }: { manager?: ManagerReport; saveSetting: (body: Record<string, unknown>) => void; saving: boolean }) {
-  return <div className="grid gap-4 md:grid-cols-[1fr_.85fr]"><Card><CardHeader eyebrow="APPEARANCE" title="界面与刷新" description="Windows DWM 原生模糊 + 高对比内容层" action={saving ? <LoaderCircle className="size-4 animate-spin" /> : undefined} /><div className="space-y-3 p-5"><Switch checked={manager?.settings.liquidGlass ?? true} onChange={(value) => saveSetting({ liquidGlass: value })} label="白色液态玻璃背景" /><div className="setting-row"><div><p>额度自动刷新</p><small>默认每 5 分钟，不影响 5 秒状态探测</small></div><div className="segmented">{[5, 10].map((value) => <button className={cn(manager?.settings.autoRefreshMinutes === value && "active")} onClick={() => saveSetting({ autoRefreshMinutes: value })} key={value}>{value} 分钟</button>)}</div></div><InfoLine label="网络模式" value={manager?.settings.proxyURL || "自动 v2rayN / 系统代理 / 直连"} /><InfoLine label="低额度警告" value={`${manager?.settings.quotaWarningPercent ?? 20}%`} /><InfoLine label="设置文件" value={manager?.settings.settingsPath || "当前用户目录"} /></div></Card><Card><CardHeader eyebrow="FEATURES" title="Antigravity Tools 能力" description="当前原生管理核心提供的功能" /><div className="space-y-2 p-5">{manager?.features.map((feature) => <div className="feature-row" key={feature.id}><span className={cn("feature-check", feature.available && "active")}>{feature.available && <Check />}</span><div><p>{feature.name}</p><small>{feature.description}</small></div></div>)}</div></Card></div>;
+function SettingsView({ manager, saveSetting, saving, syncing, onSync }: { manager?: ManagerReport; saveSetting: (body: Record<string, unknown>) => void; saving: boolean; syncing: boolean; onSync: () => void }) {
+  return <div className="grid gap-4 md:grid-cols-[1fr_.85fr]"><Card><CardHeader eyebrow="MODEL ACCESS" title="模型与界面设置" description="默认仅暴露 Gemini；扩展模型需主动开启并重新同步" action={saving ? <LoaderCircle className="size-4 animate-spin" /> : undefined} /><div className="space-y-3 p-5"><Switch checked={manager?.settings.enableGrokModels ?? false} onChange={(value) => saveSetting({ enableGrokModels: value })} label="Grok 模型" /><Switch checked={manager?.settings.enableOtherModels ?? false} onChange={(value) => saveSetting({ enableOtherModels: value })} label="其他 AI 文本模型（Claude / GPT 等）" /><Button className="w-full" variant="primary" disabled={saving || syncing} onClick={onSync}><RefreshCw className={cn("size-4", syncing && "animate-spin")} />应用模型开关</Button><Switch checked={manager?.settings.liquidGlass ?? true} onChange={(value) => saveSetting({ liquidGlass: value })} label="白色液态玻璃背景" /><div className="setting-row"><div><p>额度自动刷新</p><small>默认每 5 分钟，不影响 5 秒状态探测</small></div><div className="segmented">{[5, 10].map((value) => <button className={cn(manager?.settings.autoRefreshMinutes === value && "active")} onClick={() => saveSetting({ autoRefreshMinutes: value })} key={value}>{value} 分钟</button>)}</div></div><InfoLine label="网络模式" value={manager?.settings.proxyURL || "自动 v2rayN / 系统代理 / 直连"} /><InfoLine label="低额度警告" value={`${manager?.settings.quotaWarningPercent ?? 20}%`} /><InfoLine label="设置文件" value={manager?.settings.settingsPath || "当前用户目录"} /></div></Card><Card><CardHeader eyebrow="FEATURES" title="Antigravity Tools 能力" description="当前原生管理核心提供的功能" /><div className="space-y-2 p-5">{manager?.features.map((feature) => <div className="feature-row" key={feature.id}><span className={cn("feature-check", feature.available && "active")}>{feature.available && <Check />}</span><div><p>{feature.name}</p><small>{feature.description}</small></div></div>)}</div></Card></div>;
 }
 
 function InfoLine({ label, value }: { label: string; value: string }) { return <div className="info-line"><span>{label}</span><strong title={value}>{value}</strong></div>; }
@@ -343,6 +346,7 @@ function TrayWidget() {
   const [status, setStatus] = useState<DashboardStatus>();
   const [quota, setQuota] = useState<QuotaReport>();
   const [usage, setUsage] = useState<UsageReport>();
+  const [manager, setManager] = useState<ManagerReport>();
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("正在读取当前额度…");
   const refreshing = useRef(false);
@@ -353,9 +357,13 @@ function TrayWidget() {
     refreshing.current = true;
     setLoading(true);
     try {
-      const nextStatus = await apiGet<DashboardStatus>("/api/status");
+      const [nextStatus, nextManager] = await Promise.all([
+        apiGet<DashboardStatus>("/api/status"),
+        apiGet<ManagerReport>("/api/manager"),
+      ]);
       const target = requestedProvider ?? nextStatus.selectedProvider;
       setStatus(nextStatus);
+      setManager(nextManager);
       setProvider(target);
       const accountCount = target === "xai" ? nextStatus.providerAccounts.xai : nextStatus.providerAccounts.antigravity;
       const nextUsage = await apiGet<UsageReport>(`/api/usage?provider=${target}`).catch(() => undefined);
@@ -428,7 +436,7 @@ function TrayWidget() {
         </div>
       </header>
       <div className="widget-provider-tabs">
-        {(["antigravity", "xai"] as Provider[]).map((item) => <button key={item} aria-label={`切换到 ${providerName(item)}`} className={cn(provider === item && "active")} onClick={() => void selectProvider(item)}><span>{item === "xai" ? <Zap /> : <Sparkles />}{providerName(item)}</span><em>{item === "xai" ? status?.providerAccounts.xai ?? 0 : status?.providerAccounts.antigravity ?? 0}</em></button>)}
+        {(["antigravity", ...(manager?.settings.enableGrokModels ? ["xai" as Provider] : [])] as Provider[]).map((item) => <button key={item} aria-label={`切换到 ${providerName(item)}`} className={cn(provider === item && "active")} onClick={() => void selectProvider(item)}><span>{item === "xai" ? <Zap /> : <Sparkles />}{providerName(item)}</span><em>{item === "xai" ? status?.providerAccounts.xai ?? 0 : status?.providerAccounts.antigravity ?? 0}</em></button>)}
       </div>
       <section className="widget-content">
         <div className="widget-account"><span className={cn("status-dot", status?.gateway.ok && "online")} /><div><strong>{account?.account || providerName(provider)}</strong><small>{account?.plan || message}</small></div><Badge tone={quota?.stale ? "warn" : quota ? "good" : "neutral"}>{quota?.stale ? "缓存" : quota ? "实时" : "等待"}</Badge></div>
@@ -451,7 +459,7 @@ function ControlCenterApp() {
   const [usage, setUsage] = useState<UsageReport>();
   const [manager, setManager] = useState<ManagerReport>();
   const [connectors, setConnectors] = useState<ConnectorResponse>();
-  const [version, setVersion] = useState("0.6.10-test");
+  const [version, setVersion] = useState("0.6.11-test");
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
@@ -562,7 +570,14 @@ function ControlCenterApp() {
   const saveSetting = useCallback(async (body: Record<string, unknown>) => {
     if (saving) return;
     setSaving(true);
-    try { setManager(await apiPost<ManagerReport>("/api/manager/settings", body)); setNotice({ text: "设置已保存" }); }
+    try {
+      setManager(await apiPost<ManagerReport>("/api/manager/settings", body));
+      if (body.enableGrokModels === false) {
+        setProvider("antigravity");
+        setQuota(undefined);
+      }
+      setNotice({ text: "设置已保存" });
+    }
     catch (error) { setNotice({ text: `保存失败：${normalizeError(error)}`, error: true }); }
     finally { setSaving(false); }
   }, [saving]);
@@ -581,7 +596,7 @@ function ControlCenterApp() {
     initialized.current = true;
     void (async () => {
       try {
-        const startup: StartupInfo = hasDesktopBridge() ? await desktopBridge()!.startupInfo() : { version: "0.6.10-test", autoSetup: false };
+        const startup: StartupInfo = hasDesktopBridge() ? await desktopBridge()!.startupInfo() : { version: "0.6.11-test", autoSetup: false };
         setVersion(startup.version);
         await refresh(true);
         if (startup.autoSetup) await runAction("setup");
@@ -638,7 +653,7 @@ function ControlCenterApp() {
     : section === "routing" ? <RoutingView {...{ manager, saveSetting, saving }} />
     : section === "connectors" ? <ConnectorsView connectors={connectors} onCopy={copy} onAction={runAction} busy={busy} />
     : section === "analytics" ? <AnalyticsView usage={usage} />
-    : <SettingsView {...{ manager, saveSetting, saving }} />;
+    : <SettingsView manager={manager} saveSetting={saveSetting} saving={saving} syncing={busy} onSync={() => void runAction("sync")} />;
 
   return (
     <div className={cn("app-shell", manager?.settings.liquidGlass === false && "solid-mode")}>
@@ -647,12 +662,12 @@ function ControlCenterApp() {
       <div className="app-body">
         <main className="main-panel" onScroll={handleMainScroll}>
           <header className="mac-brand-bar">
-            <div className="mac-brand-identity"><span className="mac-brand-logo">ZA</span><div><h1>ZCode Antigravity</h1><p>Updated {status?.updatedAt ? formatTime(status.updatedAt) : "等待首次刷新"}</p></div></div>
+            <div className="mac-brand-identity"><img className="mac-brand-logo" src={brandMark} alt="ZCode Antigravity" /><div><h1>ZCode Antigravity</h1><p>Updated {status?.updatedAt ? formatTime(status.updatedAt) : "等待首次刷新"}</p></div></div>
             <div className="mac-brand-actions"><Badge tone={status?.gateway.ok ? "good" : "neutral"}>{status?.gateway.ok ? "本地在线" : "Local only"}</Badge><Button size="icon" aria-label="刷新额度" onClick={() => void refresh(true)} disabled={busy}><RefreshCw className={cn("size-4", refreshing.current && "animate-spin")} /></Button></div>
           </header>
           <div className="mac-meta-row"><div><span className={cn("status-dot", status?.gateway.ok && "online")} /><strong>{providerName(provider)}</strong><span>· {provider === "xai" ? status?.providerAccounts.xai ?? 0 : status?.providerAccounts.antigravity ?? 0} 个账号</span></div><div><Activity /><span>额度每 {manager?.settings.autoRefreshMinutes ?? 5} 分钟 · Token 每 5 秒</span></div></div>
           <HorizontalNavigation section={section} setSection={setSection} />
-          <ProviderTabs provider={provider} counts={status?.providerAccounts} busy={busy} onSelect={(value) => void selectProvider(value)} />
+          <ProviderTabs provider={provider} counts={status?.providerAccounts} busy={busy} grokEnabled={manager?.settings.enableGrokModels ?? false} onSelect={(value) => void selectProvider(value)} />
           <StatusStrip status={status} />
           <div className="page-content">{content}</div>
           <footer className="mac-app-footer"><span>127.0.0.1 · 当前用户密钥</span><span>{subtitle} · v{version}</span></footer>

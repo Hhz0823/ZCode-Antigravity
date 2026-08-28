@@ -13,7 +13,7 @@ import (
 func TestManagerSettingsUpdatePersistsValidatedRouting(t *testing.T) {
 	a := testApp(t)
 	runtime := &guiRuntime{app: a, usage: newUsageTracker(a.paths.UsageMetrics)}
-	body := bytes.NewBufferString(`{"routingStrategy":"fill-first","sessionAffinity":false,"autoRefreshMinutes":10,"quotaWarningPercent":30}`)
+	body := bytes.NewBufferString(`{"routingStrategy":"fill-first","sessionAffinity":false,"autoRefreshMinutes":10,"quotaWarningPercent":30,"enableGrokModels":true,"enableOtherModels":true}`)
 	request := httptest.NewRequest(http.MethodPost, "/api/manager/settings", body)
 	recorder := httptest.NewRecorder()
 	runtime.serveManagerSettings(recorder, request)
@@ -21,7 +21,7 @@ func TestManagerSettingsUpdatePersistsValidatedRouting(t *testing.T) {
 		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
 	current := a.currentSettings()
-	if current.RoutingStrategy != "fill-first" || current.SessionAffinity || current.AutoRefreshMinutes != 10 || current.QuotaWarningPercent != 30 {
+	if current.RoutingStrategy != "fill-first" || current.SessionAffinity || current.AutoRefreshMinutes != 10 || current.QuotaWarningPercent != 30 || !current.EnableGrokModels || !current.EnableOtherModels {
 		t.Fatalf("settings not applied: %#v", current)
 	}
 	raw, err := os.ReadFile(a.paths.UserSettings)
@@ -32,7 +32,7 @@ func TestManagerSettingsUpdatePersistsValidatedRouting(t *testing.T) {
 	if err := json.Unmarshal(raw, &persisted); err != nil {
 		t.Fatal(err)
 	}
-	if persisted.RoutingStrategy != "fill-first" || persisted.AutoRefreshMinutes != 10 {
+	if persisted.RoutingStrategy != "fill-first" || persisted.AutoRefreshMinutes != 10 || !persisted.EnableGrokModels || !persisted.EnableOtherModels {
 		t.Fatalf("settings not persisted: %#v", persisted)
 	}
 }

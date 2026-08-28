@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "0.6.10-test"
+private let appVersion = "0.6.11-test"
 
 private extension Notification.Name {
     static let selectBridgeProvider = Notification.Name("ZCodeSelectBridgeProvider")
@@ -184,6 +184,8 @@ struct ManagerRouting: Decodable {
 struct ManagerSettings: Decodable {
     let autoRefreshMinutes: Int
     let quotaWarningPercent: Int
+    let enableGrokModels: Bool
+    let enableOtherModels: Bool
     let proxyURL: String
     let theme: String
     let liquidGlass: Bool
@@ -202,6 +204,8 @@ struct ManagerSettingsUpdate: Encodable {
     var sessionAffinity: Bool?
     var autoRefreshMinutes: Int?
     var quotaWarningPercent: Int?
+    var enableGrokModels: Bool?
+    var enableOtherModels: Bool?
     var theme: String?
     var liquidGlass: Bool?
 
@@ -210,6 +214,8 @@ struct ManagerSettingsUpdate: Encodable {
         sessionAffinity: Bool? = nil,
         autoRefreshMinutes: Int? = nil,
         quotaWarningPercent: Int? = nil,
+        enableGrokModels: Bool? = nil,
+        enableOtherModels: Bool? = nil,
         theme: String? = nil,
         liquidGlass: Bool? = nil
     ) {
@@ -217,6 +223,8 @@ struct ManagerSettingsUpdate: Encodable {
         self.sessionAffinity = sessionAffinity
         self.autoRefreshMinutes = autoRefreshMinutes
         self.quotaWarningPercent = quotaWarningPercent
+        self.enableGrokModels = enableGrokModels
+        self.enableOtherModels = enableOtherModels
         self.theme = theme
         self.liquidGlass = liquidGlass
     }
@@ -445,11 +453,11 @@ final class BridgeModel: ObservableObject {
                 }
             }
             message = latest.operation.message ?? (latest.gateway.ok ? "网关在线" : "等待接入")
-            StatusBarController.shared.update(provider: provider, quota: quota, usage: usage, status: latest)
+            StatusBarController.shared.update(provider: provider, quota: quota, usage: usage, status: latest, grokEnabled: manager?.settings.enableGrokModels ?? false)
         } catch {
             errorMessage = error.localizedDescription
             message = "状态刷新失败"
-            StatusBarController.shared.update(provider: provider, quota: quota, usage: usage, status: status)
+            StatusBarController.shared.update(provider: provider, quota: quota, usage: usage, status: status, grokEnabled: manager?.settings.enableGrokModels ?? false)
         }
         loading = false
     }
@@ -589,6 +597,7 @@ final class StatusWidgetModel: ObservableObject {
     @Published var weeklyReset = "等待同步"
     @Published var outputText = "—"
     @Published var speedText = "等待首次响应"
+    @Published var grokEnabled = false
 }
 
 private struct StatusPopoverView: View {
@@ -597,12 +606,11 @@ private struct StatusPopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 11)
-                        .fill(LinearGradient(colors: [CodexUPalette.accentLight, CodexUPalette.accent], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    Text("ZA").font(.caption.bold()).foregroundStyle(.white)
-                }
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
                 .frame(width: 38, height: 38)
+                .clipShape(RoundedRectangle(cornerRadius: 11))
                 VStack(alignment: .leading, spacing: 1) {
                     Text("ZCode Antigravity").font(.headline)
                     Text("额度与 Token 小组件").font(.caption).foregroundStyle(.secondary)
@@ -619,7 +627,9 @@ private struct StatusPopoverView: View {
 
             HStack(spacing: 7) {
                 widgetProviderButton("Antigravity", provider: "antigravity")
-                widgetProviderButton("Grok / xAI", provider: "xai")
+                if model.grokEnabled {
+                    widgetProviderButton("Grok / xAI", provider: "xai")
+                }
             }
             .padding(4)
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
@@ -733,13 +743,14 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         statusItem = item
     }
 
-    func update(provider: String, quota: QuotaReport?, usage: UsageReport?, status: DashboardStatus?) {
+    func update(provider: String, quota: QuotaReport?, usage: UsageReport?, status: DashboardStatus?, grokEnabled: Bool) {
         DispatchQueue.main.async {
             let name = provider == "xai" ? "Grok / xAI" : "Antigravity"
             let count = provider == "xai" ? status?.providerAccounts.xai ?? 0 : status?.providerAccounts.antigravity ?? 0
             let five = self.quotaWindow(quota, kind: "five")
             let week = self.quotaWindow(quota, kind: "week")
             self.widgetModel.provider = provider
+            self.widgetModel.grokEnabled = grokEnabled
             self.widgetModel.providerName = name
             self.widgetModel.accountCount = count
             self.widgetModel.fiveHourPercent = five?.remainingPercent
@@ -1055,13 +1066,11 @@ struct DashboardView: View {
     private var topToolbar: some View {
         HStack(spacing: 14) {
             HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14).fill(
-                        LinearGradient(colors: [CodexUPalette.accentLight, CodexUPalette.accent], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    )
-                    Text("ZA").font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white)
-                }
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
                 .frame(width: 48, height: 48)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(.white.opacity(0.7), lineWidth: 1))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("ZCode Antigravity").font(.system(size: 20, weight: .semibold, design: .rounded))
@@ -1166,14 +1175,16 @@ struct DashboardView: View {
             ) {
                 Task { await model.selectProvider("antigravity") }
             }
-            ProviderChoiceButton(
-                title: "Grok / xAI",
-                subtitle: "Grok Build",
-                count: model.status?.providerAccounts.xai ?? 0,
-                selected: model.provider == "xai",
-                switching: model.providerSwitching && model.provider == "xai"
-            ) {
-                Task { await model.selectProvider("xai") }
+            if model.manager?.settings.enableGrokModels == true {
+                ProviderChoiceButton(
+                    title: "Grok / xAI",
+                    subtitle: "Grok Build",
+                    count: model.status?.providerAccounts.xai ?? 0,
+                    selected: model.provider == "xai",
+                    switching: model.providerSwitching && model.provider == "xai"
+                ) {
+                    Task { await model.selectProvider("xai") }
+                }
             }
             Spacer()
             if let error = model.errorMessage {
@@ -1241,7 +1252,9 @@ struct DashboardView: View {
                     CardTitle(kicker: "LOCAL ACTIONS", title: "接入控制", icon: "bolt.shield.fill")
                     ActionButton(title: "一键接入 ZCode", subtitle: "启动网关并同步当前账号", primary: true) { await model.runAction("setup") }
                     ActionButton(title: "登录 Antigravity", subtitle: "Google OAuth") { await model.runAction("login") }
-                    ActionButton(title: "登录 Grok / xAI", subtitle: "xAI 设备授权") { await model.runAction("login-grok") }
+                    if model.manager?.settings.enableGrokModels == true {
+                        ActionButton(title: "登录 Grok / xAI", subtitle: "xAI 设备授权") { await model.runAction("login-grok") }
+                    }
                     ActionButton(title: "修复并重新同步", subtitle: "重新校验模型与 Provider") { await model.runAction("sync") }
                     ActionButton(title: "打开 ZCode", subtitle: "接入完成后开始使用") { await model.runAction("open-zcode") }
                     ActionButton(title: "停止本地网关", subtitle: "不会删除账号或聊天", destructive: true) { await model.runAction("stop") }
@@ -1258,7 +1271,9 @@ struct DashboardView: View {
                     CardTitle(kicker: "ACCOUNT MANAGER", title: "账号与额度", icon: "person.2.badge.gearshape.fill")
                     HStack(spacing: 10) {
                         QuotaSummaryTile(title: "Antigravity", value: "\(model.status?.providerAccounts.antigravity ?? 0)", icon: "sparkles", tint: CodexUPalette.accent)
-                        QuotaSummaryTile(title: "Grok / xAI", value: "\(model.status?.providerAccounts.xai ?? 0)", icon: "xmark.circle.fill", tint: CodexUPalette.secondary)
+                        if model.manager?.settings.enableGrokModels == true {
+                            QuotaSummaryTile(title: "Grok / xAI", value: "\(model.status?.providerAccounts.xai ?? 0)", icon: "xmark.circle.fill", tint: CodexUPalette.secondary)
+                        }
                         QuotaSummaryTile(title: "健康账号", value: "\(model.manager?.accounts.filter { $0.status == "active" }.count ?? 0)", icon: "checkmark.shield.fill", tint: .green)
                     }
                     quotaContent
@@ -1269,7 +1284,9 @@ struct DashboardView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     CardTitle(kicker: "OAUTH", title: "添加账号", icon: "key.fill")
                     ActionButton(title: "登录 Antigravity", subtitle: "Google OAuth 2.0") { await model.runAction("login") }
-                    ActionButton(title: "登录 Grok / xAI", subtitle: "xAI 官方设备授权") { await model.runAction("login-grok") }
+                    if model.manager?.settings.enableGrokModels == true {
+                        ActionButton(title: "登录 Grok / xAI", subtitle: "xAI 官方设备授权") { await model.runAction("login-grok") }
+                    }
                     ActionButton(title: "刷新全部额度", subtitle: "重新读取所有账号") { await model.refreshAll() }
                     Text("凭据保存在当前用户目录；界面只显示脱敏账号信息，不显示 Token。")
                         .font(.caption)
@@ -1427,7 +1444,31 @@ struct DashboardView: View {
     private var settingsPanel: some View {
         NativeCard {
             VStack(alignment: .leading, spacing: 18) {
-                CardTitle(kicker: "PREFERENCES", title: "界面与后台刷新", icon: "gearshape.fill")
+                CardTitle(kicker: "PREFERENCES", title: "模型、界面与后台刷新", icon: "gearshape.fill")
+                settingsRow(title: "Grok 模型", detail: "默认关闭；开启后重新同步，才会写入 ZCode 与 Agent") {
+                    Toggle("", isOn: Binding(
+                        get: { model.manager?.settings.enableGrokModels ?? false },
+                        set: { value in
+                            Task {
+                                await model.updateManagerSettings(.init(enableGrokModels: value))
+                                if !value { await model.selectProvider("antigravity") }
+                            }
+                        }
+                    )).labelsHidden()
+                }
+                settingsRow(title: "其他 AI 文本模型", detail: "默认关闭；开启后可同步 Claude、GPT 等非 Gemini 文本模型") {
+                    Toggle("", isOn: Binding(
+                        get: { model.manager?.settings.enableOtherModels ?? false },
+                        set: { value in Task { await model.updateManagerSettings(.init(enableOtherModels: value)) } }
+                    )).labelsHidden()
+                }
+                HStack {
+                    Label("默认只向 ZCode / Agent 暴露 Gemini", systemImage: "sparkles")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    ActionButton(title: "应用模型开关", subtitle: "退出 ZCode 后重新同步", primary: true) { await model.runAction("sync") }
+                        .frame(width: 300)
+                }
                 settingsRow(title: "液态透明高斯模糊", detail: "只模糊白色窗口底板，卡片、按钮和文字保持高对比度") {
                     Toggle("", isOn: Binding(
                         get: { model.manager?.settings.liquidGlass ?? true },

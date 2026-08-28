@@ -289,9 +289,11 @@ func (g *guiRuntime) status() dashboardStatus {
 		if errProbe := g.app.probeGateway(current.Port); errProbe == nil {
 			status.Gateway = dashboardItem{OK: true, Label: "网关在线", Detail: g.app.gatewayURL(current.Port), Running: true}
 			if catalog, errModels := g.app.fetchModels(current.Port); errModels == nil {
+				cfg := g.app.currentSettings()
 				includeAntigravity := status.SelectedProvider == "antigravity" && accounts.Antigravity > 0
-				includeXAI := status.SelectedProvider == "xai" && accounts.XAI > 0
-				if models, errSelect := selectAgentModels(catalog, includeAntigravity, includeXAI); errSelect == nil {
+				includeXAI := status.SelectedProvider == "xai" && accounts.XAI > 0 && cfg.EnableGrokModels
+				includeOther := includeAntigravity && cfg.EnableOtherModels
+				if models, errSelect := selectAgentModels(catalog, includeAntigravity, includeXAI, includeOther); errSelect == nil {
 					status.Models = modelIDs(models)
 				}
 			}
@@ -378,10 +380,18 @@ func preferredInitialProvider(authDir string) string {
 	return "antigravity"
 }
 
+func (g *guiRuntime) grokModelsEnabled() bool {
+	return g.app.currentSettings().EnableGrokModels
+}
+
 func (g *guiRuntime) currentProvider() string {
 	g.providerMu.RLock()
-	defer g.providerMu.RUnlock()
-	return normalizeProvider(g.provider)
+	provider := normalizeProvider(g.provider)
+	g.providerMu.RUnlock()
+	if provider == "xai" && !g.grokModelsEnabled() {
+		return "antigravity"
+	}
+	return provider
 }
 
 func (g *guiRuntime) setProvider(provider string) {
@@ -416,6 +426,10 @@ func (g *guiRuntime) serveProvider(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported provider"})
 		return
 	}
+	if normalizeProvider(provider) == "xai" && !g.grokModelsEnabled() {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "Grok 模型默认关闭；请先在设置中开启 Grok 模型"})
+		return
+	}
 	g.setProvider(provider)
 	writeJSON(w, http.StatusOK, map[string]string{"provider": g.currentProvider()})
 }
@@ -432,6 +446,10 @@ func (g *guiRuntime) serveAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	action := strings.ToLower(strings.TrimSpace(request.Action))
+	if action == "login-grok" && !g.grokModelsEnabled() {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "Grok 模型默认关闭；请先在设置中开启 Grok 模型"})
+		return
+	}
 	if action == "open-zcode" {
 		if errOpen := openZCodeApplication(); errOpen != nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": errOpen.Error()})

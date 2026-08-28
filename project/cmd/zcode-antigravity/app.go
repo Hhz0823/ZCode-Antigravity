@@ -45,6 +45,8 @@ type settings struct {
 	MaxRetryInterval      int    `json:"maxRetryInterval"`
 	AutoRefreshMinutes    int    `json:"autoRefreshMinutes"`
 	QuotaWarningPercent   int    `json:"quotaWarningPercent"`
+	EnableGrokModels      bool   `json:"enableGrokModels"`
+	EnableOtherModels     bool   `json:"enableOtherModels"`
 	BackgroundModel       string `json:"backgroundModel"`
 	Theme                 string `json:"theme"`
 	LiquidGlass           bool   `json:"liquidGlass"`
@@ -108,6 +110,8 @@ func defaultSettings() settings {
 		MaxRetryInterval:      20,
 		AutoRefreshMinutes:    5,
 		QuotaWarningPercent:   20,
+		EnableGrokModels:      false,
+		EnableOtherModels:     false,
 		BackgroundModel:       "gemini-3.6-flash",
 		Theme:                 "system",
 		LiquidGlass:           true,

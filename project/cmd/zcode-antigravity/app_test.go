@@ -322,24 +322,31 @@ func TestSelectAgentModelsSeparatesGrokFromMedia(t *testing.T) {
 		modelInfo{ID: "grok-imagine-image", SupportedOutputModalities: []string{"image"}},
 		modelInfo{ID: "claude-opus-4-6"},
 	)
-	grok, err := selectAgentModels(catalog, false, true)
+	grok, err := selectAgentModels(catalog, false, true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := fmt.Sprint(modelIDs(grok)); got != "[grok-4.5 grok-build-0.1]" {
 		t.Fatalf("Grok models = %s", got)
 	}
-	combined, err := selectAgentModels(catalog, true, true)
+	defaults, err := selectAgentModels(catalog, true, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := fmt.Sprint(modelIDs(combined)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-web-search grok-4.5 grok-build-0.1]" {
+	if got := fmt.Sprint(modelIDs(defaults)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-web-search]" {
+		t.Fatalf("default models = %s", got)
+	}
+	combined, err := selectAgentModels(catalog, true, true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(modelIDs(combined)); got != "[claude-opus-4-6 gemini-3.6-flash gemini-3.7-flash gemini-web-search grok-4.5 grok-build-0.1]" {
 		t.Fatalf("combined models = %s", got)
 	}
 }
 
 func TestSelectAvailableAgentModelsIsolatesProviderFailure(t *testing.T) {
-	models, warnings := selectAvailableAgentModels(requiredTestModels(), true, true)
+	models, warnings := selectAvailableAgentModels(requiredTestModels(), true, true, false)
 	if got := fmt.Sprint(modelIDs(models)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-web-search]" {
 		t.Fatalf("unexpected surviving provider models: %s", got)
 	}
@@ -432,6 +439,45 @@ func TestConfigureZCodeBacksUpAndPreservesOtherProviders(t *testing.T) {
 	}
 	if secondChanged || secondBackup != "" {
 		t.Fatalf("idempotent sync changed config: changed=%v backup=%q", secondChanged, secondBackup)
+	}
+}
+
+func TestConfigureZCodeModelAccessCanBeEnabledAndRemoved(t *testing.T) {
+	a := testApp(t)
+	if err := os.MkdirAll(filepath.Dir(a.paths.ZCodeConfig), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(a.paths.ZCodeConfig, []byte(`{"provider":{}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	models := append(requiredTestModels(),
+		modelInfo{ID: "grok-4.5", SupportedOutputModalities: []string{"text"}},
+		modelInfo{ID: "claude-opus-4-6", SupportedOutputModalities: []string{"text"}},
+	)
+	if _, changed, err := a.configureZCodeWithAccess(18081, models, true, true); err != nil || !changed {
+		t.Fatalf("enable optional models: changed=%v err=%v", changed, err)
+	}
+	_, root, err := readJSONObject(a.paths.ZCodeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	providers, _ := objectField(root, "provider")
+	ours := providers[providerID].(map[string]any)
+	if got := fmt.Sprint(sortedProviderModelIDs(ours)); got != "[claude-opus-4-6 gemini-3.6-flash gemini-3.7-flash gemini-web-search grok-4.5]" {
+		t.Fatalf("enabled model ids = %s", got)
+	}
+
+	if _, changed, err := a.configureZCode(18081, models); err != nil || !changed {
+		t.Fatalf("restore Gemini-only: changed=%v err=%v", changed, err)
+	}
+	_, root, err = readJSONObject(a.paths.ZCodeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	providers, _ = objectField(root, "provider")
+	ours = providers[providerID].(map[string]any)
+	if got := fmt.Sprint(sortedProviderModelIDs(ours)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-web-search]" {
+		t.Fatalf("Gemini-only model ids = %s", got)
 	}
 }
 

@@ -1,16 +1,21 @@
+<p align="center">
+  <img src="project/native/windows/ui/src/assets/BrandMark.png" width="112" alt="ZCode Antigravity 原创黄色袋鼠与四芒星图标">
+</p>
+
 # ZCode Antigravity Bridge
 
 > 在 Windows 与 macOS 上统一接入 Antigravity Gemini 和 xAI Grok，
 > 并把本机安全网关提供给 ZCode、Grok Build、Codex、Claude Code 与 OpenCode。
 
-**当前版本：** Windows / macOS `v0.6.10-test`
+**当前版本：** Windows / macOS `v0.6.11-test`
 **适用系统：** macOS 12+（Apple Silicon / Intel）、Windows 10 / 11 x64
 **项目状态：** 测试版
 
 
 ## 功能特性
 
-- 可在控制中心切换 **Antigravity** 与 **Grok / xAI**；账号、模型、额度和 Agent 配置跟随切换。
+- 默认只向 ZCode 与 Agent 暴露 **Gemini**；Grok 和其他 AI 文本模型默认关闭，需要时在“设置”中主动开启并重新同步。关闭开关不会删除账号或额度缓存。
+- 开启 Grok 后可在控制中心切换 **Antigravity** 与 **Grok / xAI**；账号、模型、额度和 Agent 配置跟随切换。
 - Windows 的 Grok 设备登录会把 xAI 生成的临时验证码直接显示在软件内，支持选中、复制和重新打开官方授权页；用户把该码输入 `accounts.x.ai` 页面后，软件自动检测授权结果。
 - Antigravity 精确写入 `gemini-3.7-flash` / `gemini-3.6-flash`，并提供独立的 `gemini-web-search`（**Gemini Web Search (Google)**）联网搜索模型；Grok 只同步 xAI 返回的文本模型，自动排除 Imagine 图片和视频模型。
 - 选择 `Gemini Web Search (Google)` 后，每次提问都会调用 Antigravity 原生 Google Search，并向 ZCode 返回搜索结果、网页引用和 `web_search_requests`；普通 Gemini 3.7/3.6 对话不会被强制联网。
@@ -41,11 +46,11 @@
 
 | 文件 | 用途 | 建议 |
 | --- | --- | --- |
-| `ZCode-Antigravity-macOS-Universal-v0.6.10-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
-| `ZCode-Antigravity-Setup-v0.6.10-test.exe` | Windows 图形化安装器 | **普通用户首选** |
-| `ZCode-Antigravity-OneClick-v0.6.10-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
-| `ZCode-Antigravity-Windows-x64-0.6.10-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
-| `ZCode-Antigravity-Source-v0.6.10-test.zip` | 当前源码快照 | 审计 / 构建 |
+| `ZCode-Antigravity-macOS-Universal-v0.6.11-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
+| `ZCode-Antigravity-Setup-v0.6.11-test.exe` | Windows 图形化安装器 | **普通用户首选** |
+| `ZCode-Antigravity-OneClick-v0.6.11-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
+| `ZCode-Antigravity-Windows-x64-0.6.11-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
+| `ZCode-Antigravity-Source-v0.6.11-test.zip` | 当前源码快照 | 审计 / 构建 |
 
 ## macOS 快速安装
 
@@ -59,7 +64,7 @@
 
 1. 完整解压 macOS Universal ZIP；如需校验，打开 `Terminal Tools` 后双击 `Verify-Package.command`。
 2. 完全退出 ZCode。当前 App 使用临时签名且尚未公证；首次运行请按住 Control 点击 `ZCode Antigravity.app`，选择“打开”。
-3. 双击 `ZCode Antigravity.app`，选择 Antigravity 或 Grok；按需完成 Google OAuth 或 xAI 设备授权，再点击“一键接入 ZCode”。Google OAuth 回调最长等待 30 分钟；超时后应回到程序重新登录，不要刷新旧的 localhost 页面。
+3. 双击 `ZCode Antigravity.app`，默认完成 Google OAuth 后点击“一键接入 ZCode”。如需 Grok 或其他 AI 文本模型，先到“设置”开启对应开关并应用，再完成相应授权。Google OAuth 回调最长等待 30 分钟；超时后应回到程序重新登录，不要刷新旧的 localhost 页面。
 4. 重新打开 ZCode，选择 `Google` 下的目标模型；需要实时网页信息时选择 `Gemini Web Search (Google)`。发送一条短消息验收，搜索回答应包含来源引用。关闭原生窗口后菜单栏额度组件仍会保留。
 
 Mac 运行数据位于 `~/Library/Application Support/ZCodeAntigravity`。Google token 使用
@@ -77,9 +82,9 @@ AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切�
 ### 安装步骤
 
 1. 从 Windows 系统托盘完全退出 ZCode。仅关闭窗口可能仍会留下 `ZCode.exe` 进程。
-2. 下载 `ZCode-Antigravity-Setup-v0.6.10-test.exe`，并先校验 SHA-256。请勿使用任务栏点击会同时置顶主窗口的 `v0.6.3-test`、网关启动后可能保留旧额度提示的 `v0.6.2-test` 或更早测试版。
+2. 下载 `ZCode-Antigravity-Setup-v0.6.11-test.exe`，并先校验 SHA-256。请勿使用任务栏点击会同时置顶主窗口的 `v0.6.3-test`、网关启动后可能保留旧额度提示的 `v0.6.2-test` 或更早测试版。
 3. 双击安装器。程序会自动使用正在运行的 v2rayN / Windows 系统代理，无需开启 TUN；未发现代理时才直连。
-4. 在控制中心选择 Antigravity 或 Grok，完成对应授权并等待状态检查通过。Grok 登录时，将软件弹层中的临时验证码输入已打开的 xAI 官方页面；授权后无需再把结果粘贴回软件。
+4. 默认登录 Antigravity 即可。需要 Grok 时，先在“设置”开启 Grok 模型，再切换到 Grok 并完成授权；将软件弹层中的临时验证码输入已打开的 xAI 官方页面，授权后无需再把结果粘贴回软件。
 5. 重新打开 ZCode，选择 Provider `Google`；常规对话选 Gemini 3.7/3.6，需要联网时选 `Gemini Web Search (Google)`。控制中心会作为任务栏额度小组件继续驻留。
 6. 先发送一条短消息进行小规模验收。账号权限和实时额度以第一次真实请求为准。
 
@@ -107,7 +112,7 @@ $env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
 
 ## 已验证范围
 
-Windows 基线与 `v0.6.10-test` 的构建测试记录包括：
+Windows 基线与 `v0.6.11-test` 的构建测试记录包括：
 
 - 管理器与 CLIProxyAPI 的 Go 测试、Windows x64 构建和静态检查通过。
 - OAuth PKCE / callback、DPAPI 凭据存储、原子替换和 loopback 约束通过。
@@ -125,6 +130,7 @@ Windows 基线与 `v0.6.10-test` 的构建测试记录包括：
 - 历史 `v0.6.4-test` Tauri 基线在 Windows 11 实机确认 Acrylic 会连续模糊窗口后方桌面，且 7 秒、198 帧拖动录像无白屏/黑屏/撕裂；该结果不冒充为 `v0.6.7-test` Electron 目标机验证，新壳仍需 Windows 10/11 复测。
 - 账号、三协议代理、模型路由、会话亲和、重试策略、5/10 分钟刷新与液态玻璃设置均通过带当前用户会话密钥的本机 API 读写；账号 ID 与标签脱敏，接口不返回凭据。
 - 双提供商切换、Grok billing 解析、文本模型过滤和八类 Agent 一键配置均有单元测试。
+- Gemini-only 默认策略、Grok/其他文本模型显式开关、禁用 Grok 时的后端切换保护均有回归测试。
 - Antigravity 额度 HTTP 403 去项目字段重试和 `fetchAvailableModels` 降级路径均有回归测试。
 ## 隐私与安全边界
 
@@ -136,6 +142,7 @@ Windows 基线与 `v0.6.10-test` 的构建测试记录包括：
 - 每次修改 ZCode 配置前会创建有上限的备份。
 - 发布包不包含 OAuth token、账号 JSON、本地 API key、运行日志或本机 ZCode 配置。
 - Windows Acrylic 由 DWM / Electron 合成器完成；应用不读取、缓存或上传窗口后方像素。
+- 黄色袋鼠与渐变四芒星图标为本项目原创组合标识，不是美团或 Google 官方联合标识；美团、Gemini 与 Google 等名称及商标归各自权利人所有。
 - 停止 Bridge 或移除 Provider 不会自动撤销 Google / xAI 授权；如需彻底撤销，请在对应账号中单独操作。
 
 ## 常见问题

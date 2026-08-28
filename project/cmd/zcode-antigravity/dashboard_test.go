@@ -58,6 +58,33 @@ func TestProxyEndpointStatusAllowsDirectNetworkWithoutTUN(t *testing.T) {
 	}
 }
 
+func TestGrokProviderRequiresExplicitSetting(t *testing.T) {
+	a := testApp(t)
+	runtime := &guiRuntime{app: a, provider: "xai"}
+	if got := runtime.currentProvider(); got != "antigravity" {
+		t.Fatalf("disabled Grok provider = %q, want antigravity", got)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/api/provider", bytes.NewBufferString(`{"provider":"xai"}`))
+	recorder := httptest.NewRecorder()
+	runtime.serveProvider(recorder, request)
+	if recorder.Code != http.StatusConflict || !strings.Contains(recorder.Body.String(), "设置") {
+		t.Fatalf("disabled Grok response = %d %s", recorder.Code, recorder.Body.String())
+	}
+
+	cfg := a.currentSettings()
+	cfg.EnableGrokModels = true
+	if err := a.saveUserSettings(cfg); err != nil {
+		t.Fatal(err)
+	}
+	request = httptest.NewRequest(http.MethodPost, "/api/provider", bytes.NewBufferString(`{"provider":"xai"}`))
+	recorder = httptest.NewRecorder()
+	runtime.serveProvider(recorder, request)
+	if recorder.Code != http.StatusOK || runtime.currentProvider() != "xai" {
+		t.Fatalf("enabled Grok response = %d %s provider=%s", recorder.Code, recorder.Body.String(), runtime.currentProvider())
+	}
+}
+
 func TestGatewayNeedsRecoveryOnlyForUnexpectedBridgeExit(t *testing.T) {
 	recorded := state{Port: 18080, PID: 3210}
 	account := providerAccountCounts{Antigravity: 1}

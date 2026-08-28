@@ -2,6 +2,27 @@
 
 最新验证日期：2026-08-28（Asia/Shanghai）
 
+## v0.6.11-test Gemini-only 默认模型与新组合图标
+
+- 新安装与旧设置缺省值均为 Gemini-only：`enableGrokModels=false`、
+  `enableOtherModels=false`。Grok 和其他文本模型只能在设置中主动开启，并在退出 ZCode 后重新同步；
+  关闭开关会从托管 Provider 清单移除可选模型，但不删除账号或额度缓存。
+- 后端在 Grok 关闭时强制当前提供商回落到 Antigravity，并拒绝 Grok 切换、登录与 Agent 一键配置；
+  macOS / Windows 主界面、接入操作和独立额度小组件同时隐藏 Grok 入口，避免旧选中状态绕过开关。
+- 模型过滤回归确认默认只写入 `gemini-3.6-flash`、`gemini-3.7-flash`、
+  `gemini-web-search`；显式开启后才加入 Grok 文本模型与 Claude/GPT 等其他文本模型，图片、视频、
+  音频、嵌入和 TTS 模型仍被排除。
+- 新图标使用项目原创的黄色底板、袋鼠轮廓和渐变四芒星；同一图标用于 macOS Dock/窗口、
+  Windows EXE/任务栏/窗口与网页 favicon。没有打包美团或 Google 的官方素材。
+- 0.6.11 Universal App 已在 Apple Silicon Mac 实际安装并打开：设置页两个模型开关均为关闭，
+  主界面不显示 Grok 标签或登录按钮，网关 HTTP 200，ZCode `Google` Provider 实际只保留上述 3 个 Gemini 模型；
+  0.6.10 App 已保存在可恢复备份目录。
+- Go Core 测试与 vet、CLIProxyAPI `go mod verify` / 全量测试、Electron 生产构建与 5 项 IPC 测试、
+  Swift 类型检查均通过；macOS 双架构/临时签名/ZIP/逐文件哈希及 Windows ZIP/安装器/单文件包哈希、
+  ASAR 新图标资源和 PE32+ 结构检查通过。
+- Windows 目标机 `192.168.1.9:22` TCP 可连接但 OpenSSH 在 banner exchange 阶段超时，
+  因此本轮没有把交叉构建冒充为 Windows 实机运行验证。
+
 ## v0.6.10-test Agent Provider 统一显示为 Google
 
 - ZCode 的托管 Provider 保持内部 ID `zcode-antigravity-local`，可见 `name` 从长名称统一为

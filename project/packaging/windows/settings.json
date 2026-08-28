@@ -3,5 +3,7 @@
   "portScanEnd": 18180,
   "callbackPreferredPort": 51121,
   "callbackScanEnd": 51221,
+  "enableGrokModels": false,
+  "enableOtherModels": false,
   "proxyURL": ""
 }

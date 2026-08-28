@@ -3,7 +3,7 @@ const resetFive = new Date(now.getTime() + 3.4 * 60 * 60 * 1000).toISOString();
 const resetWeek = new Date(now.getTime() + 4.2 * 24 * 60 * 60 * 1000).toISOString();
 
 const status = {
-  version: "0.6.10-test",
+  version: "0.6.11-test",
   gateway: { ok: true, label: "网关在线", detail: "http://127.0.0.1:18080", running: true },
   proxy: { ok: true, label: "v2rayN 自动代理", detail: "127.0.0.1:10808 · 无需 TUN", running: true },
   tun: { ok: true, label: "TUN 未启用（可选）", detail: "Gemini / Grok 可使用直连或专用代理", running: false },
@@ -31,11 +31,11 @@ const usage = {
 };
 
 const manager = {
-  version: "0.6.10-test",
+  version: "0.6.11-test",
   accounts: [{ id: "ag-demo", provider: "antigravity", label: "y*****g@gmail.com", plan: "Google AI Pro", status: "active", updatedAt: now.toISOString() }, { id: "xai-demo", provider: "xai", label: "g***@example.com", plan: "SuperGrok", status: "active", updatedAt: now.toISOString() }],
   proxy: { running: true, baseURL: "http://127.0.0.1:18080", port: 18080, protocols: [{ name: "OpenAI", path: "/v1/chat/completions", description: "Chat Completions / Responses 兼容" }, { name: "Anthropic", path: "/v1/messages", description: "Claude Code 原生消息协议" }, { name: "Gemini", path: "/v1beta/models", description: "Google SDK 兼容协议" }] },
   routing: { strategy: "round-robin", sessionAffinity: true, sessionAffinityTTL: "1h", requestRetry: 3, credentialRetry: 3, retryInterval: 30, backgroundModel: "gemini-3.7-flash" },
-  settings: { autoRefreshMinutes: 5, quotaWarningPercent: 20, proxyURL: "", theme: "dark", liquidGlass: true, settingsPath: "%LOCALAPPDATA%\\ZCodeAntigravity\\settings.json" },
+  settings: { autoRefreshMinutes: 5, quotaWarningPercent: 20, enableGrokModels: false, enableOtherModels: false, proxyURL: "", theme: "dark", liquidGlass: true, settingsPath: "%LOCALAPPDATA%\\ZCodeAntigravity\\settings.json" },
   features: [{ id: "accounts", name: "多账号管家", description: "OAuth 登录、账号发现和脱敏状态", available: true }, { id: "protocols", name: "三协议中继", description: "OpenAI、Anthropic、Gemini", available: true }, { id: "routing", name: "模型路由", description: "轮询、加权与填满优先", available: true }, { id: "retry", name: "自动自愈", description: "401/429 重试与凭据轮换", available: true }, { id: "usage", name: "用量统计", description: "输出 Token、推理 Token 与 tok/s", available: true }],
 };
 
