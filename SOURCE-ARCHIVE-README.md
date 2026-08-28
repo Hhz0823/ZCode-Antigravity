@@ -72,6 +72,8 @@ git apply --whitespace=error-all /path/to/ZCode-Antigravity/project/docs/CLIProx
     真实可执行文件路径，并提供 Apple Silicon + Intel Universal App 与 `.command` 维护脚本。
 16. macOS Antigravity access/refresh token 使用 AES-256-GCM 加密，随机主密钥保存在当前用户登录
     钥匙串；公开源码继续不保存 OAuth 客户端身份，发布维护者可在链接时注入。
+17. macOS 菜单栏状态项固定为单个方形模板图标，完整额度保留在 Popover；组件打开时通过原生事件
+    监听稳定处理应用内外点击，关闭后立即释放监听。
 
 ## 构建
 

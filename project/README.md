@@ -64,7 +64,7 @@ Build the single-BAT installer from a verified expanded package:
 ```powershell
 .\packaging\windows\Build-Single-Bat.ps1 `
   -PackageDir C:\path\to\expanded-package `
-  -OutputFile C:\path\to\ZCode-Antigravity-OneClick-v0.6.8-test.bat
+  -OutputFile C:\path\to\ZCode-Antigravity-OneClick-v0.6.9-test.bat
 ```
 
 Build the native no-console EXE installer from the same verified package:
@@ -72,5 +72,5 @@ Build the native no-console EXE installer from the same verified package:
 ```powershell
 .\packaging\windows\Build-Exe-Installer.ps1 `
   -PackageDir C:\path\to\expanded-package `
-  -OutputFile C:\path\to\ZCode-Antigravity-Setup-v0.6.8-test.exe
+  -OutputFile C:\path\to\ZCode-Antigravity-Setup-v0.6.9-test.exe
 ```

@@ -1,7 +1,7 @@
 ZCode Antigravity Bridge - macOS Universal test build
 ====================================================
 
-版本：0.6.8-test
+版本：0.6.9-test
 架构：Apple Silicon (arm64) + Intel (x86_64)
 最低系统：macOS 12
 
@@ -9,7 +9,7 @@ ZCode Antigravity Bridge - macOS Universal test build
 ----
 本程序使用原生 SwiftUI + AppKit 控制中心，让 macOS 版 ZCode 和其他 Agent
 通过只监听本机的兼容 Provider 调用 Antigravity Gemini 与 xAI Grok 文本模型。
-App 会在程序坞显示图标，并在菜单栏持续显示所选账号额度。
+App 会在程序坞显示图标；菜单栏只保留一个方形额度图标，不再常驻显示 5 小时和本周文字。
 主窗口只在白色底板使用透明 NSWindow 与 behindWindow NSVisualEffectView 的系统高斯材质；导航、卡片、按钮和文字保持高对比度，并提供总览、账号、API 代理、模型路由、
 Agent 接入、用量统计和设置七个原生页面。
 Agent 页面可一键备份并接入 DeepSeek Harness、Grok Build、Codex、Claude Code、Gemini CLI、
@@ -17,7 +17,7 @@ Qwen Code、Kimi Code 与 OpenCode；通用客户端配置仍可复制。
 额度卡片按账号和时间窗口显示彩色进度条、重置时间与最低余量；程序每 5 分钟
 自动刷新一次额度，手动刷新、切换提供商和接入完成后会立即刷新。
 单击菜单栏图标只显示独立额度 Popover（5 小时 / 本周余量与重置时间），不会把
-主窗口带到其他应用上层；主界面显示协议返回的
+主窗口带到其他应用上层；点击 Popover 外部的窗口或桌面空白处会自动收起。主界面显示协议返回的
 最近输出 Token、推理 Token、Token/s 和本地累计输出，不保存提示词或回复。
 
 这是非官方测试版，会使用未公开的 Antigravity 接口。Google 可能限流、暂停

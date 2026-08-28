@@ -2,6 +2,17 @@
 
 最新验证日期：2026-08-28（Asia/Shanghai）
 
+## v0.6.9-test macOS 单图标菜单栏与 Popover 自动收起
+
+- macOS `NSStatusItem` 从动态文字宽度改为系统 `squareLength`，按钮固定为模板图标且不再写入
+  `5h xx% · 周 xx%` 标题；完整额度继续显示在悬停提示和 Popover 中。
+- 保留原生 `.transient` 行为，并仅在 Popover 显示期间安装本地与全局鼠标监听：点击组件内部不关闭，
+  点击主窗口、其他应用或桌面空白处立即关闭；关闭后两个监听均移除。
+- Swift arm64 / x86_64 macOS 12 类型检查通过；原生候选 App 运行时 AX 检查确认状态项标题为空、
+  尺寸为 `24 × 24`，同机旧版为 `160.5 × 24`。内外部点击关闭与监听释放路径通过编译检查。
+- macOS Universal App 的双架构、临时签名、ZIP CRC 与包内 SHA-256 验证通过；Windows Electron
+  IPC、生产构建和交叉安装包回归保持通过。
+
 ## v0.6.8-test Gemini 原生 Google Search
 
 - 直接复现 ZCode 的 Anthropic 请求路径：`gemini-3.7-flash` 虽返回 HTTP 200，但不会生成搜索结果或引用；

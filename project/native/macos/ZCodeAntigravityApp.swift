@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "0.6.8-test"
+private let appVersion = "0.6.9-test"
 
 private extension Notification.Name {
     static let selectBridgeProvider = Notification.Name("ZCodeSelectBridgeProvider")
@@ -705,24 +705,29 @@ private struct WidgetQuotaColumn: View {
 }
 
 @MainActor
-final class StatusBarController: NSObject {
+final class StatusBarController: NSObject, NSPopoverDelegate {
     static let shared = StatusBarController()
 
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
     private let widgetModel = StatusWidgetModel()
+    private var localMouseMonitor: Any?
+    private var globalMouseMonitor: Any?
 
     func install() {
         guard statusItem == nil else { return }
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(systemSymbolName: "gauge.with.dots.needle.67percent", accessibilityDescription: "ZCode 额度")
         item.button?.image?.isTemplate = true
+        item.button?.imagePosition = .imageOnly
+        item.button?.title = ""
         item.button?.toolTip = "ZCode Antigravity 额度"
         item.button?.target = self
         item.button?.action = #selector(togglePopover)
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         popover.behavior = .transient
         popover.animates = true
+        popover.delegate = self
         popover.contentSize = NSSize(width: 430, height: 330)
         popover.contentViewController = NSHostingController(rootView: StatusPopoverView(model: widgetModel))
         statusItem = item
@@ -749,10 +754,6 @@ final class StatusBarController: NSObject {
                 self.widgetModel.outputText = "—"
                 self.widgetModel.speedText = "等待首次响应"
             }
-            var buttonParts: [String] = []
-            if let remaining = five?.remainingPercent { buttonParts.append(String(format: "5h %.0f%%", remaining)) }
-            if let remaining = week?.remainingPercent { buttonParts.append(String(format: "周 %.0f%%", remaining)) }
-            self.statusItem?.button?.title = buttonParts.isEmpty ? "" : " " + buttonParts.joined(separator: " · ")
             self.statusItem?.button?.toolTip = "\(name) · \(count) 个账号\n\(self.quotaMenuTitle("5 小时", bucket: five))\n\(self.quotaMenuTitle("本周", bucket: week))"
         }
     }
@@ -760,10 +761,52 @@ final class StatusBarController: NSObject {
     @objc private func togglePopover() {
         guard let button = statusItem?.button else { return }
         if popover.isShown {
-            popover.performClose(nil)
+            closePopover()
         } else {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            startOutsideClickMonitoring()
         }
+    }
+
+    private func startOutsideClickMonitoring() {
+        stopOutsideClickMonitoring()
+        localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self, self.popover.isShown else { return event }
+            let popoverWindow = self.popover.contentViewController?.view.window
+            let statusWindow = self.statusItem?.button?.window
+            if event.window === popoverWindow || event.window === statusWindow {
+                return event
+            }
+            self.closePopover()
+            return event
+        }
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            DispatchQueue.main.async { self?.closePopover() }
+        }
+    }
+
+    private func stopOutsideClickMonitoring() {
+        if let localMouseMonitor {
+            NSEvent.removeMonitor(localMouseMonitor)
+            self.localMouseMonitor = nil
+        }
+        if let globalMouseMonitor {
+            NSEvent.removeMonitor(globalMouseMonitor)
+            self.globalMouseMonitor = nil
+        }
+    }
+
+    private func closePopover() {
+        guard popover.isShown else {
+            stopOutsideClickMonitoring()
+            return
+        }
+        popover.performClose(nil)
+        stopOutsideClickMonitoring()
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        stopOutsideClickMonitoring()
     }
 
     private func quotaWindow(_ quota: QuotaReport?, kind: String) -> QuotaBucket? {
@@ -818,7 +861,7 @@ final class StatusBarController: NSObject {
     }
 
     func openWindow() {
-        popover.performClose(nil)
+        closePopover()
         bringMainWindowForward()
     }
 }
