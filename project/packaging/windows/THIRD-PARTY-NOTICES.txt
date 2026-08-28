@@ -27,7 +27,7 @@ the loopback-only management calls used by the local quota dashboard.
 Windows Electron control center
 ===============================
 
-The v0.6.12 control center uses Electron 44, React, Tailwind CSS, and lucide-react.
+The v0.6.13 control center uses Electron 44, React, Tailwind CSS, and lucide-react.
 Exact JavaScript versions and integrity hashes are recorded in ui/package-lock.json.
 Electron's MIT license and Chromium third-party notices are shipped beside the executable
 as LICENSE.electron.txt and LICENSES.chromium.html.

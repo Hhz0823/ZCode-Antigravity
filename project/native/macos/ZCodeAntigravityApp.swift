@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "0.6.12-test"
+private let appVersion = "0.6.13-test"
 
 private extension Notification.Name {
     static let selectBridgeProvider = Notification.Name("ZCodeSelectBridgeProvider")
@@ -673,7 +673,6 @@ private struct StatusPopoverView: View {
         .padding(18)
         .frame(width: 430)
         .background(.ultraThinMaterial)
-        .environment(\.controlActiveState, .key)
     }
 
     private func widgetProviderButton(_ title: String, provider: String) -> some View {
@@ -708,7 +707,16 @@ private struct WidgetQuotaColumn: View {
             Text(title).font(.caption).foregroundStyle(.secondary)
             Text(percent.map { String(format: "%.0f%%", $0) } ?? "—")
                 .font(.title3.monospacedDigit().weight(.semibold))
-            ProgressView(value: max(0, min(100, percent ?? 0)), total: 100).tint(tint)
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.secondary.opacity(0.24))
+                    Capsule().fill(tint).frame(width: geometry.size.width * max(0, min(1, (percent ?? 0) / 100)))
+                }
+            }
+            .frame(height: 8)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(title)
+            .accessibilityValue(percent.map { String(format: "%.0f%%", $0) } ?? "不可用")
             Text(reset).font(.caption2.monospacedDigit()).foregroundStyle(.secondary).lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

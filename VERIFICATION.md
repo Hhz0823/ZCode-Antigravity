@@ -2,7 +2,23 @@
 
 最新验证日期：2026-08-28（Asia/Shanghai）
 
+## v0.6.13-test macOS 小组件改用焦点无关的自绘额度条
+
+- 用户在 0.6.12 实际复测后仍能复现首次弹出为灰色，证明只注入 `controlActiveState = .key`
+  不能覆盖 `ProgressView` 底层 AppKit 控件的首帧非活动窗口降色；0.6.12 方案已删除。
+- `WidgetQuotaColumn` 不再使用原生 `ProgressView`，改为普通 SwiftUI `Capsule` 轨道和显式蓝色 / 紫色
+  填充；宽度仅由额度百分比计算，颜色不再读取 key-window、App active 或焦点状态。
+- 自绘额度条保留百分比上下限、8 px 高度、圆角轨道以及可访问性 label/value；没有添加窗口激活、
+  主窗口置顶、定时重绘或额外依赖。
+- arm64 / x86_64 macOS 12 类型检查、Universal 构建与本机 0.6.13 安装通过；主窗口关闭后
+  三个后台进程继续驻留且网关 HTTP 200。
+- Electron 生产构建与 5 项 IPC 测试、Go Core 与 CLIProxyAPI 回归、双平台包的签名/架构、
+  ZIP/逐文件哈希、ASAR 与 PE 结构检查通过。
+
 ## v0.6.12-test macOS 状态栏首次弹出即显示完整配色
+
+> 后续用户实测确认本节的 `.key` 环境覆盖仍不足以阻止原生 `ProgressView` 首帧灰化；
+> 此方案已由 v0.6.13 的焦点无关自绘额度条取代。
 
 - 复现确认：状态栏 `NSPopover` 首次出现时不是 key window，SwiftUI 会把内部原生控件视作非关键窗口；
   因此两条带 `.tint(...)` 的 `ProgressView` 首帧被系统降成灰色，点击 Popover 后才切换为彩色。
