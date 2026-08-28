@@ -30,20 +30,20 @@ Requirements
 First test
 ----------
 Recommended: fully exit ZCode from the tray and double-click
-ZCode-Antigravity-Setup-v0.6.9-test.exe. This is a native Windows GUI installer: it shows no
+ZCode-Antigravity-Setup-v0.6.10-test.exe. This is a native Windows GUI installer: it shows no
 terminal, verifies the embedded ZIP plus all three executables, installs only for the current
 user, creates Desktop/Start Menu shortcuts, and opens the control center after completion.
 Do not use v0.4.0-test on Windows; its Rust client expected baseUrl while the Go Core correctly
 emitted baseURL, so startup stopped before the control center could open.
 Do not use v0.5.2-test for a fresh Antigravity login; that release was packaged without the
-required OAuth desktop configuration. v0.6.9-test also repairs a recorded gateway automatically
+required OAuth desktop configuration. v0.6.10-test also repairs a recorded gateway automatically
 when its process exits unexpectedly, while preserving an intentional Stop. It also queues a quota
 refresh that overlaps the five-second status poll, so Grok quota appears automatically after the
 gateway comes online. Its tray click now opens an independent Acrylic quota widget and never raises
 the main control-center window unless the user explicitly asks to open it.
 
 For the single-BAT fallback, fully exit ZCode from the tray and double-click
-ZCode-Antigravity-OneClick-v0.6.9-test.bat. It verifies and extracts its embedded package,
+ZCode-Antigravity-OneClick-v0.6.10-test.bat. It verifies and extracts its embedded package,
 then opens the graphical control center without leaving a terminal window. The control center
 opens OAuth when needed, writes the verified ZCode Provider directly, and starts ZCode after
 successful readback.
@@ -62,7 +62,7 @@ For the expanded package:
    The Google OAuth loopback callback remains available for up to 30 minutes. If it expires,
    return to the control center and start a new login instead of reloading the old localhost page.
 6. The first model-directory load can take up to about 35 seconds on a poor connection.
-7. Reopen ZCode. Select Provider "Antigravity + Grok (Local Bridge)" and choose the desired
+7. Reopen ZCode. Select Provider "Google" and choose the desired
    Gemini or Grok text model. The system-tray quota widget remains available after closing the panel.
 8. Run Test-Gemini-3.7-Flash.bat once. It sends a small real inference request and writes a
    redacted audit result to %LOCALAPPDATA%\ZCodeAntigravity\last-smoke-test.json.
@@ -187,9 +187,9 @@ Available scripts
 
 Installer formats
 -----------------
-- ZCode-Antigravity-Setup-v0.6.9-test.exe: recommended no-terminal current-user installer.
-- ZCode-Antigravity-OneClick-v0.6.9-test.bat: fallback single-file installer.
-- ZCode-Antigravity-Windows-x64-0.6.9-test.zip: manually verifiable expanded package.
+- ZCode-Antigravity-Setup-v0.6.10-test.exe: recommended no-terminal current-user installer.
+- ZCode-Antigravity-OneClick-v0.6.10-test.bat: fallback single-file installer.
+- ZCode-Antigravity-Windows-x64-0.6.10-test.zip: manually verifiable expanded package.
 - The EXE installer is custom-built and unsigned. It does not require administrator rights or
   7-Zip on the target computer; Windows SmartScreen may still require manual confirmation.
 
@@ -265,7 +265,7 @@ cause a clear setup error instead of silently substituting another model.
 
 Build versions
 --------------
-- ZCode Antigravity Bridge: 0.6.9-test
+- ZCode Antigravity Bridge: 0.6.10-test
 - Control center: Electron 44.0.0, Chromium, React 19.2.8, Tailwind CSS 4.3.3
 - CLIProxyAPI base: v7.2.132, commit 78f0c4079e3e6273d65d03b5549cffc898703264
 - Local build: 7.2.132-zcode.13

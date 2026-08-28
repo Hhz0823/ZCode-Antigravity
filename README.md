@@ -3,7 +3,7 @@
 > 在 Windows 与 macOS 上统一接入 Antigravity Gemini 和 xAI Grok，
 > 并把本机安全网关提供给 ZCode、Grok Build、Codex、Claude Code 与 OpenCode。
 
-**当前版本：** Windows / macOS `v0.6.9-test`
+**当前版本：** Windows / macOS `v0.6.10-test`
 **适用系统：** macOS 12+（Apple Silicon / Intel）、Windows 10 / 11 x64
 **项目状态：** 测试版
 
@@ -24,6 +24,7 @@
 - Antigravity / Grok 使用独立的原生选择卡、账号数、选中态与切换进度；切换期间保留各自最近成功额度，避免旧请求覆盖新提供商界面。
 - Antigravity 额度请求支持 sandbox / daily / production 端点、HTTP 403 无项目字段重试和逐模型额度降级。
 - DeepSeek Harness、Grok Build、OpenAI Codex、Claude Code、Gemini CLI、Qwen Code、Kimi Code 与 OpenCode 均支持一键接入；修改前自动备份并只合并本程序管理的 Provider，通用客户端配置仍可复制。
+- ZCode 和支持自定义 Provider 显示名的 Agent 统一显示为简洁的 `Google`；内部兼容 ID 保持不变，升级时会原位更新而不会生成重复 Provider。
 - Gemini CLI 使用原生 Gemini 协议，因此仅在选择 Antigravity 时启用；Grok 可一键接入其余 OpenAI / Anthropic 兼容客户端。
 - Windows 控制中心使用 **Electron 44 + React + Tailwind CSS / shadcn 风格组件**；Electron 负责窗口、任务栏小组件和受限 IPC，Chromium 随系统 DPI 缩放并叠加原生 DWM Acrylic，子进程全部隐藏。
 - macOS 控制中心使用 **SwiftUI + AppKit** 原生开发，具有真正的 Dock 图标、原生菜单栏额度组件；Universal `.app` 同时兼容 Apple Silicon 与 Intel。
@@ -40,11 +41,11 @@
 
 | 文件 | 用途 | 建议 |
 | --- | --- | --- |
-| `ZCode-Antigravity-macOS-Universal-v0.6.9-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
-| `ZCode-Antigravity-Setup-v0.6.9-test.exe` | Windows 图形化安装器 | **普通用户首选** |
-| `ZCode-Antigravity-OneClick-v0.6.9-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
-| `ZCode-Antigravity-Windows-x64-0.6.9-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
-| `ZCode-Antigravity-Source-v0.6.9-test.zip` | 当前源码快照 | 审计 / 构建 |
+| `ZCode-Antigravity-macOS-Universal-v0.6.10-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
+| `ZCode-Antigravity-Setup-v0.6.10-test.exe` | Windows 图形化安装器 | **普通用户首选** |
+| `ZCode-Antigravity-OneClick-v0.6.10-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
+| `ZCode-Antigravity-Windows-x64-0.6.10-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
+| `ZCode-Antigravity-Source-v0.6.10-test.zip` | 当前源码快照 | 审计 / 构建 |
 
 ## macOS 快速安装
 
@@ -59,7 +60,7 @@
 1. 完整解压 macOS Universal ZIP；如需校验，打开 `Terminal Tools` 后双击 `Verify-Package.command`。
 2. 完全退出 ZCode。当前 App 使用临时签名且尚未公证；首次运行请按住 Control 点击 `ZCode Antigravity.app`，选择“打开”。
 3. 双击 `ZCode Antigravity.app`，选择 Antigravity 或 Grok；按需完成 Google OAuth 或 xAI 设备授权，再点击“一键接入 ZCode”。Google OAuth 回调最长等待 30 分钟；超时后应回到程序重新登录，不要刷新旧的 localhost 页面。
-4. 重新打开 ZCode，选择 `Antigravity + Grok (Local Bridge)` 下的目标模型；需要实时网页信息时选择 `Gemini Web Search (Google)`。发送一条短消息验收，搜索回答应包含来源引用。关闭原生窗口后菜单栏额度组件仍会保留。
+4. 重新打开 ZCode，选择 `Google` 下的目标模型；需要实时网页信息时选择 `Gemini Web Search (Google)`。发送一条短消息验收，搜索回答应包含来源引用。关闭原生窗口后菜单栏额度组件仍会保留。
 
 Mac 运行数据位于 `~/Library/Application Support/ZCodeAntigravity`。Google token 使用
 AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切片已完成交叉编译和
@@ -76,10 +77,10 @@ AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切�
 ### 安装步骤
 
 1. 从 Windows 系统托盘完全退出 ZCode。仅关闭窗口可能仍会留下 `ZCode.exe` 进程。
-2. 下载 `ZCode-Antigravity-Setup-v0.6.9-test.exe`，并先校验 SHA-256。请勿使用任务栏点击会同时置顶主窗口的 `v0.6.3-test`、网关启动后可能保留旧额度提示的 `v0.6.2-test` 或更早测试版。
+2. 下载 `ZCode-Antigravity-Setup-v0.6.10-test.exe`，并先校验 SHA-256。请勿使用任务栏点击会同时置顶主窗口的 `v0.6.3-test`、网关启动后可能保留旧额度提示的 `v0.6.2-test` 或更早测试版。
 3. 双击安装器。程序会自动使用正在运行的 v2rayN / Windows 系统代理，无需开启 TUN；未发现代理时才直连。
 4. 在控制中心选择 Antigravity 或 Grok，完成对应授权并等待状态检查通过。Grok 登录时，将软件弹层中的临时验证码输入已打开的 xAI 官方页面；授权后无需再把结果粘贴回软件。
-5. 重新打开 ZCode，选择 Provider `Antigravity + Grok (Local Bridge)`；常规对话选 Gemini 3.7/3.6，需要联网时选 `Gemini Web Search (Google)`。控制中心会作为任务栏额度小组件继续驻留。
+5. 重新打开 ZCode，选择 Provider `Google`；常规对话选 Gemini 3.7/3.6，需要联网时选 `Gemini Web Search (Google)`。控制中心会作为任务栏额度小组件继续驻留。
 6. 先发送一条短消息进行小规模验收。账号权限和实时额度以第一次真实请求为准。
 
 ## 本地端口与代理
@@ -106,7 +107,7 @@ $env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
 
 ## 已验证范围
 
-Windows 基线与 `v0.6.9-test` 的构建测试记录包括：
+Windows 基线与 `v0.6.10-test` 的构建测试记录包括：
 
 - 管理器与 CLIProxyAPI 的 Go 测试、Windows x64 构建和静态检查通过。
 - OAuth PKCE / callback、DPAPI 凭据存储、原子替换和 loopback 约束通过。

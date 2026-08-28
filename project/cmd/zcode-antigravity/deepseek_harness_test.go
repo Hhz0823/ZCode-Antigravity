@@ -51,7 +51,7 @@ func TestConfigureDeepSeekHarnessMergesBacksUpAndUpdates(t *testing.T) {
 		t.Fatal("existing provider was removed")
 	}
 	bridge := providers[deepSeekHarnessProviderID].(map[string]any)
-	if bridge["baseURL"] != "http://127.0.0.1:18080/v1" || bridge["apiKeyEnv"] != deepSeekHarnessCredentialRef {
+	if bridge["displayName"] != "Google" || bridge["baseURL"] != "http://127.0.0.1:18080/v1" || bridge["apiKeyEnv"] != deepSeekHarnessCredentialRef {
 		t.Fatalf("bridge = %#v", bridge)
 	}
 	models := bridge["models"].([]any)

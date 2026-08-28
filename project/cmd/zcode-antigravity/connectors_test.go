@@ -26,9 +26,20 @@ func TestAgentConnectorsIncludeOneClickDeepSeekHarness(t *testing.T) {
 		}
 	}
 	settings := connectors[0].Snippets["$DSH_HOME/settings.yaml"]
-	for _, expected := range []string{"zcode-bridge", "openai-completions", "http://127.0.0.1:18080/v1", "input: [text, image]"} {
+	for _, expected := range []string{"zcode-bridge", "displayName: Google", "openai-completions", "http://127.0.0.1:18080/v1", "input: [text, image]"} {
 		if !strings.Contains(settings, expected) {
 			t.Fatalf("DeepSeek Harness snippet missing %q: %s", expected, settings)
+		}
+	}
+	configSnippet := map[string]string{"codex": "~/.codex/config.toml", "opencode": "~/.config/opencode/opencode.json"}
+	for id, path := range configSnippet {
+		for _, connector := range connectors {
+			if connector.ID == id {
+				snippet := connector.Snippets[path]
+				if !strings.Contains(snippet, "Google") || strings.Contains(snippet, "ZCode Local Bridge") {
+					t.Fatalf("%s provider display name is not Google: %s", id, snippet)
+				}
+			}
 		}
 	}
 	grok := buildAgentConnectors("http://127.0.0.1:18080", "local-key", "grok-4.6", "xai")[0]

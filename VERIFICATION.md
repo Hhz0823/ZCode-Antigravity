@@ -2,6 +2,16 @@
 
 最新验证日期：2026-08-28（Asia/Shanghai）
 
+## v0.6.10-test Agent Provider 统一显示为 Google
+
+- ZCode 的托管 Provider 保持内部 ID `zcode-antigravity-local`，可见 `name` 从长名称统一为
+  `Google`；原 ID 的旧配置会原位更新，不会新增第二个 Provider。
+- Codex、Grok Build、OpenCode 与 DeepSeek Harness 共用同一个显示名常量 `Google`；各客户端
+  原有 `zcode_bridge` / `zcode-bridge` 兼容 ID、模型、密钥与 loopback 地址保持不变。
+- 配置生成、保留用户字段、旧回环配置升级及非托管同名配置拒绝覆盖回归测试通过。
+- Go Core / CLIProxyAPI 测试、Electron IPC 与生产构建、Swift arm64 / x86_64 类型检查通过；
+  双平台和源码发布包完成结构、哈希及敏感文件检查。
+
 ## v0.6.9-test macOS 单图标菜单栏与 Popover 自动收起
 
 - macOS `NSStatusItem` 从动态文字宽度改为系统 `squareLength`，按钮固定为模板图标且不再写入

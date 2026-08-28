@@ -15,7 +15,7 @@ import (
 
 const (
 	deepSeekHarnessProviderID    = "zcode-bridge"
-	deepSeekHarnessProviderName  = "ZCode Local Bridge"
+	deepSeekHarnessProviderName  = providerName
 	deepSeekHarnessCredentialRef = "ZCODE_BRIDGE_API_KEY"
 )
 

@@ -393,6 +393,9 @@ func TestConfigureZCodeBacksUpAndPreservesOtherProviders(t *testing.T) {
 	if !ok {
 		t.Fatal("our provider missing")
 	}
+	if ours["name"] != "Google" {
+		t.Fatalf("provider display name = %v, want Google", ours["name"])
+	}
 	if got := fmt.Sprint(sortedProviderModelIDs(ours)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-web-search]" {
 		t.Fatalf("model ids = %s", got)
 	}

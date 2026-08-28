@@ -19,7 +19,7 @@ import (
 
 const (
 	providerID   = "zcode-antigravity-local"
-	providerName = "Antigravity + Grok (Local Bridge)"
+	providerName = "Google"
 )
 
 type providerAccountCounts struct {

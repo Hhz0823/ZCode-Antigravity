@@ -12,7 +12,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-const connectorProviderName = "ZCode Local Bridge"
+const connectorProviderName = providerName
 
 type connectorInstallContext struct {
 	BaseURL       string

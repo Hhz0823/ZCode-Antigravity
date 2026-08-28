@@ -74,6 +74,8 @@ git apply --whitespace=error-all /path/to/ZCode-Antigravity/project/docs/CLIProx
     钥匙串；公开源码继续不保存 OAuth 客户端身份，发布维护者可在链接时注入。
 17. macOS 菜单栏状态项固定为单个方形模板图标，完整额度保留在 Popover；组件打开时通过原生事件
     监听稳定处理应用内外点击，关闭后立即释放监听。
+18. ZCode 与支持自定义名称的 Agent 统一显示 Provider 名 `Google`，内部托管 ID 保持不变以兼容
+    已有配置，并继续拒绝覆盖非本程序创建的同名条目。
 
 ## 构建
 

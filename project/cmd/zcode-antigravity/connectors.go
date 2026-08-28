@@ -109,7 +109,7 @@ func buildAgentConnectors(baseURL, apiKey, model, provider string) []agentConnec
 			ID: "codex", Name: "OpenAI Codex", Description: "添加一个 Responses API 自定义模型提供商",
 			Model: model, Action: connectorAction("codex"),
 			Snippets: map[string]string{
-				"~/.codex/config.toml": fmt.Sprintf("model = %q\nmodel_provider = \"zcode_bridge\"\n\n[model_providers.zcode_bridge]\nname = \"ZCode Local Bridge\"\nbase_url = %q\nwire_api = \"responses\"\nexperimental_bearer_token = %q", model, openAIBase, apiKey),
+				"~/.codex/config.toml": fmt.Sprintf("model = %q\nmodel_provider = \"zcode_bridge\"\n\n[model_providers.zcode_bridge]\nname = %q\nbase_url = %q\nwire_api = \"responses\"\nexperimental_bearer_token = %q", model, connectorProviderName, openAIBase, apiKey),
 			},
 		},
 		{
@@ -146,7 +146,7 @@ func buildAgentConnectors(baseURL, apiKey, model, provider string) []agentConnec
 			ID: "opencode", Name: "OpenCode", Description: "OpenAI-compatible Provider 配置",
 			Model: model, Action: connectorAction("opencode"),
 			Snippets: map[string]string{
-				"~/.config/opencode/opencode.json":    fmt.Sprintf("{\n  \"$schema\": \"https://opencode.ai/config.json\",\n  \"provider\": {\n    \"zcode-bridge\": {\n      \"npm\": \"@ai-sdk/openai-compatible\",\n      \"name\": \"ZCode Local Bridge\",\n      \"options\": { \"baseURL\": %q, \"apiKey\": \"{file:~/.config/opencode/zcode-bridge-key}\" },\n      \"models\": { %q: { \"name\": %q } }\n    }\n  },\n  \"model\": %q\n}", openAIBase, model, model, "zcode-bridge/"+model),
+				"~/.config/opencode/opencode.json":    fmt.Sprintf("{\n  \"$schema\": \"https://opencode.ai/config.json\",\n  \"provider\": {\n    \"zcode-bridge\": {\n      \"npm\": \"@ai-sdk/openai-compatible\",\n      \"name\": %q,\n      \"options\": { \"baseURL\": %q, \"apiKey\": \"{file:~/.config/opencode/zcode-bridge-key}\" },\n      \"models\": { %q: { \"name\": %q } }\n    }\n  },\n  \"model\": %q\n}", connectorProviderName, openAIBase, model, model, "zcode-bridge/"+model),
 				"~/.config/opencode/zcode-bridge-key": apiKey,
 			},
 		},
@@ -185,7 +185,7 @@ func deepSeekHarnessSnippets(openAIBase, apiKey, model string, imageInput bool) 
 		input = "[text, image]"
 	}
 	return map[string]string{
-		"$DSH_HOME/settings.yaml":     fmt.Sprintf("llm-pi-ai:\n  providers:\n    zcode-bridge:\n      displayName: ZCode Local Bridge\n      apiKeyEnv: ZCODE_BRIDGE_API_KEY\n      api: openai-completions\n      baseURL: %s\n      compat:\n        supportsDeveloperRole: false\n        maxTokensField: max_tokens\n      models:\n        - id: %s\n          name: %s\n          input: %s\nagent-default-model:\n  provider: zcode-bridge\n  model: %s", openAIBase, model, model, input, model),
+		"$DSH_HOME/settings.yaml":     fmt.Sprintf("llm-pi-ai:\n  providers:\n    zcode-bridge:\n      displayName: %s\n      apiKeyEnv: ZCODE_BRIDGE_API_KEY\n      api: openai-completions\n      baseURL: %s\n      compat:\n        supportsDeveloperRole: false\n        maxTokensField: max_tokens\n      models:\n        - id: %s\n          name: %s\n          input: %s\nagent-default-model:\n  provider: zcode-bridge\n  model: %s", connectorProviderName, openAIBase, model, model, input, model),
 		"$DSH_HOME/.credentials.yaml": fmt.Sprintf("version: 1\nrefs:\n  ZCODE_BRIDGE_API_KEY: %s", apiKey),
 	}
 }

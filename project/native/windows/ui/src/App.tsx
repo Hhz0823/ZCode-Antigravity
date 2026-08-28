@@ -451,7 +451,7 @@ function ControlCenterApp() {
   const [usage, setUsage] = useState<UsageReport>();
   const [manager, setManager] = useState<ManagerReport>();
   const [connectors, setConnectors] = useState<ConnectorResponse>();
-  const [version, setVersion] = useState("0.6.9-test");
+  const [version, setVersion] = useState("0.6.10-test");
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
@@ -581,7 +581,7 @@ function ControlCenterApp() {
     initialized.current = true;
     void (async () => {
       try {
-        const startup: StartupInfo = hasDesktopBridge() ? await desktopBridge()!.startupInfo() : { version: "0.6.9-test", autoSetup: false };
+        const startup: StartupInfo = hasDesktopBridge() ? await desktopBridge()!.startupInfo() : { version: "0.6.10-test", autoSetup: false };
         setVersion(startup.version);
         await refresh(true);
         if (startup.autoSetup) await runAction("setup");

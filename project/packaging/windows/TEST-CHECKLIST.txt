@@ -1,7 +1,7 @@
 Windows acceptance checklist
 ============================
 
-[ ] ZCode-Antigravity-Setup-v0.6.9-test.exe opens a native confirmation dialog without a terminal.
+[ ] ZCode-Antigravity-Setup-v0.6.10-test.exe opens a native confirmation dialog without a terminal.
 [ ] Control-center refresh, login, sync, stop, port inspection, and ZCode launch never flash a console window.
 [ ] The native EXE writes install.ps1 with exactly one EF BB BF UTF-8 BOM before Windows PowerShell 5.1 parses it.
 [ ] A release build without injected or verified Antigravity OAuth desktop configuration fails before producing artifacts.
@@ -43,7 +43,7 @@ Windows acceptance checklist
 [ ] netstat -ano shows the service only on 127.0.0.1, not 0.0.0.0 or [::].
 [ ] ZCode refuses sync while ZCode.exe remains in the tray.
 [ ] After fully exiting ZCode, Sync-ZCode.bat creates a timestamped backup.
-[ ] ZCode shows Provider "Antigravity + Grok (Local Bridge)"; Antigravity has exactly the two managed Gemini entries.
+[ ] ZCode shows Provider "Google"; Antigravity has exactly the managed Gemini entries.
 [ ] Grok / xAI login uses browser device authorization, then exposes text models but no Imagine image/video models.
 [ ] The widget's Open Control Center button and tray context-menu item explicitly reopen the panel; provider switch changes quota/model cards; Exit removes the tray and releases the local API.
 [ ] One-click setup for DeepSeek Harness, Grok Build, Codex, Claude Code, Gemini CLI, Qwen Code,

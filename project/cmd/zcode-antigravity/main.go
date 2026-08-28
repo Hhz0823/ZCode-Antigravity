@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const version = "0.6.9-test"
+const version = "0.6.10-test"
 
 var defaultCommand = "menu"
 

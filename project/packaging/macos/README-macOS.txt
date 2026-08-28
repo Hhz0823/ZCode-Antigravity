@@ -1,7 +1,7 @@
 ZCode Antigravity Bridge - macOS Universal test build
 ====================================================
 
-版本：0.6.9-test
+版本：0.6.10-test
 架构：Apple Silicon (arm64) + Intel (x86_64)
 最低系统：macOS 12
 
@@ -35,7 +35,7 @@ API 权限或封禁账号。请只使用专门的测试账号，不要使用主 
 6. 按需完成 Google OAuth 或 xAI 设备授权，再点击“一键接入 ZCode”。
    Google OAuth 本地回调最长等待 30 分钟；如果页面明确提示超时，请回到程序
    重新点击登录，不要重新加载旧的 localhost 回调页。
-7. 在 ZCode 中选择 Antigravity + Grok (Local Bridge) 下的目标模型，先发送一条短消息验收。
+7. 在 ZCode 中选择 Google 下的目标模型，先发送一条短消息验收。
    需要实时网页信息时选择 Gemini Web Search (Google)；回答应包含来源引用。
 8. 关闭原生窗口后菜单栏额度组件继续运行；程序坞或 Popover 内的“打开主界面”可重开窗口。
 

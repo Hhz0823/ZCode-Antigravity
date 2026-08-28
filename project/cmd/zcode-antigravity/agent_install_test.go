@@ -57,7 +57,7 @@ func TestOneClickAgentConfigsPreserveExistingSettings(t *testing.T) {
 	assertJSONContains(t, seedPath(root, "claude/settings.json"), "permissions", "ANTHROPIC_BASE_URL")
 	assertJSONContains(t, seedPath(root, "gemini-home/.gemini/settings.json"), "ui", "selectedType")
 	assertJSONContains(t, seedPath(root, "qwen/settings.json"), "theme", "zcode-bridge")
-	assertJSONContains(t, seedPath(root, "opencode/opencode.json"), "instructions", "@ai-sdk/openai-compatible")
+	assertJSONContains(t, seedPath(root, "opencode/opencode.json"), "instructions", "@ai-sdk/openai-compatible", "Google")
 	for _, path := range []string{"codex/config.toml", "kimi/config.toml", "grok/config.toml"} {
 		raw := mustReadFile(t, seedPath(root, path))
 		var parsed map[string]any
@@ -66,6 +66,11 @@ func TestOneClickAgentConfigsPreserveExistingSettings(t *testing.T) {
 		}
 		if !strings.Contains(string(raw), "zcode") {
 			t.Fatalf("%s missing managed provider", path)
+		}
+	}
+	for _, path := range []string{"codex/config.toml", "grok/config.toml"} {
+		if raw := string(mustReadFile(t, seedPath(root, path))); !strings.Contains(raw, "Google") || strings.Contains(raw, "ZCode Local Bridge") {
+			t.Fatalf("%s provider display name is not Google: %s", path, raw)
 		}
 	}
 	env := string(mustReadFile(t, seedPath(root, "gemini-home/.gemini/.env")))
