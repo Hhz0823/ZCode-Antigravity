@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "0.6.6-test"
+private let appVersion = "0.6.7-test"
 
 private extension Notification.Name {
     static let selectBridgeProvider = Notification.Name("ZCodeSelectBridgeProvider")
@@ -901,12 +901,12 @@ private enum CodexUPalette {
     static let accentLight = Color(red: 123 / 255, green: 160 / 255, blue: 255 / 255)
     static let secondary = Color(red: 139 / 255, green: 109 / 255, blue: 255 / 255)
     static let tertiary = Color(red: 255 / 255, green: 159 / 255, blue: 10 / 255)
-    static let border = Color(red: 148 / 255, green: 163 / 255, blue: 184 / 255).opacity(0.32)
+    static let border = Color(red: 148 / 255, green: 163 / 255, blue: 184 / 255).opacity(0.42)
     static let pageBackground = Color.clear
-    static let glassFill = Color(nsColor: .controlBackgroundColor).opacity(0.38)
-    static let glassFillLight = Color(nsColor: .controlBackgroundColor).opacity(0.24)
+    static let glassFill = Color(nsColor: .controlBackgroundColor).opacity(0.96)
+    static let glassFillLight = Color(nsColor: .controlBackgroundColor).opacity(0.92)
     static let glassStroke = LinearGradient(
-        colors: [.white.opacity(0.72), accentLight.opacity(0.36), secondary.opacity(0.28)],
+        colors: [.white.opacity(0.94), accentLight.opacity(0.24), secondary.opacity(0.14)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
@@ -915,18 +915,20 @@ private enum CodexUPalette {
 private struct NativeBlurBackground: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
-        view.material = .underWindowBackground
+        view.material = .menu
         view.blendingMode = .behindWindow
         view.state = .active
-        view.isEmphasized = true
+        view.isEmphasized = false
+        view.alphaValue = 0.82
         return view
     }
 
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
         nsView.state = .active
         nsView.blendingMode = .behindWindow
-        nsView.material = .underWindowBackground
-        nsView.isEmphasized = true
+        nsView.material = .menu
+        nsView.isEmphasized = false
+        nsView.alphaValue = 0.82
     }
 }
 
@@ -936,32 +938,25 @@ private struct LiquidGlassBackground: View {
     var body: some View {
         ZStack {
             NativeBlurBackground()
-            ZStack {
-                LinearGradient(
-                    colors: scheme == .dark
-                        ? [Color(red: 0.04, green: 0.08, blue: 0.20).opacity(0.26), CodexUPalette.secondary.opacity(0.10)]
-                        : [Color.white.opacity(0.14), CodexUPalette.accentLight.opacity(0.09), CodexUPalette.secondary.opacity(0.07)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                Circle()
-                    .fill(CodexUPalette.accent.opacity(scheme == .dark ? 0.16 : 0.11))
-                    .frame(width: 520, height: 520)
-                    .blur(radius: 68)
-                    .offset(x: -350, y: -270)
-                Circle()
-                    .fill(CodexUPalette.secondary.opacity(scheme == .dark ? 0.15 : 0.10))
-                    .frame(width: 580, height: 580)
-                    .blur(radius: 76)
-                    .offset(x: 420, y: 250)
-                Ellipse()
-                    .fill(Color.cyan.opacity(scheme == .dark ? 0.10 : 0.07))
-                    .frame(width: 700, height: 300)
-                    .blur(radius: 72)
-                    .rotationEffect(.degrees(-18))
-                    .offset(x: 120, y: -300)
-            }
-            .drawingGroup(opaque: false, colorMode: .linear)
+            LinearGradient(
+                colors: scheme == .dark
+                    ? [Color(red: 0.04, green: 0.08, blue: 0.20).opacity(0.12), CodexUPalette.secondary.opacity(0.04)]
+                    : [Color.white.opacity(0.06), CodexUPalette.accentLight.opacity(0.035), CodexUPalette.secondary.opacity(0.025)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            RadialGradient(
+                colors: [CodexUPalette.accent.opacity(scheme == .dark ? 0.08 : 0.045), .clear],
+                center: .topLeading,
+                startRadius: 20,
+                endRadius: 700
+            )
+            RadialGradient(
+                colors: [CodexUPalette.secondary.opacity(scheme == .dark ? 0.07 : 0.04), .clear],
+                center: .bottomTrailing,
+                startRadius: 30,
+                endRadius: 760
+            )
         }
         .ignoresSafeArea()
     }
@@ -1012,8 +1007,6 @@ struct DashboardView: View {
                 .accessibilityHidden(true)
         }
         .preferredColorScheme(theme == "light" ? .light : (theme == "dark" ? .dark : nil))
-        .animation(.easeInOut(duration: 0.18), value: model.provider)
-        .animation(.easeInOut(duration: 0.18), value: navigation.section)
     }
 
     private var topToolbar: some View {
@@ -1069,8 +1062,8 @@ struct DashboardView: View {
                 .background(CodexUPalette.glassFillLight, in: Capsule())
                 .overlay(Capsule().stroke(CodexUPalette.border))
             Text("\(model.provider == "xai" ? "Grok / xAI" : "Antigravity") · \(selectedProviderCount) 个账号")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+                .font(.callout.weight(.medium))
+                .foregroundStyle(.primary)
             Spacer()
             Label("额度每 5 分钟 · Token 每 5 秒", systemImage: "clock.arrow.circlepath")
                 .font(.caption)
@@ -1392,7 +1385,7 @@ struct DashboardView: View {
         NativeCard {
             VStack(alignment: .leading, spacing: 18) {
                 CardTitle(kicker: "PREFERENCES", title: "界面与后台刷新", icon: "gearshape.fill")
-                settingsRow(title: "液态透明高斯模糊", detail: "使用原生窗口材质、半透明玻璃卡片与模糊色团") {
+                settingsRow(title: "液态透明高斯模糊", detail: "只模糊白色窗口底板，卡片、按钮和文字保持高对比度") {
                     Toggle("", isOn: Binding(
                         get: { model.manager?.settings.liquidGlass ?? true },
                         set: { value in Task { await model.updateManagerSettings(.init(liquidGlass: value)) } }

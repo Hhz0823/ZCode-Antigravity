@@ -320,7 +320,7 @@ function AnalyticsView({ usage }: { usage?: UsageReport }) {
 }
 
 function SettingsView({ manager, saveSetting, saving }: { manager?: ManagerReport; saveSetting: (body: Record<string, unknown>) => void; saving: boolean }) {
-  return <div className="grid gap-4 md:grid-cols-[1fr_.85fr]"><Card><CardHeader eyebrow="APPEARANCE" title="界面与刷新" description="Windows Acrylic + WebView2 合成" action={saving ? <LoaderCircle className="size-4 animate-spin" /> : undefined} /><div className="space-y-3 p-5"><Switch checked={manager?.settings.liquidGlass ?? true} onChange={(value) => saveSetting({ liquidGlass: value })} label="液态玻璃背景" /><div className="setting-row"><div><p>额度自动刷新</p><small>默认每 5 分钟，不影响 5 秒状态探测</small></div><div className="segmented">{[5, 10].map((value) => <button className={cn(manager?.settings.autoRefreshMinutes === value && "active")} onClick={() => saveSetting({ autoRefreshMinutes: value })} key={value}>{value} 分钟</button>)}</div></div><InfoLine label="网络模式" value={manager?.settings.proxyURL || "自动 v2rayN / 系统代理 / 直连"} /><InfoLine label="低额度警告" value={`${manager?.settings.quotaWarningPercent ?? 20}%`} /><InfoLine label="设置文件" value={manager?.settings.settingsPath || "当前用户目录"} /></div></Card><Card><CardHeader eyebrow="FEATURES" title="Antigravity Tools 能力" description="当前原生管理核心提供的功能" /><div className="space-y-2 p-5">{manager?.features.map((feature) => <div className="feature-row" key={feature.id}><span className={cn("feature-check", feature.available && "active")}>{feature.available && <Check />}</span><div><p>{feature.name}</p><small>{feature.description}</small></div></div>)}</div></Card></div>;
+  return <div className="grid gap-4 md:grid-cols-[1fr_.85fr]"><Card><CardHeader eyebrow="APPEARANCE" title="界面与刷新" description="Windows DWM 原生模糊 + 高对比内容层" action={saving ? <LoaderCircle className="size-4 animate-spin" /> : undefined} /><div className="space-y-3 p-5"><Switch checked={manager?.settings.liquidGlass ?? true} onChange={(value) => saveSetting({ liquidGlass: value })} label="白色液态玻璃背景" /><div className="setting-row"><div><p>额度自动刷新</p><small>默认每 5 分钟，不影响 5 秒状态探测</small></div><div className="segmented">{[5, 10].map((value) => <button className={cn(manager?.settings.autoRefreshMinutes === value && "active")} onClick={() => saveSetting({ autoRefreshMinutes: value })} key={value}>{value} 分钟</button>)}</div></div><InfoLine label="网络模式" value={manager?.settings.proxyURL || "自动 v2rayN / 系统代理 / 直连"} /><InfoLine label="低额度警告" value={`${manager?.settings.quotaWarningPercent ?? 20}%`} /><InfoLine label="设置文件" value={manager?.settings.settingsPath || "当前用户目录"} /></div></Card><Card><CardHeader eyebrow="FEATURES" title="Antigravity Tools 能力" description="当前原生管理核心提供的功能" /><div className="space-y-2 p-5">{manager?.features.map((feature) => <div className="feature-row" key={feature.id}><span className={cn("feature-check", feature.available && "active")}>{feature.available && <Check />}</span><div><p>{feature.name}</p><small>{feature.description}</small></div></div>)}</div></Card></div>;
 }
 
 function InfoLine({ label, value }: { label: string; value: string }) { return <div className="info-line"><span>{label}</span><strong title={value}>{value}</strong></div>; }
@@ -451,7 +451,7 @@ function ControlCenterApp() {
   const [usage, setUsage] = useState<UsageReport>();
   const [manager, setManager] = useState<ManagerReport>();
   const [connectors, setConnectors] = useState<ConnectorResponse>();
-  const [version, setVersion] = useState("0.6.6-test");
+  const [version, setVersion] = useState("0.6.7-test");
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
@@ -581,7 +581,7 @@ function ControlCenterApp() {
     initialized.current = true;
     void (async () => {
       try {
-        const startup: StartupInfo = hasDesktopBridge() ? await desktopBridge()!.startupInfo() : { version: "0.6.6-test", autoSetup: false };
+        const startup: StartupInfo = hasDesktopBridge() ? await desktopBridge()!.startupInfo() : { version: "0.6.7-test", autoSetup: false };
         setVersion(startup.version);
         await refresh(true);
         if (startup.autoSetup) await runAction("setup");

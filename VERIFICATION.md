@@ -2,6 +2,24 @@
 
 最新验证日期：2026-08-28（Asia/Shanghai）
 
+## v0.6.7-test 单层原生玻璃、高对比内容与滚动优化
+
+- 两端统一为“只有窗口底板是白色液态玻璃”：Windows 由 DWM Acrylic
+  模糊桌面，macOS 由唯一 `NSVisualEffectView` 以 `behindWindow` 方式合成；
+  导航、提供商切换、状态卡、额度卡和操作按钮使用接近实色的白色内容层和深色文字。
+- macOS 删除三个 520–700 px 大尺寸 SwiftUI `.blur` 色团、`drawingGroup`
+  和根层隐式切换动画；保留系统材质与无模糊的静态渐变光感。真实桌面合成截图确认
+  卡片/按钮不再被后方文字干扰，卡片间隙仍能看到经系统模糊的桌面。
+- Apple Silicon 原生预览完成 4 页连续向下和向上滚动，无需重试即从滚动值
+  `0` 到 `1` 再回到 `0`；arm64 与 x86_64 macOS 12 Swift 类型检查通过。
+- Electron 正式模式不再执行渲染器全窗 `backdrop-filter`，同时隐藏动画光团与噪点层、
+  禁用页面入场动画，并对滚动容器启用 layout/paint/style containment。
+- Windows 渲染模式连续滚动 3 轮，每轮 180 帧：平均 16.57–16.67 ms，P95 17.4–17.5 ms，
+  540 帧中仅 2 帧超过 20 ms，活动动画数为 0。该数据是 macOS 构建主机上的 Chromium
+  渲染回归，不冒充 Windows 10/11 DWM 实机帧时。
+- 管理器 `go test ./...` / `go vet ./...`、CLIProxyAPI `go mod verify` / `go test ./...`、
+  Electron IPC/CSS 回归（5/5）与 React/Tailwind 生产构建通过。
+
 ## v0.6.6-test Electron / Swift 双端统一与 macOS 真实接入验证
 
 - Windows 客户端已从 Tauri/Rust GUI 迁移到 Electron 44 + React 19 + Tailwind CSS 4；

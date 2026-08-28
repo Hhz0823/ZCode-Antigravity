@@ -2,6 +2,8 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const { assertApiPath, assertXaiURL, normalizeConnection, trayTooltip } = require("./protocol.cjs");
 
 test("accepts only the fixed local API allowlist", () => {
@@ -30,4 +32,13 @@ test("builds the independent tray quota summary", () => {
     "ZCode · Antigravity · 5小时 92% · 本周 78% · 43.3 tok/s",
   );
   assert.equal(trayTooltip({ provider: "xai" }), "ZCode · Grok · 额度暂不可用");
+});
+
+test("delegates desktop blur to DWM without animated renderer blur", () => {
+  const css = fs.readFileSync(path.join(__dirname, "..", "src", "index.css"), "utf8");
+  assert.match(css, /\.electron-shell \.app-shell,[\s\S]*?backdrop-filter: none;/);
+  assert.match(css, /\.electron-shell \.liquid-orb,[\s\S]*?\.electron-shell \.noise-layer \{ display: none; \}/);
+  assert.match(css, /\.electron-shell \.page-content \{ animation: none; \}/);
+  assert.match(css, /\.electron-shell \.main-panel \{[\s\S]*?contain: layout paint style;/);
+  assert.match(css, /\.glass-card \{[^\n]*background: rgba\(250,251,255,\.96\);/);
 });

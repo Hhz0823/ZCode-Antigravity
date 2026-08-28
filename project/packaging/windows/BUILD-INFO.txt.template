@@ -1,27 +1,27 @@
 ZCode Antigravity Bridge build information
 ===========================================
 
-Package: ZCode-Antigravity-Windows-x64-0.6.6-test
+Package: ZCode-Antigravity-Windows-x64-0.6.7-test
 Build date (UTC): __BUILD_DATE__
 Target: Windows x64 (PE32+ Go Core and Electron GUI control center)
 
 Manager
 -------
-Version: 0.6.6-test
+Version: 0.6.7-test
 Go: 1.26.4
 CGO: disabled
 SHA-256: __MANAGER_SHA256__
 
 Control center
 --------------
-Version: 0.6.6-test
+Version: 0.6.7-test
 UI: Electron 44.0.0, React 19.2.8, Tailwind CSS 4.3.3, shadcn-style components
 Native shell: Electron main/preload with context isolation and renderer sandbox
 Subsystem: Windows GUI (no console window)
 Rendering: packaged Chromium with native DWM Acrylic and responsive DPI scaling
 Quota view: protected loopback route, redacted cache, grouped native bars, 5-minute refresh
 Token view: protocol usage, output/reasoning tokens, generation/effective token/s, no prompt text
-Theme: Segoe UI Variable / Microsoft YaHei, liquid glass, animated light orbs, bundled icon
+Theme: Segoe UI Variable / Microsoft YaHei, DWM liquid-glass background, high-contrast content surfaces, bundled icon
 SHA-256: __CONTROL_CENTER_SHA256__
 
 Backend
@@ -70,10 +70,11 @@ Local backend patches
 33. Replace the Rust/Tauri shell with Electron 44 while preserving the tested Go native-host API and React theme.
 34. Enable context isolation and renderer sandboxing, disable Node integration, and expose only fixed IPC methods.
 35. Use DWM Acrylic for the main window and independent tray widget while removing renderer-side full-window blur during scroll and drag.
+36. Restrict liquid glass to the white window backdrop; keep navigation, cards, buttons, and text on high-contrast surfaces, with zero renderer animations in Electron mode.
 
 Verification evidence
 ---------------------
-Current v0.6.6-test build-host checks:
+Current v0.6.7-test build-host checks:
 - Manager go test ./... and Windows x64 build: passed
 - Manager go test -race: passed on the macOS build host
 - CLIProxyAPI go mod verify, go test ./..., and Windows x64 build: passed
@@ -87,7 +88,8 @@ Current v0.6.6-test build-host checks:
 - Windows child-process CREATE_NO_WINDOW test and Windows x64 test-binary cross-compile: passed
 - Provider/model selection, Grok billing proxy, tray state, and eight Agent connector tests: passed
 - Native SwiftUI macOS main executable and Electron Windows main executable build checks: passed
-- v0.6.6-test preserves the verified Grok recovery/login path and adds an independent DPI-aware taskbar quota widget
+- v0.6.7-test preserves the verified Grok recovery/login path and independent DPI-aware taskbar quota widget
+- Electron mode uses one native DWM blur backdrop, zero active renderer animations, and high-contrast content surfaces; three 180-frame scroll runs measured p95 17.4-17.5 ms
 - Electron target-runtime retest is required on Windows; the following visual/runtime items are retained from the earlier v0.6.4 Tauri baseline and are not claimed for Electron until rerun
 - Seven-second Windows drag recording (198 frames): no white/black frame, tearing, or frozen desktop sample: passed
 - 5-second connection/Token poll left quota fetchedAt/cache write time unchanged; five-minute quota cadence is isolated: passed

@@ -7,7 +7,8 @@ This package lets ZCode and other local agents use Antigravity Gemini or xAI Gro
 models through a loopback-only compatible Provider. The control center switches account,
 model, quota, and connector views together. Image/video generation models are not injected.
 The Electron 44 window uses React, Tailwind CSS, shadcn-style components, native Acrylic, and the same
-light liquid-glass information architecture as the macOS app. Its seven pages are Overview,
+light liquid-glass information architecture as the macOS app. Only the white window backdrop is
+blurred; navigation, cards, buttons, and text remain high contrast. Its seven pages are Overview,
 Accounts, API Proxy, Model Routing, Agent Connectors, Analytics, and Settings.
 
 Important risk
@@ -29,20 +30,20 @@ Requirements
 First test
 ----------
 Recommended: fully exit ZCode from the tray and double-click
-ZCode-Antigravity-Setup-v0.6.6-test.exe. This is a native Windows GUI installer: it shows no
+ZCode-Antigravity-Setup-v0.6.7-test.exe. This is a native Windows GUI installer: it shows no
 terminal, verifies the embedded ZIP plus all three executables, installs only for the current
 user, creates Desktop/Start Menu shortcuts, and opens the control center after completion.
 Do not use v0.4.0-test on Windows; its Rust client expected baseUrl while the Go Core correctly
 emitted baseURL, so startup stopped before the control center could open.
 Do not use v0.5.2-test for a fresh Antigravity login; that release was packaged without the
-required OAuth desktop configuration. v0.6.6-test also repairs a recorded gateway automatically
+required OAuth desktop configuration. v0.6.7-test also repairs a recorded gateway automatically
 when its process exits unexpectedly, while preserving an intentional Stop. It also queues a quota
 refresh that overlaps the five-second status poll, so Grok quota appears automatically after the
 gateway comes online. Its tray click now opens an independent Acrylic quota widget and never raises
 the main control-center window unless the user explicitly asks to open it.
 
 For the single-BAT fallback, fully exit ZCode from the tray and double-click
-ZCode-Antigravity-OneClick-v0.6.6-test.bat. It verifies and extracts its embedded package,
+ZCode-Antigravity-OneClick-v0.6.7-test.bat. It verifies and extracts its embedded package,
 then opens the graphical control center without leaving a terminal window. The control center
 opens OAuth when needed, writes the verified ZCode Provider directly, and starts ZCode after
 successful readback.
@@ -123,10 +124,10 @@ Graphical control center and quota
   components. It starts the audited Go manager as a hidden child and loads only the packaged
   renderer through a sandboxed, context-isolated preload bridge.
 - The main window and taskbar quota widget share a liquid-glass visual language. The client uses
-  native DWM Acrylic with translucent WebView layers and animated light orbs. It does not capture
+  one native DWM Acrylic backdrop with near-solid white content surfaces. It does not capture
   the desktop, so dragging and resizing do not wait for background resampling.
-- Scrollable cards use lightweight translucent fills instead of stacking WebView blur filters.
-  Ambient orbs and nonessential transitions pause during scrolling or native window dragging.
+- Electron mode disables renderer-side ambient orbs, full-window blur, and page-entry animation;
+  scrolling cards remain high contrast without stacking WebView blur filters.
 - Seven pages expose redacted account state, OpenAI/Anthropic/Gemini endpoints, routing and
   session affinity, retry limits, Agent connectors, local Token analytics, refresh cadence,
   quota warning threshold, and UI settings.
@@ -184,9 +185,9 @@ Available scripts
 
 Installer formats
 -----------------
-- ZCode-Antigravity-Setup-v0.6.6-test.exe: recommended no-terminal current-user installer.
-- ZCode-Antigravity-OneClick-v0.6.6-test.bat: fallback single-file installer.
-- ZCode-Antigravity-Windows-x64-0.6.6-test.zip: manually verifiable expanded package.
+- ZCode-Antigravity-Setup-v0.6.7-test.exe: recommended no-terminal current-user installer.
+- ZCode-Antigravity-OneClick-v0.6.7-test.bat: fallback single-file installer.
+- ZCode-Antigravity-Windows-x64-0.6.7-test.zip: manually verifiable expanded package.
 - The EXE installer is custom-built and unsigned. It does not require administrator rights or
   7-Zip on the target computer; Windows SmartScreen may still require manual confirmation.
 
@@ -260,7 +261,7 @@ cause a clear setup error instead of silently substituting another model.
 
 Build versions
 --------------
-- ZCode Antigravity Bridge: 0.6.6-test
+- ZCode Antigravity Bridge: 0.6.7-test
 - Control center: Electron 44.0.0, Chromium, React 19.2.8, Tailwind CSS 4.3.3
 - CLIProxyAPI base: v7.2.132, commit 78f0c4079e3e6273d65d03b5549cffc898703264
 - Local build: 7.2.132-zcode.12

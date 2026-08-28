@@ -3,7 +3,7 @@
 > 在 Windows 与 macOS 上统一接入 Antigravity Gemini 和 xAI Grok，
 > 并把本机安全网关提供给 ZCode、Grok Build、Codex、Claude Code 与 OpenCode。
 
-**当前版本：** Windows / macOS `v0.6.6-test`
+**当前版本：** Windows / macOS `v0.6.7-test`
 **适用系统：** macOS 12+（Apple Silicon / Intel）、Windows 10 / 11 x64
 **项目状态：** 测试版
 
@@ -26,6 +26,7 @@
 - Gemini CLI 使用原生 Gemini 协议，因此仅在选择 Antigravity 时启用；Grok 可一键接入其余 OpenAI / Anthropic 兼容客户端。
 - Windows 控制中心使用 **Electron 44 + React + Tailwind CSS / shadcn 风格组件**；Electron 负责窗口、任务栏小组件和受限 IPC，Chromium 随系统 DPI 缩放并叠加原生 DWM Acrylic，子进程全部隐藏。
 - macOS 控制中心使用 **SwiftUI + AppKit** 原生开发，具有真正的 Dock 图标、原生菜单栏额度组件；Universal `.app` 同时兼容 Apple Silicon 与 Intel。
+- Windows / macOS 只让最底层白色窗口背景使用原生液态玻璃与高斯模糊；导航、卡片、按钮和文字使用高对比度内容层，不再对每张滚动卡重复模糊。
 - 七页控制中心统一提供总览、账号、API 代理、模型路由、Agent 接入、用量统计和设置；右侧操作区始终保留本机 OAuth、网关与 ZCode 接入动作。
 - 控制中心使用系统字体、响应式布局和页面切换反馈；Windows 自带固定版本 Electron/Chromium，macOS 保持原生 SwiftUI，两端打开面板都不会弹出终端窗口。
 - Windows 会自动使用已启用的系统代理；检测到 v2rayN 时自动探测新版 mixed `10808` 与旧版 HTTP `10809`，无需开启 TUN。手动代理优先，均不可用时才直连。
@@ -38,11 +39,11 @@
 
 | 文件 | 用途 | 建议 |
 | --- | --- | --- |
-| `ZCode-Antigravity-macOS-Universal-v0.6.6-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
-| `ZCode-Antigravity-Setup-v0.6.6-test.exe` | Windows 图形化安装器 | **普通用户首选** |
-| `ZCode-Antigravity-OneClick-v0.6.6-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
-| `ZCode-Antigravity-Windows-x64-0.6.6-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
-| `ZCode-Antigravity-Source-v0.6.6-test.zip` | 当前源码快照 | 审计 / 构建 |
+| `ZCode-Antigravity-macOS-Universal-v0.6.7-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
+| `ZCode-Antigravity-Setup-v0.6.7-test.exe` | Windows 图形化安装器 | **普通用户首选** |
+| `ZCode-Antigravity-OneClick-v0.6.7-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
+| `ZCode-Antigravity-Windows-x64-0.6.7-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
+| `ZCode-Antigravity-Source-v0.6.7-test.zip` | 当前源码快照 | 审计 / 构建 |
 
 ## macOS 快速安装
 
@@ -74,7 +75,7 @@ AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切�
 ### 安装步骤
 
 1. 从 Windows 系统托盘完全退出 ZCode。仅关闭窗口可能仍会留下 `ZCode.exe` 进程。
-2. 下载 `ZCode-Antigravity-Setup-v0.6.6-test.exe`，并先校验 SHA-256。请勿使用任务栏点击会同时置顶主窗口的 `v0.6.3-test`、网关启动后可能保留旧额度提示的 `v0.6.2-test` 或更早测试版。
+2. 下载 `ZCode-Antigravity-Setup-v0.6.7-test.exe`，并先校验 SHA-256。请勿使用任务栏点击会同时置顶主窗口的 `v0.6.3-test`、网关启动后可能保留旧额度提示的 `v0.6.2-test` 或更早测试版。
 3. 双击安装器。程序会自动使用正在运行的 v2rayN / Windows 系统代理，无需开启 TUN；未发现代理时才直连。
 4. 在控制中心选择 Antigravity 或 Grok，完成对应授权并等待状态检查通过。Grok 登录时，将软件弹层中的临时验证码输入已打开的 xAI 官方页面；授权后无需再把结果粘贴回软件。
 5. 重新打开 ZCode，选择 Provider `Antigravity + Grok (Local Bridge)`；控制中心会作为任务栏额度小组件继续驻留。
@@ -104,7 +105,7 @@ $env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
 
 ## 已验证范围
 
-Windows 基线与 `v0.6.6-test` 的构建测试记录包括：
+Windows 基线与 `v0.6.7-test` 的构建测试记录包括：
 
 - 管理器与 CLIProxyAPI 的 Go 测试、Windows x64 构建和静态检查通过。
 - OAuth PKCE / callback、DPAPI 凭据存储、原子替换和 loopback 约束通过。
@@ -117,7 +118,8 @@ Windows 基线与 `v0.6.6-test` 的构建测试记录包括：
 - Windows 全部 GUI 子进程使用 `CREATE_NO_WINDOW`；Windows x64 测试程序交叉编译通过。
 - Electron 控制中心通过前端生产构建、IPC allowlist 测试、Electron 44 Windows x64 交叉打包、ASAR 内容核验和 PE32+ GUI 子系统检查。
 - Windows 控制中心使用 React、Tailwind CSS 4 与 shadcn 风格组件实现七页响应式界面；Segoe UI Variable / 微软雅黑由 Chromium 按系统 DPI 渲染。
-- 历史 `v0.6.4-test` Tauri 基线在 Windows 11 实机确认 Acrylic 会连续模糊窗口后方桌面，且 7 秒、198 帧拖动录像无白屏/黑屏/撕裂；该结果不冒充为 `v0.6.6-test` Electron 目标机验证，新壳仍需 Windows 10/11 复测。
+- `v0.6.7-test` Electron 实际模式仅使用 DWM 模糊窗口底板，渲染层活动动画为 0；180 帧连续滚动 3 轮的 P95 为 17.4–17.5 ms，卡片保持白色高对比内容层。
+- 历史 `v0.6.4-test` Tauri 基线在 Windows 11 实机确认 Acrylic 会连续模糊窗口后方桌面，且 7 秒、198 帧拖动录像无白屏/黑屏/撕裂；该结果不冒充为 `v0.6.7-test` Electron 目标机验证，新壳仍需 Windows 10/11 复测。
 - 账号、三协议代理、模型路由、会话亲和、重试策略、5/10 分钟刷新与液态玻璃设置均通过带当前用户会话密钥的本机 API 读写；账号 ID 与标签脱敏，接口不返回凭据。
 - 双提供商切换、Grok billing 解析、文本模型过滤和八类 Agent 一键配置均有单元测试。
 - Antigravity 额度 HTTP 403 去项目字段重试和 `fetchAvailableModels` 降级路径均有回归测试。
