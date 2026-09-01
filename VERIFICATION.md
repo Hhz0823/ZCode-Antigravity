@@ -1,6 +1,27 @@
 # 修复与验证记录
 
-最新验证日期：2026-08-28（Asia/Shanghai）
+最新验证日期：2026-09-01（Asia/Shanghai）
+
+## V1.0.0 正式版发布
+
+- 管理器、macOS 原生客户端、Windows Electron 客户端和全部打包默认版本统一为 `1.0.0`；
+  macOS `CFBundleShortVersionString=1.0.0`、递增构建号 `CFBundleVersion=1000`。
+- 管理器 `go test ./...`、`go vet ./...`、`go test -race ./...` 通过；固定的 CLIProxyAPI
+  `go mod verify` 与全量 `go test ./...` 通过。
+- SwiftUI / AppKit 客户端在 `arm64-apple-macos12.0` 与 `x86_64-apple-macos12.0` 下类型检查通过；
+  Universal App 的主程序、Go Core 与后端均包含 `x86_64 arm64` 两个切片。
+- macOS 正式 ZIP 的 CRC、外层 SHA-256、包内逐文件 SHA-256、临时签名和版本字段通过；V1.0.0
+  已安装到 Apple Silicon 本机，三个进程正常驻留，Core 监听 `127.0.0.1:18200`，模型网关监听
+  `127.0.0.1:18080`，`/healthz` 返回 HTTP 200 与 `{"status":"ok"}`。
+- 旧的 0.6.13 App 已移动到 `~/Library/Application Support/ZCodeAntigravity/App Backups` 的可恢复
+  备份，账号、加密凭据、额度缓存和 ZCode 配置未被发布安装覆盖。
+- Windows Electron 的 5 项 IPC / 协议 / 小组件 / DWM 回归测试和 React / Tailwind 生产构建通过；
+  `npm audit` 报告 0 个漏洞。Windows x64 交叉包的 ZIP CRC、包内逐文件哈希、ASAR 入口与品牌资源、
+  PE32+ x64 和 GUI 子系统检查通过。
+- Windows V1.0.0 本轮在 macOS 构建主机完成交叉构建与自动化 / 静态验证，没有冒充新的 Windows
+  10/11 目标机运行结果；macOS Intel 切片同样完成交叉编译和结构检查，但尚未完成 Intel 实机启动。
+- 正式发布继续使用已验证含 Antigravity OAuth 桌面配置的后端；公开源码和源码归档不包含 OAuth
+  客户端凭据、用户 token、本地 API key、账号文件、日志或本机 ZCode 配置。
 
 ## v0.6.13-test macOS 小组件改用焦点无关的自绘额度条
 

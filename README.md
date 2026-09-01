@@ -1,236 +1,167 @@
 <p align="center">
-  <img src="project/native/windows/ui/src/assets/BrandMark.png" width="112" alt="ZCode Antigravity 原创黄色袋鼠与四芒星图标">
+  <img src="project/native/windows/ui/src/assets/BrandMark.png" width="112" alt="ZCode Antigravity 黄色袋鼠与四芒星图标">
 </p>
 
-# ZCode Antigravity Bridge
+<h1 align="center">ZCode Antigravity</h1>
 
-> 在 Windows 与 macOS 上统一接入 Antigravity Gemini 和 xAI Grok，
-> 并把本机安全网关提供给 ZCode、Grok Build、Codex、Claude Code 与 OpenCode。
+<p align="center">
+  <strong>把 Gemini 与可选的 Grok 接入 ZCode 和更多 Agent / CLI，并在桌面直接查看额度、Token 与连接状态。</strong>
+</p>
 
-**当前版本：** Windows / macOS `v0.6.13-test`
-**适用系统：** macOS 12+（Apple Silicon / Intel）、Windows 10 / 11 x64
-**项目状态：** 测试版
+<p align="center">
+  <img alt="Version" src="https://img.shields.io/badge/version-V1.0.0-2f6bff">
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-12%2B-111111?logo=apple">
+  <img alt="Windows" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?logo=windows11">
+  <img alt="Local only" src="https://img.shields.io/badge/API-loopback%20only-20a464">
+</p>
 
+<p align="center">
+  <a href="https://github.com/Hhz0823/ZCode-Antigravity/releases/tag/v1.0.0"><strong>下载 V1.0.0 正式版</strong></a>
+  · <a href="#快速开始">快速开始</a>
+  · <a href="#一键接入-agent--cli">Agent 接入</a>
+  · <a href="#隐私与安全">安全边界</a>
+</p>
 
-## 功能特性
+ZCode Antigravity 是面向 Windows 与 macOS 的本地 AI 控制中心。它负责账号授权、模型路由、
+ZCode / Agent 配置、额度监控与网络出口选择；默认只启用 Gemini，需要时可在设置中开启 Grok
+和其他文本模型。
 
-- 默认只向 ZCode 与 Agent 暴露 **Gemini**；Grok 和其他 AI 文本模型默认关闭，需要时在“设置”中主动开启并重新同步。关闭开关不会删除账号或额度缓存。
-- 开启 Grok 后可在控制中心切换 **Antigravity** 与 **Grok / xAI**；账号、模型、额度和 Agent 配置跟随切换。
-- Windows 的 Grok 设备登录会把 xAI 生成的临时验证码直接显示在软件内，支持选中、复制和重新打开官方授权页；用户把该码输入 `accounts.x.ai` 页面后，软件自动检测授权结果。
-- Antigravity 精确写入 `gemini-3.7-flash` / `gemini-3.6-flash`，并提供独立的 `gemini-web-search`（**Gemini Web Search (Google)**）联网搜索模型；Grok 只同步 xAI 返回的文本模型，自动排除 Imagine 图片和视频模型。
-- 选择 `Gemini Web Search (Google)` 后，每次提问都会调用 Antigravity 原生 Google Search，并向 ZCode 返回搜索结果、网页引用和 `web_search_requests`；普通 Gemini 3.7/3.6 对话不会被强制联网。
-- 支持 Low / Medium / High 思考等级，并转换为 Gemini `thinkingLevel`。
-- 支持文本、图片、音频和视频输入转换；当前 Gemini 3.7 Flash 声明输出仅为文本。
-- Windows 任务栏与 macOS 菜单栏提供常驻额度小组件；macOS 菜单栏只占用一个方形小图标，第一次弹出即使用完整彩色额度条，无需再点击组件激活，点击外部空白处会自动收起 Popover；可切换 Antigravity / Grok、刷新额度、打开面板或退出。
-- 单击 Windows 系统托盘通知区域图标或 macOS 菜单栏图标，可直接查看所选提供商的 **5 小时 / 本周剩余额度、重置时间、最近输出 Token 与 Token/s**；无对应窗口时明确显示“当前提供商未提供”。
-- Antigravity 显示每周 / 5 小时余量；Grok 显示官方 Grok Build billing 返回的共享周/月余量、重置时间和 Extra Usage Credits。
-- 额度面板每 5 分钟自动刷新；手动刷新、切换提供商和接入完成会立即刷新。刷新失败时保留上次成功数据。
-- 本地网关按协议返回的真实 usage 数据显示最近输出 Token、推理 Token、生成速度和本地累计输出；有首字节时间时使用“输出 Token ÷ 生成阶段耗时”，否则明确标为“有效吞吐”。统计不保存提示词或回复。
-- Antigravity / Grok 使用独立的原生选择卡、账号数、选中态与切换进度；切换期间保留各自最近成功额度，避免旧请求覆盖新提供商界面。
-- Antigravity 额度请求支持 sandbox / daily / production 端点、HTTP 403 无项目字段重试和逐模型额度降级。
-- DeepSeek Harness、Grok Build、OpenAI Codex、Claude Code、Gemini CLI、Qwen Code、Kimi Code 与 OpenCode 均支持一键接入；修改前自动备份并只合并本程序管理的 Provider，通用客户端配置仍可复制。
-- ZCode 和支持自定义 Provider 显示名的 Agent 统一显示为简洁的 `Google`；内部兼容 ID 保持不变，升级时会原位更新而不会生成重复 Provider。
-- Gemini CLI 使用原生 Gemini 协议，因此仅在选择 Antigravity 时启用；Grok 可一键接入其余 OpenAI / Anthropic 兼容客户端。
-- Windows 控制中心使用 **Electron 44 + React + Tailwind CSS / shadcn 风格组件**；Electron 负责窗口、任务栏小组件和受限 IPC，Chromium 随系统 DPI 缩放并叠加原生 DWM Acrylic，子进程全部隐藏。
-- macOS 控制中心使用 **SwiftUI + AppKit** 原生开发，具有真正的 Dock 图标、原生菜单栏额度组件；Universal `.app` 同时兼容 Apple Silicon 与 Intel。
-- Windows / macOS 只让最底层白色窗口背景使用原生液态玻璃与高斯模糊；导航、卡片、按钮和文字使用高对比度内容层，不再对每张滚动卡重复模糊。
-- 七页控制中心统一提供总览、账号、API 代理、模型路由、Agent 接入、用量统计和设置；右侧操作区始终保留本机 OAuth、网关与 ZCode 接入动作。
-- 控制中心使用系统字体、响应式布局和页面切换反馈；Windows 自带固定版本 Electron/Chromium，macOS 保持原生 SwiftUI，两端打开面板都不会弹出终端窗口。
-- Windows 会自动使用已启用的系统代理；检测到 v2rayN 时自动探测新版 mixed `10808` 与旧版 HTTP `10809`，无需开启 TUN。手动代理优先，均不可用时才直连。
-- 发布构建会拒绝生成缺少 Antigravity OAuth 桌面配置的安装包；网关进程意外退出时，控制中心会自动用当前版本恢复服务，用户主动停止则不会被重新拉起。
-- 本地密钥随机生成；Windows 使用 DPAPI、macOS 使用登录钥匙串主密钥保护凭据；API 与 OAuth 回调仅监听 loopback。
+## 核心功能
+
+| 功能 | 能做什么 |
+| --- | --- |
+| **Gemini 优先，Grok 可选** | 默认只向客户端暴露 Gemini；Grok / xAI 与其他文本模型按需开启，账号、额度和路由互不混淆。 |
+| **原生 Google 联网搜索** | 独立的 `gemini-web-search` 模型调用 Antigravity 原生 Google Search，返回网页引用和可检查的搜索请求数据。 |
+| **多模态输入** | 支持文本、图片、音频和视频输入转换；当前 Gemini 3.7 Flash 输出为文本。 |
+| **一键接入更多 Agent** | 自动备份并合并 ZCode、DeepSeek Harness、Grok Build、Codex、Claude Code、Gemini CLI、Qwen Code、Kimi Code 与 OpenCode 配置。 |
+| **无需强制开启 TUN** | Windows 自动使用系统代理或运行中的 v2rayN mixed / HTTP 代理，均不可用时才直连；手动代理始终优先。 |
+| **额度与 Token 小组件** | macOS 菜单栏和 Windows 系统托盘直接查看 5 小时 / 本周额度、重置时间、最近输出 Token、推理 Token 与 Token/s。 |
+| **本地安全边界** | API、OAuth 回调和管理接口只监听 `127.0.0.1`；配置写入前自动备份，凭据使用系统安全能力加密。 |
+| **双平台精美界面** | macOS 使用 SwiftUI + AppKit 原生界面，Windows 使用 Electron + React + Tailwind；背景玻璃化，内容层保持高对比度。 |
+
+## 模型与联网能力
+
+默认的 Antigravity 模型：
+
+- `gemini-3.7-flash`：通用对话、编程与多模态理解。
+- `gemini-3.6-flash`：兼容模型。
+- `gemini-web-search`：界面显示为 **Gemini Web Search (Google)**，固定走原生 Google Search 并返回来源引用。
+
+普通 Gemini 模型不会因为提示词中写了“搜索”就伪装成已联网。需要最新网页信息时，请明确选择
+`Gemini Web Search (Google)`。Grok 和其他 AI 文本模型默认关闭，可在“设置 → 模型”中开启并重新同步；
+图片 / 视频生成模型不会混入文本模型列表。
+
+## 一键接入 Agent / CLI
+
+| 客户端 | 接入方式 | 说明 |
+| --- | --- | --- |
+| ZCode | 一键写入 Provider | Provider 显示为简洁的 `Google`，内部兼容 ID 保持稳定。 |
+| DeepSeek Harness | 一键合并配置 | 保留已有 Provider，并在修改前创建备份。 |
+| Grok Build | 一键合并配置 | 可连接 Antigravity 或已启用的 Grok。 |
+| OpenAI Codex | 一键写入自定义 Provider | 使用本机 OpenAI 兼容网关。 |
+| Claude Code | 一键写入 LLM Gateway | 使用本机 Anthropic 兼容网关。 |
+| Gemini CLI | 一键写入原生 Gemini 端点 | 仅在 Antigravity 提供商下启用。 |
+| Qwen Code / Kimi Code | 一键合并配置 | 不删除用户已有配置。 |
+| OpenCode | 一键合并 Provider | 可随当前提供商同步模型。 |
+
+程序只管理自己创建的配置项，并会在覆盖前创建有上限的备份。通用 OpenAI / Anthropic 客户端也可从
+“Agent 接入”页复制当前本地配置。
 
 ## 下载
 
-前往 [GitHub Releases](../../releases) 下载。
+前往 [V1.0.0 正式版 Release](https://github.com/Hhz0823/ZCode-Antigravity/releases/tag/v1.0.0) 下载：
 
-| 文件 | 用途 | 建议 |
+| 文件 | 用途 | 推荐场景 |
 | --- | --- | --- |
-| `ZCode-Antigravity-macOS-Universal-v0.6.13-test.zip` | macOS Universal App 与维护脚本 | **Mac 用户首选** |
-| `ZCode-Antigravity-Setup-v0.6.13-test.exe` | Windows 图形化安装器 | **普通用户首选** |
-| `ZCode-Antigravity-OneClick-v0.6.13-test.bat` | 内嵌完整运行包的单文件安装器 | 备用方案 |
-| `ZCode-Antigravity-Windows-x64-0.6.13-test.zip` | 可展开、可逐文件校验的便携包 | 手动部署 / 排错 |
-| `ZCode-Antigravity-Source-v0.6.13-test.zip` | 当前源码快照 | 审计 / 构建 |
+| `ZCode-Antigravity-macOS-Universal-v1.0.0.zip` | macOS Universal App 与校验 / 维护工具 | macOS 用户首选 |
+| `ZCode-Antigravity-Setup-v1.0.0.exe` | Windows 图形化安装器 | Windows 用户首选 |
+| `ZCode-Antigravity-OneClick-v1.0.0.bat` | 内嵌完整载荷的单文件安装器 | 备用安装方案 |
+| `ZCode-Antigravity-Windows-x64-1.0.0.zip` | 可逐文件校验的 Windows 便携包 | 手动部署与排错 |
+| `ZCode-Antigravity-Source-v1.0.0.zip` | 与发布标签对应的源码快照 | 审计与二次开发 |
+| `SHA256SUMS-v1.0.0.txt` | 全部正式版资产的 SHA-256 | 下载后完整性校验 |
 
-## macOS 快速安装
+## 快速开始
 
-### 准备条件
+### macOS
 
-- macOS 12 或更新版本，Apple Silicon 与 Intel 均可。
-- 已安装 macOS 版 ZCode，并至少打开过一次。
-- 能正常访问 Google / xAI 登录与相应模型服务；可使用系统 TUN，或自行配置可信的本机 HTTP/SOCKS5 代理。
+1. 完整解压 Universal ZIP，在 `Terminal Tools` 中运行 `Verify-Package.command` 校验安装包。
+2. 首次运行时按住 Control 点击 `ZCode Antigravity.app` 并选择“打开”。当前 App 使用临时签名，尚未公证。
+3. 登录 Antigravity，点击“一键接入 ZCode”，然后完全退出并重新打开 ZCode。
+4. 在 ZCode 中选择 Provider `Google` 和目标 Gemini 模型；需要联网时选择 `Gemini Web Search (Google)`。
 
-### 安装步骤
+关闭主窗口后，菜单栏仍会保留一个小图标。单击即可查看额度与 Token 小组件，再点窗口外部会自动收起。
 
-1. 完整解压 macOS Universal ZIP；如需校验，打开 `Terminal Tools` 后双击 `Verify-Package.command`。
-2. 完全退出 ZCode。当前 App 使用临时签名且尚未公证；首次运行请按住 Control 点击 `ZCode Antigravity.app`，选择“打开”。
-3. 双击 `ZCode Antigravity.app`，默认完成 Google OAuth 后点击“一键接入 ZCode”。如需 Grok 或其他 AI 文本模型，先到“设置”开启对应开关并应用，再完成相应授权。Google OAuth 回调最长等待 30 分钟；超时后应回到程序重新登录，不要刷新旧的 localhost 页面。
-4. 重新打开 ZCode，选择 `Google` 下的目标模型；需要实时网页信息时选择 `Gemini Web Search (Google)`。发送一条短消息验收，搜索回答应包含来源引用。关闭原生窗口后菜单栏额度组件仍会保留。
+### Windows
 
-Mac 运行数据位于 `~/Library/Application Support/ZCodeAntigravity`。Google token 使用
-AES-256-GCM 加密，随机主密钥存放在 macOS 登录钥匙串。Intel 切片已完成交叉编译和
-结构校验，但当前尚未完成 Intel 实机启动测试；详见包内 `README-macOS.txt`。
+1. 从系统托盘完全退出 ZCode；仅关闭主窗口可能仍会留下 `ZCode.exe`。
+2. 校验 SHA-256 后运行 `ZCode-Antigravity-Setup-v1.0.0.exe`。当前安装器未使用商业代码签名证书。
+3. 登录 Antigravity 并点击“一键接入 ZCode”。程序会自动探测 Windows 系统代理与 v2rayN，无需强制开启 TUN。
+4. 重新打开 ZCode，选择 Provider `Google` 和目标模型；系统托盘图标可随时打开额度小组件。
 
-## Windows 快速安装
+如需 Grok，在设置中启用 Grok 后完成 xAI 设备授权。Windows 会在软件内显示临时验证码；把它输入官方
+授权页后，程序会自动轮询授权结果，无需粘贴回调内容。
 
-### 准备条件
+## 网络出口与本地端口
 
-- Windows 10 或 Windows 11 x64。
-- 已安装 ZCode 3.7.x，并至少打开过一次。
-- 当前网络可访问 Google / xAI 授权页和对应模型服务；TUN 与本机代理均为可选。
-
-### 安装步骤
-
-1. 从 Windows 系统托盘完全退出 ZCode。仅关闭窗口可能仍会留下 `ZCode.exe` 进程。
-2. 下载 `ZCode-Antigravity-Setup-v0.6.13-test.exe`，并先校验 SHA-256。请勿使用任务栏点击会同时置顶主窗口的 `v0.6.3-test`、网关启动后可能保留旧额度提示的 `v0.6.2-test` 或更早测试版。
-3. 双击安装器。程序会自动使用正在运行的 v2rayN / Windows 系统代理，无需开启 TUN；未发现代理时才直连。
-4. 默认登录 Antigravity 即可。需要 Grok 时，先在“设置”开启 Grok 模型，再切换到 Grok 并完成授权；将软件弹层中的临时验证码输入已打开的 xAI 官方页面，授权后无需再把结果粘贴回软件。
-5. 重新打开 ZCode，选择 Provider `Google`；常规对话选 Gemini 3.7/3.6，需要联网时选 `Gemini Web Search (Google)`。控制中心会作为任务栏额度小组件继续驻留。
-6. 先发送一条短消息进行小规模验收。账号权限和实时额度以第一次真实请求为准。
-
-## 本地端口与代理
-
-| 服务 | 默认地址 | 占用时行为 |
+| 服务 | 默认地址 | 端口占用时 |
 | --- | --- | --- |
-| 本地 API | `127.0.0.1:18080` | 自动扫描 `18081–18180` |
+| 本地模型网关 | `127.0.0.1:18080` | 自动扫描 `18081–18180` |
 | OAuth callback | `127.0.0.1:51121` | 自动扫描 `51122–51221` |
-| GUI 控制中心 | `127.0.0.1:18200–18250` | 在范围内选择可用端口 |
-| 自动网络出口 | v2rayN / Windows 系统代理 / 直连 | 无需 TUN；手动 `proxyURL` 优先 |
+| 控制中心 | `127.0.0.1:18200–18250` | 在范围内选择可用端口 |
 
-默认 `proxyURL` 为空，表示自动模式：先读取 Windows 当前用户系统代理，再在 v2rayN
-运行时探测 SOCKS5/mixed `127.0.0.1:10808` 与旧版 HTTP `10809`，都不可用才直连。需要固定代理时支持
-`http`、`https` 和 `socks5`；手动 `proxyURL` 始终优先。
+Windows 自动网络顺序为：手动 `proxyURL` → 当前用户系统代理 → v2rayN mixed / SOCKS5
+`127.0.0.1:10808` → 旧版 HTTP `10809` → 直连。macOS 可使用系统 TUN、`HTTP_PROXY` /
+`HTTPS_PROXY`，或 App 资源中的 `settings.json`。所有代理均应指向可信的本机服务。
 
-macOS 包同样默认直连且不固定代理端口；也可以使用系统 TUN、在包内 `.env` 设置
-`HTTP_PROXY` / `HTTPS_PROXY`，或修改 App 的 `Contents/Resources/settings.json`。
+## 额度、Token 与状态栏小组件
 
-安装前也可设置自定义代理端口：
+- Antigravity 展示 5 小时和每周剩余额度；Grok 展示上游 Grok Build billing 返回的共享周期额度。
+- 额度每 5 分钟自动刷新，手动刷新、切换提供商和完成接入会立即刷新；失败时保留上次成功数据。
+- Token 统计来自本地网关真实 usage，显示最近输出、推理 Token、生成速度和本地累计输出。
+- 不保存提示词或模型回复。上游未提供某类额度时会明确显示“未提供”，不会用本地 Token 估算账号余量。
 
-```powershell
-$env:ZCODE_ANTIGRAVITY_PROXY_PORT = '10808'
-```
+## 隐私与安全
+
+- API、OAuth callback 与管理路由只监听 loopback，不开放远程管理。
+- Windows 使用当前用户 DPAPI 保护 OAuth token；macOS 使用登录钥匙串中的随机主密钥进行 AES-256-GCM 加密。
+- ZCode 配置只保存随机本地网关密钥，不写入 Google / xAI token。
+- 修改 ZCode 或 Agent 配置前自动备份；停止 Bridge 不会删除账号或聊天记录。
+- 发布包不包含 OAuth token、账号 JSON、本地 API key、日志或用户的 ZCode 配置。
+- 背景模糊由系统 / Electron 合成器完成，程序不会读取、缓存或上传窗口后方像素。
 
 ## 已验证范围
 
-Windows 基线与 `v0.6.13-test` 的构建测试记录包括：
+V1.0.0 正式版发布流程包括：
 
-- 管理器与 CLIProxyAPI 的 Go 测试、Windows x64 构建和静态检查通过。
-- OAuth PKCE / callback、DPAPI 凭据存储、原子替换和 loopback 约束通过。
-- Gemini 3.7 Flash High 与 Gemini 3.6 Flash High 的真实文本请求通过。
-- `Gemini Web Search (Google)` 在真实 Antigravity 账号上完成联网搜索：返回 `server_tool_use` / `web_search_tool_result`、`web_search_requests=1` 和可解析来源引用。
-- 图片理解与视频时序理解通过；当前不宣称支持原生位图生成。
-- 单 BAT 自解包、载荷和三 EXE 哈希校验、同版本重装通过。
-- 原生 EXE 安装器的隔离安装、再安装与无终端 GUI 行为通过。
-- EXE 内嵌 PowerShell 脚本现在由构建器和运行时双重保证 UTF-8 BOM，并加入中文脚本编码回归测试，修复 Windows PowerShell 5.1 的 `ParserError: UnexpectedToken`。
-- 已在构建主机复现中文代码页 936 会产生 `UnexpectedToken`，并确认新 EXE 只内嵌一个 `EF BB BF + param(` 脚本头。
-- Windows 全部 GUI 子进程使用 `CREATE_NO_WINDOW`；Windows x64 测试程序交叉编译通过。
-- Electron 控制中心通过前端生产构建、IPC allowlist 测试、Electron 44 Windows x64 交叉打包、ASAR 内容核验和 PE32+ GUI 子系统检查。
-- Windows 控制中心使用 React、Tailwind CSS 4 与 shadcn 风格组件实现七页响应式界面；Segoe UI Variable / 微软雅黑由 Chromium 按系统 DPI 渲染。
-- `v0.6.7-test` Electron 实际模式仅使用 DWM 模糊窗口底板，渲染层活动动画为 0；180 帧连续滚动 3 轮的 P95 为 17.4–17.5 ms，卡片保持白色高对比内容层。
-- 历史 `v0.6.4-test` Tauri 基线在 Windows 11 实机确认 Acrylic 会连续模糊窗口后方桌面，且 7 秒、198 帧拖动录像无白屏/黑屏/撕裂；该结果不冒充为 `v0.6.7-test` Electron 目标机验证，新壳仍需 Windows 10/11 复测。
-- 账号、三协议代理、模型路由、会话亲和、重试策略、5/10 分钟刷新与液态玻璃设置均通过带当前用户会话密钥的本机 API 读写；账号 ID 与标签脱敏，接口不返回凭据。
-- 双提供商切换、Grok billing 解析、文本模型过滤和八类 Agent 一键配置均有单元测试。
-- Gemini-only 默认策略、Grok/其他文本模型显式开关、禁用 Grok 时的后端切换保护均有回归测试。
-- Antigravity 额度 HTTP 403 去项目字段重试和 `fetchAvailableModels` 降级路径均有回归测试。
-## 隐私与安全边界
+- 管理器与固定 CLIProxyAPI 源码的 Go 测试、`go vet` 与依赖校验。
+- macOS arm64 / x86_64 类型检查、Universal 构建、签名结构、包内哈希和本机启动 / 网关健康检查。
+- Windows x64 Go 交叉编译、Electron IPC allowlist 测试、前端生产构建、ASAR 内容与 PE32+ GUI 子系统检查。
+- OAuth PKCE / callback、加密存储、模型路由、额度降级、双提供商切换和八类 Agent 配置回归测试。
+- Gemini 文本、Google Search 引用、图片理解和视频时序理解的既有真实账号验证。
 
-- Google / xAI access、refresh token 和运行状态保存在当前用户的 ZCodeAntigravity 数据目录。
-- OAuth token 字段在 Windows 下使用当前用户 DPAPI 保护。
-- OAuth token 字段在 macOS 下用登录钥匙串中的随机主密钥进行 AES-256-GCM 加密。
-- ZCode `config.json` 只写入随机本地网关密钥，不写入 Google token。
-- API、OAuth callback 和管理路由只监听 `127.0.0.1`，远程管理与 Web 控制面板默认关闭。
-- 每次修改 ZCode 配置前会创建有上限的备份。
-- 发布包不包含 OAuth token、账号 JSON、本地 API key、运行日志或本机 ZCode 配置。
-- Windows Acrylic 由 DWM / Electron 合成器完成；应用不读取、缓存或上传窗口后方像素。
-- 黄色袋鼠与渐变四芒星图标为本项目原创组合标识，不是美团或 Google 官方联合标识；美团、Gemini 与 Google 等名称及商标归各自权利人所有。
-- 停止 Bridge 或移除 Provider 不会自动撤销 Google / xAI 授权；如需彻底撤销，请在对应账号中单独操作。
-
-## 常见问题
-
-### Windows 提示未知发布者
-
-当前安装器、Electron 控制中心和 Go Core 均未使用商业代码签名证书。先对照本页或 `SHA256SUMS.txt`
-校验哈希；仅在哈希完全一致时选择继续运行。
-
-### macOS 提示无法验证开发者
-
-当前 Mac App 使用临时签名，没有 Apple Developer ID 签名或公证。先运行
-`Verify-Package.command`；哈希通过后，按住 Control 点击 App 并选择“打开”。
-不要全局关闭 Gatekeeper。
-
-### 一直重连或请求超时
-
-查看“网络出口”卡片是否显示 `v2rayN 自动代理` 或 `Windows 系统代理`。若显示直连，
-确认 v2rayN 已启动且 mixed/HTTP 本机端口正在监听；无需开启 TUN。显式配置代理时，
-再检查 `proxyURL` 或 `.env` 是否指向真正监听的可信 loopback 端口。
-
-### 提示 ZCode 仍在运行
-
-请彻底退出 ZCode。Bridge 不会在 ZCode 仍运行时写入需要修改的配置。
-
-### 401 或没有模型
-
-在控制中心确认当前选择了正确的提供商。Antigravity 可运行 `Login-Antigravity`，
-Grok 可运行 `Login-Grok`，然后重新启动并同步网关。
-
-### Gemini 为什么没有联网搜索
-
-`gemini-3.7-flash` 和 `gemini-3.6-flash` 是普通对话/编程模型，不会仅因为提示词写了“搜索”就伪装成已联网。
-需要当前网页信息时，在 ZCode 模型选择器中改选 `Gemini Web Search (Google)`。该模型固定路由到
-Antigravity 支持原生 Google Search 的搜索通道，并会返回可检查的来源引用。更新后如果看不到该模型，请完全退出 ZCode，再点击“修复并重新同步”。
-
-### Grok 额度为什么只有一条周/月额度
-
-xAI 目前把 Build、Chat、Imagine 等产品计入统一共享用量池。面板按官方 Grok Build
-billing 响应显示当前周期，不把本地 token 数估算成账号余量。若上游暂时不返回
-billing 配置，面板会明确显示错误，不会沿用 Antigravity 的百分比。
-
-### 如何接入其他 Agent
-
-先启动网关，在控制中心切换到目标提供商，再展开“接入更多 Agent 程序”。DeepSeek Harness、
-Grok Build、Codex、Claude Code、Gemini CLI、Qwen Code、Kimi Code 与 OpenCode 均可点击
-“一键接入”；程序先备份原文件，再合并 `zcode-bridge` 配置和当前模型，不删除其他 Provider。
-实现依据为
-[Grok Build 自定义模型端点](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-shell/README.md)、
-[Codex 自定义 Provider](https://github.com/openai/codex/blob/main/codex-rs/core/config.schema.json) 与
-[Claude Code LLM Gateway](https://docs.anthropic.com/en/docs/claude-code/llm-gateway)。
-
-### 403、429 或模型不可用
-
-通常属于上游账号资格、风控或额度边界。项目不应绕过验证、资格或风控限制。
+Windows 正式包由 macOS 交叉构建并完成静态与自动化验证；发布时未冒充新的 Windows 目标机实测。
+macOS Intel 切片完成交叉编译和结构校验，但尚未完成 Intel 实机启动测试。详细记录见
+[`VERIFICATION.md`](VERIFICATION.md)。
 
 ## 从源码构建
 
-源码包含 SwiftUI macOS 客户端、Electron Windows 客户端、Go 本地 Core、测试、打包脚本、
-固定的 CLIProxyAPI v7.2.132 源码和可重放补丁。已验证 Windows x64 交叉编译与 macOS Universal 构建。
-提交修改前请另见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
+源码包含 SwiftUI / AppKit macOS 客户端、Electron / React Windows 客户端、Go 本地 Core、测试、
+固定的 CLIProxyAPI v7.2.132 源码与可重放补丁。GitHub 源码不内置 Google OAuth 桌面应用凭据；
+开发者需要使用自己有权使用的配置：
 
-GitHub 源码不内置 Google OAuth 客户端凭据。开发者需使用自己有权使用的
-OAuth 桌面应用配置，并在运行源码构建前设置：
-
-```powershell
-$env:ANTIGRAVITY_OAUTH_CLIENT_ID = '<your-client-id>'
-$env:ANTIGRAVITY_OAUTH_CLIENT_SECRET = '<your-client-secret>'
+```bash
+export ANTIGRAVITY_OAUTH_CLIENT_ID='<your-client-id>'
+export ANTIGRAVITY_OAUTH_CLIENT_SECRET='<your-client-secret>'
 ```
 
-macOS Universal 打包：
+macOS Universal 构建：
 
 ```bash
 cd project/packaging/macos
-ANTIGRAVITY_OAUTH_CLIENT_ID='<your-client-id>' \
-ANTIGRAVITY_OAUTH_CLIENT_SECRET='<your-client-secret>' \
 ./Build-Universal.sh
 ```
 
-构建脚本默认拒绝缺少 OAuth 配置的产物。只有本地开发且确定会在运行时通过
-`.env` 或进程环境提供配置时，才可显式设置 `ALLOW_RUNTIME_OAUTH_CONFIG=1`；这种产物
-不应当作可直接登录的发布包。发布脚本生成双架构 Mach-O、临时签名 `.app`、包内
-SHA-256 清单和 ZIP 校验文件。
-
-公开源码的默认构建从进程环境读取这两个值，不应提交到 Git。发布维护者可在链接时注入；
-两种方式都未配置时，OAuth 登录和 token 刷新会返回明确错误。
-
-Windows 客户端使用 Electron 44、React 19、Tailwind CSS 4 和 shadcn 风格组件。Windows x64 交叉打包示例：
+Windows Electron UI 构建：
 
 ```bash
 cd project/native/windows/ui
@@ -239,10 +170,27 @@ npm run test:electron
 npm run package:windows
 ```
 
-同一发布包中的 `ZCode-Antigravity.exe` 是隐藏运行的 Go Core，Electron 客户端通过一次性
-loopback 会话与它通信；OAuth、token 加密和模型路由仍由经过测试的 Core/后端负责。
+构建脚本默认拒绝生成缺少 OAuth 配置的可登录发布包。开发规范和提交要求见
+[`CONTRIBUTING.md`](CONTRIBUTING.md)。
 
-## 免责声明
+## 常见问题
 
-本项目仅用于研究、开发和测试。使用者应自行确认适用的服务条款、账号政策、
-网络规则和当地法律要求，并自行承担使用未公开接口带来的风险。
+### 为什么 Gemini 没有联网搜索？
+
+普通 Gemini 3.7 / 3.6 是对话模型。请在客户端明确选择 `Gemini Web Search (Google)`；若升级后看不到，
+完全退出 ZCode，回到控制中心点击“修复并重新同步”。
+
+### 为什么显示 401、403、429 或模型不可用？
+
+先确认当前提供商、账号授权和网络出口。403 / 429 通常属于上游资格、风控或额度边界；本项目不会绕过验证。
+
+### 为什么系统提示未知发布者？
+
+当前 Windows 安装器未使用商业代码签名，macOS App 使用临时签名且未公证。请先核对 Release 中的
+`SHA256SUMS-v1.0.0.txt`，哈希完全一致后再运行；不要全局关闭系统安全机制。
+
+## 商标与免责声明
+
+黄色袋鼠与渐变四芒星为本项目原创组合标识，并非美团、Google 或 xAI 官方联合标识。相关名称和商标
+归各自权利人所有。本项目仅用于研究、开发与测试，使用者应自行确认服务条款、账号政策、网络规则和
+当地法律要求，并承担使用未公开接口可能带来的兼容性与账号风险。

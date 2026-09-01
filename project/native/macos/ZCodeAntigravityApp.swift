@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "0.6.13-test"
+private let appVersion = "1.0.0"
 
 private extension Notification.Name {
     static let selectBridgeProvider = Notification.Name("ZCodeSelectBridgeProvider")
