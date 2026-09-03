@@ -43,6 +43,7 @@ ZCode / Agent 配置、额度监控与网络出口选择；默认只启用 Gemin
 
 默认的 Antigravity 模型：
 
+- `gemini-3.8-flash`：最新一代通用对话、编程与多模态理解。
 - `gemini-3.7-flash`：通用对话、编程与多模态理解。
 - `gemini-3.6-flash`：兼容模型。
 - `gemini-web-search`：界面显示为 **Gemini Web Search (Google)**，固定走原生 Google Search 并返回来源引用。

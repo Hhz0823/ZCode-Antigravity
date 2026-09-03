@@ -10,7 +10,7 @@ const status = {
   zcode: { ok: true, label: "ZCode 已接入", detail: "http://127.0.0.1:18080", running: true },
   providerAccounts: { antigravity: 2, xai: 1 },
   selectedProvider: "antigravity",
-  models: ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-web-search"],
+  models: ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-web-search"],
   operation: { running: false },
   updatedAt: now.toISOString(),
 };
