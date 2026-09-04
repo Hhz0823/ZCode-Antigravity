@@ -570,6 +570,44 @@ index 645f2f7a1b2caa7e9367a0de99c79a839d81963b..70ec1e3bd12ac34ec37d316513253839
  	}
  }
  
+diff --git a/internal/registry/model_definitions_test.go b/internal/registry/model_definitions_test.go
+index 2ef087e9eece11dcd31986e93ff0ea19fb9d381c..bd187b7bca8bb593f8f8d5ceec6a966cc4794db0 100644
+--- a/internal/registry/model_definitions_test.go
++++ b/internal/registry/model_definitions_test.go
+@@ -1,6 +1,9 @@
+ package registry
+ 
+-import "testing"
++import (
++	"strings"
++	"testing"
++)
+ 
+ func TestModelOverrideHeadersFromEmbeddedModels(t *testing.T) {
+ 	const wantUA = "codex-tui/0.144.0 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11 (codex-tui; 0.144.0)"
+@@ -35,6 +38,22 @@ func TestGeminiVertexModelsUseFlashLiteReleaseID(t *testing.T) {
+ 	t.Fatalf("Vertex models do not contain %q", releaseID)
+ }
+ 
++func TestAntigravityModelsIncludeGemini38FlashHigh(t *testing.T) {
++	for _, model := range GetAntigravityModels() {
++		if model == nil || model.ID != "gemini-3.8-flash-high" {
++			continue
++		}
++		if model.ContextLength != 1048576 || model.MaxCompletionTokens != 65536 {
++			t.Fatalf("Gemini 3.8 limits = context %d, output %d", model.ContextLength, model.MaxCompletionTokens)
++		}
++		if got := strings.Join(model.SupportedInputModalities, ","); got != "text,image,audio,video" {
++			t.Fatalf("Gemini 3.8 input modalities = %q", got)
++		}
++		return
++	}
++	t.Fatal("Antigravity models do not contain gemini-3.8-flash-high")
++}
++
+ func TestWithXAIBuiltinsIncludesImage20(t *testing.T) {
+ 	models := WithXAIBuiltins(nil)
+ 	for _, model := range models {
 diff --git a/internal/registry/model_registry.go b/internal/registry/model_registry.go
 index ed904bc2716743a1b4b8ca290e91e3cd64f8cd48..1768d6ab09602e419894cff6033edf6198dfe680 100644
 --- a/internal/registry/model_registry.go
@@ -671,6 +709,48 @@ index 0000000000000000000000000000000000000000..ef3fce534690213b728f10519f9505e2
 +	}
 +	t.Fatalf("model %q not found", modelID)
 +}
+diff --git a/internal/registry/models/models.json b/internal/registry/models/models.json
+index 7c6ba824b5512babe8aabd2432060dc3638859d5..0ffed3f4d353d5cd8aaa008eb35e58029fd8c092 100644
+--- a/internal/registry/models/models.json
++++ b/internal/registry/models/models.json
+@@ -3319,6 +3319,37 @@
+         "text"
+       ]
+     },
++    {
++      "id": "gemini-3.8-flash-high",
++      "object": "model",
++      "owned_by": "antigravity",
++      "type": "antigravity",
++      "display_name": "Gemini 3.8 Flash",
++      "name": "gemini-3.8-flash-high",
++      "description": "Gemini 3.8 Flash (High)",
++      "context_length": 1048576,
++      "max_completion_tokens": 65536,
++      "thinking": {
++        "min": 32,
++        "max": 65535,
++        "dynamic_allowed": true,
++        "levels": [
++          "minimal",
++          "low",
++          "medium",
++          "high"
++        ]
++      },
++      "supportedInputModalities": [
++        "text",
++        "image",
++        "audio",
++        "video"
++      ],
++      "supportedOutputModalities": [
++        "text"
++      ]
++    },
+     {
+       "id": "gemini-3.7-flash-high",
+       "object": "model",
 diff --git a/internal/runtime/executor/antigravity_executor.go b/internal/runtime/executor/antigravity_executor.go
 index 733a6acfd9a3811c612164ed2949cbb056493ea6..1114d9762b5bcdfd455d7559f6250cbf6ed8dec4 100644
 --- a/internal/runtime/executor/antigravity_executor.go
@@ -766,7 +846,7 @@ index 108eb914e7aec4e7011a1fe18b10cae19394bf52..82bde6f50a2cc69bbdfaa90820ee5e38
  	form.Set("refresh_token", refreshToken)
  
 diff --git a/internal/runtime/executor/antigravity_executor_buildrequest_test.go b/internal/runtime/executor/antigravity_executor_buildrequest_test.go
-index 66390cba3010862b24f446d042c140c460b51095..8d0a0e1a275e83e84e395596c277d0baac351cc9 100644
+index 66390cba3010862b24f446d042c140c460b51095..22fc567a407951c0fdd9db31ff195c8aa9a30d2a 100644
 --- a/internal/runtime/executor/antigravity_executor_buildrequest_test.go
 +++ b/internal/runtime/executor/antigravity_executor_buildrequest_test.go
 @@ -10,7 +10,9 @@ import (
@@ -813,24 +893,28 @@ index 66390cba3010862b24f446d042c140c460b51095..8d0a0e1a275e83e84e395596c277d0ba
  func TestAntigravityPrepareRequestAuth_FetchesMissingProjectID(t *testing.T) {
  	executor := &AntigravityExecutor{}
  	auth := &cliproxyauth.Auth{Metadata: map[string]any{
-@@ -322,6 +351,23 @@ func assertNonSchemaRequestPreserved(t *testing.T, body map[string]any) {
+@@ -322,6 +351,27 @@ func assertNonSchemaRequestPreserved(t *testing.T, body map[string]any) {
  	}
  }
  
-+func TestBuildRequestPreservesGemini37MaxOutputTokens(t *testing.T) {
-+	body := buildRequestBodyFromRawPayload(t, "gemini-3.7-flash-high", []byte(`{
-+		"request": {
-+			"contents": [{"role":"user","parts":[{"text":"hello"}]}],
-+			"generationConfig": {"maxOutputTokens": 64}
-+		}
-+	}`))
-+	request, ok := body["request"].(map[string]any)
-+	if !ok {
-+		t.Fatal("request missing")
-+	}
-+	generationConfig, ok := request["generationConfig"].(map[string]any)
-+	if !ok || generationConfig["maxOutputTokens"] != float64(64) {
-+		t.Fatalf("Gemini 3.7 maxOutputTokens was not preserved: %#v", generationConfig)
++func TestBuildRequestPreservesCurrentGeminiFlashMaxOutputTokens(t *testing.T) {
++	for _, model := range []string{"gemini-3.7-flash-high", "gemini-3.8-flash-high"} {
++		t.Run(model, func(t *testing.T) {
++			body := buildRequestBodyFromRawPayload(t, model, []byte(`{
++				"request": {
++					"contents": [{"role":"user","parts":[{"text":"hello"}]}],
++					"generationConfig": {"maxOutputTokens": 64}
++				}
++			}`))
++			request, ok := body["request"].(map[string]any)
++			if !ok {
++				t.Fatal("request missing")
++			}
++			generationConfig, ok := request["generationConfig"].(map[string]any)
++			if !ok || generationConfig["maxOutputTokens"] != float64(64) {
++				t.Fatalf("%s maxOutputTokens was not preserved: %#v", model, generationConfig)
++			}
++		})
 +	}
 +}
 +
@@ -871,7 +955,7 @@ index 4fd9c6dbc83408046203b1bcf2c371a22b4b8fda..2ee423770e4d39148ace08c53fb1b64b
  			reporter.EnsurePublished(ctx)
  			return resp, nil
 diff --git a/internal/runtime/executor/antigravity_executor_request.go b/internal/runtime/executor/antigravity_executor_request.go
-index c8d3141a69d0bb0b2b883559ea008c29eb333478..fdba310a183fc39a34fff8bb47168c9db3fb59df 100644
+index c8d3141a69d0bb0b2b883559ea008c29eb333478..2df774a5e5cb03e98f5c5840a42c5a800624884a 100644
 --- a/internal/runtime/executor/antigravity_executor_request.go
 +++ b/internal/runtime/executor/antigravity_executor_request.go
 @@ -78,7 +78,7 @@ func (e *AntigravityExecutor) buildRequest(ctx context.Context, auth *cliproxyau
@@ -892,12 +976,17 @@ index c8d3141a69d0bb0b2b883559ea008c29eb333478..fdba310a183fc39a34fff8bb47168c9d
  			payload, _ = sjson.DeleteBytes(payload, "request.generationConfig.maxOutputTokens")
  		}
  
-@@ -155,6 +155,10 @@ func (e *AntigravityExecutor) buildRequest(ctx context.Context, auth *cliproxyau
+@@ -155,6 +155,15 @@ func (e *AntigravityExecutor) buildRequest(ctx context.Context, auth *cliproxyau
  	return httpReq, nil
  }
  
 +func preserveAntigravityMaxOutputTokens(modelName string) bool {
-+	return strings.EqualFold(strings.TrimSpace(modelName), "gemini-3.7-flash-high")
++	switch strings.ToLower(strings.TrimSpace(modelName)) {
++	case "gemini-3.7-flash-high", "gemini-3.8-flash-high":
++		return true
++	default:
++		return false
++	}
 +}
 +
  // sanitizeAntigravityRequestSchemas cleans the JSON schemas carried by an Antigravity request.

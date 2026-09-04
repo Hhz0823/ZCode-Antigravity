@@ -30,20 +30,20 @@ Requirements
 First test
 ----------
 Recommended: fully exit ZCode from the tray and double-click
-ZCode-Antigravity-Setup-v1.0.0.exe. This is a native Windows GUI installer: it shows no
+ZCode-Antigravity-Setup-v1.0.1-test.exe. This is a native Windows GUI installer: it shows no
 terminal, verifies the embedded ZIP plus all three executables, installs only for the current
 user, creates Desktop/Start Menu shortcuts, and opens the control center after completion.
 Do not use v0.4.0-test on Windows; its Rust client expected baseUrl while the Go Core correctly
 emitted baseURL, so startup stopped before the control center could open.
 Do not use v0.5.2-test for a fresh Antigravity login; that release was packaged without the
-required OAuth desktop configuration. v1.0.0 also repairs a recorded gateway automatically
+required OAuth desktop configuration. v1.0.1-test also repairs a recorded gateway automatically
 when its process exits unexpectedly, while preserving an intentional Stop. It also queues a quota
 refresh that overlaps the five-second status poll, so Grok quota appears automatically after the
 gateway comes online. Its tray click now opens an independent Acrylic quota widget and never raises
 the main control-center window unless the user explicitly asks to open it.
 
 For the single-BAT fallback, fully exit ZCode from the tray and double-click
-ZCode-Antigravity-OneClick-v1.0.0.bat. It verifies and extracts its embedded package,
+ZCode-Antigravity-OneClick-v1.0.1-test.bat. It verifies and extracts its embedded package,
 then opens the graphical control center without leaving a terminal window. The control center
 opens OAuth when needed, writes the verified ZCode Provider directly, and starts ZCode after
 successful readback.
@@ -64,9 +64,17 @@ For the expanded package:
 6. The first model-directory load can take up to about 35 seconds on a poor connection.
 7. Reopen ZCode. Select Provider "Google" and choose the desired
    Gemini or Grok text model. The system-tray quota widget remains available after closing the panel.
-8. Run Test-Gemini-3.7-Flash.bat once. It sends a small real inference request and writes a
+8. Run Test-Gemini-3.8-Flash.bat once. It sends a small real inference request and writes a
    redacted audit result to %LOCALAPPDATA%\ZCodeAntigravity\last-smoke-test.json.
-9. In ZCode, select gemini-3.7-flash and send one small prompt.
+9. In ZCode, select gemini-3.8-flash and send one small prompt.
+
+Known Gemini 3.8 availability on 2026-09-04
+--------------------------------------------
+The tested Google account returned gemini-3.8-flash-low, gemini-3.8-flash-medium,
+gemini-3.8-flash-high, and gemini-3.8-flash-tiered from fetchAvailableModels. The managed
+client ID gemini-3.8-flash maps only to the exact upstream High entry; it is not an alias for
+Gemini 3.7 or 3.6. The live High entry reports a 1,048,576-token context window, 65,536 output
+tokens, thinking support, and text/image/audio/video input.
 
 Known model availability on 2026-08-15
 --------------------------------------
@@ -187,9 +195,9 @@ Available scripts
 
 Installer formats
 -----------------
-- ZCode-Antigravity-Setup-v1.0.0.exe: recommended no-terminal current-user installer.
-- ZCode-Antigravity-OneClick-v1.0.0.bat: fallback single-file installer.
-- ZCode-Antigravity-Windows-x64-1.0.0.zip: manually verifiable expanded package.
+- ZCode-Antigravity-Setup-v1.0.1-test.exe: recommended no-terminal current-user installer.
+- ZCode-Antigravity-OneClick-v1.0.1-test.bat: fallback single-file installer.
+- ZCode-Antigravity-Windows-x64-1.0.1-test.zip: manually verifiable expanded package.
 - The EXE installer is custom-built and unsigned. It does not require administrator rights or
   7-Zip on the target computer; Windows SmartScreen may still require manual confirmation.
 
@@ -223,7 +231,7 @@ Troubleshooting
 - Quota card HTTP 403: v0.4.2 retries without project metadata and then uses per-model quota fallback.
   If it still fails, the account or token does not have access to any current quota endpoint.
 - Model request 403 / 429 / unavailable: account entitlement, verification, risk control, or quota is upstream.
-- Missing/404 for gemini-3.7-flash-high: verify Antigravity desktop is 2.8.1 or newer, restart this
+- Missing/404 for gemini-3.8-flash-high or gemini-3.7-flash-high: refresh the upstream catalog, restart this
   bridge so its client-version refresh runs, then check the live account catalog and entitlement.
 - "project id unavailable": onboarding did not yield a usable project. The account may be
   ineligible or restricted; use another dedicated test account instead of bypassing controls.
@@ -246,9 +254,9 @@ Security boundaries
 - Existing ZCode Provider collision: never overwritten
 - Broken/non-object ZCode JSON: never overwritten
 
-Gemini 3.7 reasoning selector
------------------------------
-The managed ZCode model entry exposes the same Low, Medium, and High reasoning choices as the
+Gemini 3.8 / 3.7 reasoning selector
+-----------------------------------
+The managed ZCode model entries expose the same Low, Medium, and High reasoning choices as the
 Antigravity desktop selector. The selected value is sent as Anthropic adaptive-thinking effort
 and translated by the bridge to Gemini generationConfig.thinkingConfig.thinkingLevel.
 The client-visible model IDs intentionally omit the redundant -high suffix; the local gateway
@@ -256,19 +264,19 @@ maps them to the exact upstream High catalog entries before inference and maps r
 
 ZCode model selection
 ---------------------
-Antigravity exposes gemini-3.7-flash and gemini-3.6-flash, mapped to their exact upstream High
+Antigravity exposes gemini-3.8-flash, gemini-3.7-flash, and gemini-3.6-flash, mapped to their exact upstream High
 entries, plus gemini-web-search (Gemini Web Search (Google)) for native Google Search with source
-citations. Use the dedicated search model for current web information; ordinary Gemini 3.7/3.6
+citations. Use the dedicated search model for current web information; ordinary Gemini 3.8/3.7/3.6
 requests remain normal chat/coding requests. Grok exposes the text models returned for the logged-in xAI account. Imagine image
 and video models and unrelated providers are excluded. Missing required Gemini or Grok text models
 cause a clear setup error instead of silently substituting another model.
 
 Build versions
 --------------
-- ZCode Antigravity Bridge: 1.0.0
+- ZCode Antigravity Bridge: 1.0.1-test
 - Control center: Electron 44.0.0, Chromium, React 19.2.8, Tailwind CSS 4.3.3
 - CLIProxyAPI base: v7.2.132, commit 78f0c4079e3e6273d65d03b5549cffc898703264
-- Local build: 7.2.132-zcode.13
+- Local build: 7.2.132-zcode.14
 
 Read THIRD-PARTY-NOTICES.txt, WEB-DEPENDENCIES.txt, LICENSE.electron.txt,
 LICENSES.chromium.html, and LICENSE-CLIProxyAPI.txt for upstream details.

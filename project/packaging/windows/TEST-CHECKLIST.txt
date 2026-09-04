@@ -1,7 +1,7 @@
 Windows acceptance checklist
 ============================
 
-[ ] ZCode-Antigravity-Setup-v1.0.0.exe opens a native confirmation dialog without a terminal.
+[ ] ZCode-Antigravity-Setup-v1.0.1-test.exe opens a native confirmation dialog without a terminal.
 [ ] Control-center refresh, login, sync, stop, port inspection, and ZCode launch never flash a console window.
 [ ] The native EXE writes install.ps1 with exactly one EF BB BF UTF-8 BOM before Windows PowerShell 5.1 parses it.
 [ ] A release build without injected or verified Antigravity OAuth desktop configuration fails before producing artifacts.
@@ -48,10 +48,12 @@ Windows acceptance checklist
 [ ] The widget's Open Control Center button and tray context-menu item explicitly reopen the panel; provider switch changes quota/model cards; Exit removes the tray and releases the local API.
 [ ] One-click setup for DeepSeek Harness, Grok Build, Codex, Claude Code, Gemini CLI, Qwen Code,
     Kimi Code, and OpenCode preserves unrelated settings, creates backups, and selects the current model.
+[ ] Model list contains gemini-3.8-flash with 1,048,576 context tokens and no redundant -high suffix.
 [ ] Model list contains gemini-3.7-flash with 1,048,576 context tokens and no redundant -high suffix.
-[ ] Model list contains gemini-3.6-flash and contains no Claude, GPT, agent, image, or other Gemini model.
-[ ] Gemini 3.7 Flash reasoning dropdown contains Low, Medium, and High.
-[ ] One request at each Gemini 3.7 reasoning level completes successfully.
+[ ] Gemini-only mode contains exactly 3.8, 3.7, 3.6 and gemini-web-search; it contains no Claude, GPT, agent or image model.
+[ ] Gemini 3.8 and 3.7 Flash reasoning dropdowns contain Low, Medium, and High.
+[ ] One request at each Gemini 3.8 reasoning level completes successfully.
+[ ] Test-Gemini-3.8-Flash.bat returns ZCODE_SMOKE_OK and response model gemini-3.8-flash.
 [ ] Test-Gemini-3.6-Flash.bat returns ZCODE_SMOKE_OK and writes last-smoke-test.json.
 [ ] In ZCode, one small gemini-3.6-flash prompt returns a real model response.
 [ ] Test-Gemini-3.7-Flash.bat returns ZCODE_SMOKE_OK and response model gemini-3.7-flash.

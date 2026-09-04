@@ -1,7 +1,7 @@
 ZCode Antigravity Bridge - macOS Universal test build
 ====================================================
 
-版本：1.0.0
+版本：1.0.1-test
 架构：Apple Silicon (arm64) + Intel (x86_64)
 最低系统：macOS 12
 
@@ -88,6 +88,7 @@ ALLOW_RUNTIME_OAUTH_CONFIG=1 跳过该发布门禁。
 - Start-ZCode-Antigravity.command：启动网关并同步模型
 - Status.command：查看状态
 - Doctor.command：本机静态检查
+- Test-Gemini-3.8-Flash.command：使用最新 Gemini 3.8 Flash 发送一次小型真实请求
 - Test-Gemini-3.7-Flash.command：发送一次小型真实请求
 - Test-Grok-Build.command：使用 grok-build-0.1 发送一次小型真实请求
 - Stop-ZCode-Antigravity.command：只停止本程序记录且路径匹配的网关

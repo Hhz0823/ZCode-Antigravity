@@ -1,6 +1,30 @@
 # 修复与验证记录
 
-最新验证日期：2026-09-01（Asia/Shanghai）
+最新验证日期：2026-09-04（Asia/Shanghai）
+
+## v1.0.1-test Gemini 3.8 Flash
+
+- 通过已登录 Google 测试账号直接调用 Antigravity `fetchAvailableModels`：HTTP 200、目录共 32 个模型，
+  明确包含 `gemini-3.8-flash-high`、`medium`、`low` 和 `tiered`；High 条目标记 recommended，
+  当次返回有效额度信息。
+- 新增唯一客户端模型 `gemini-3.8-flash`，精确映射到 `gemini-3.8-flash-high`；模型目录不会泄露
+  冗余 `-high` ID，也不会把 3.7 / 3.6 伪装成 3.8。
+- 3.8 High 能力元数据按真实目录登记为 1,048,576 上下文、65,536 最大输出、最小思考预算 32、
+  Low / Medium / High 思考选择；目录声明输入支持 text / image / audio / video、输出为 text。
+- 共享请求构建路径为 3.7 和 3.8 High 保留 `maxOutputTokens`；别名、注册表、输出上限和 Agent
+  默认回退均有回归测试。管理器 `go test ./...` / `go vet ./...`、CLIProxyAPI `go mod verify` /
+  全量 `go test ./...`、Electron 5 项测试与生产构建、Swift arm64 / x86_64 类型检查均通过。
+- 固定上游补丁重新生成后，在干净的 v7.2.132 提交上通过 `git apply --check --whitespace=error-all`；
+  50 个补丁文件应用后与 1,330 个随附后端源码文件逐项一致，补丁不含 OAuth 明文。
+- macOS Universal 与 Windows x64 `1.0.1-test` 包重新构建；新后端内部版本为
+  `7.2.132-zcode.14`。ZIP、逐文件 SHA-256、macOS 临时签名 / 双架构和 Windows PE / 安装载荷检查通过。
+- 最终候选已安装到 Apple Silicon 本机：App `1.0.1 (1001)`，三个进程正常，网关 `/healthz` 为
+  HTTP 200。模型接口返回干净的 `gemini-3.8-flash` 及完整能力；ZCode `Google` Provider 已同步
+  `gemini-3.6-flash`、`gemini-3.7-flash`、`gemini-3.8-flash` 和 `gemini-web-search`。
+- 通过 ZCode 使用的 Anthropic 兼容路径发送真实小型请求：requested / response 均为
+  `gemini-3.8-flash`，精确输出 `ZCODE_SMOKE_OK`；另一次 High 思考请求以 `end_turn` 完成并精确输出
+  `ZCODE_38_HIGH_OK`。本轮没有把目录声明冒充为新的 3.8 图片 / 视频实测。
+- Windows 包完成交叉构建与静态 / 自动化验证，但本轮未在 Windows 目标机运行；候选版未发布到 GitHub。
 
 ## V1.0.0 正式版发布
 

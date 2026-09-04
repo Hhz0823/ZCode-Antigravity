@@ -52,6 +52,14 @@ func testApp(t *testing.T) *app {
 
 func requiredTestModels() []modelInfo {
 	return []modelInfo{{
+		ID:                        "gemini-3.8-flash",
+		DisplayName:               "Gemini 3.8 Flash",
+		MaxInputTokens:            1048576,
+		MaxTokens:                 65536,
+		Thinking:                  &thinkingSupport{Min: 32, Max: 65535, DynamicAllowed: true, Levels: []string{"minimal", "low", "medium", "high"}},
+		SupportedInputModalities:  []string{"text", "image", "audio", "video"},
+		SupportedOutputModalities: []string{"text"},
+	}, {
 		ID:                        "gemini-3.7-flash",
 		DisplayName:               "Gemini 3.7 Flash",
 		MaxInputTokens:            1048576,
@@ -97,6 +105,9 @@ func TestWriteBackendConfigRestrictsNetworkAndCredits(t *testing.T) {
 		"disable-control-panel: true",
 		"disable-cloaking-model-list: true",
 		`proxy-url: "socks5://127.0.0.1:1080"`,
+		`name: "gemini-3.8-flash-high"`,
+		`alias: "gemini-3.8-flash"`,
+		`display-name: "Gemini 3.8 Flash"`,
 		`name: "gemini-3.7-flash-high"`,
 		`alias: "gemini-3.7-flash"`,
 		`display-name: "Gemini 3.7 Flash"`,
@@ -114,8 +125,8 @@ func TestWriteBackendConfigRestrictsNetworkAndCredits(t *testing.T) {
 			t.Errorf("config missing %q", check)
 		}
 	}
-	if got := strings.Count(text, "force-mapping: true"); got != 3 {
-		t.Fatalf("force-mapping entry count = %d, want 3", got)
+	if got := strings.Count(text, "force-mapping: true"); got != 4 {
+		t.Fatalf("force-mapping entry count = %d, want 4", got)
 	}
 	if strings.Contains(text, "fork: true") {
 		t.Fatal("upstream IDs must not remain client-visible")
@@ -281,10 +292,10 @@ func TestSelectZCodeModelsAllowsGeminiFlashAndWebSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := fmt.Sprint(modelIDs(models)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-web-search]" {
+	if got := fmt.Sprint(modelIDs(models)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-3.8-flash gemini-web-search]" {
 		t.Fatalf("selected models = %s", got)
 	}
-	if isAllowedZCodeModel("claude-opus-4-6-thinking") || isAllowedZCodeModel("gemini-3.7-flash-high") || !isAllowedZCodeModel("gemini-3.7-flash") || !isAllowedZCodeModel(zcodeWebSearchModelID) {
+	if isAllowedZCodeModel("claude-opus-4-6-thinking") || isAllowedZCodeModel("gemini-3.8-flash-high") || !isAllowedZCodeModel("gemini-3.8-flash") || !isAllowedZCodeModel("gemini-3.7-flash") || !isAllowedZCodeModel(zcodeWebSearchModelID) {
 		t.Fatal("model allowlist decision is incorrect")
 	}
 }
@@ -309,7 +320,7 @@ func TestZCodeModelAliasesMatchClientAllowlist(t *testing.T) {
 	}
 }
 
-func TestSelectZCodeModelsRequiresBothModels(t *testing.T) {
+func TestSelectZCodeModelsRequiresAllDefaultModels(t *testing.T) {
 	if _, err := selectZCodeModels(requiredTestModels()[:1]); err == nil || !strings.Contains(err.Error(), "gemini-3.6-flash") {
 		t.Fatalf("expected missing Gemini 3.6 error, got %v", err)
 	}
@@ -333,21 +344,21 @@ func TestSelectAgentModelsSeparatesGrokFromMedia(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := fmt.Sprint(modelIDs(defaults)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-web-search]" {
+	if got := fmt.Sprint(modelIDs(defaults)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-3.8-flash gemini-web-search]" {
 		t.Fatalf("default models = %s", got)
 	}
 	combined, err := selectAgentModels(catalog, true, true, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := fmt.Sprint(modelIDs(combined)); got != "[claude-opus-4-6 gemini-3.6-flash gemini-3.7-flash gemini-web-search grok-4.5 grok-build-0.1]" {
+	if got := fmt.Sprint(modelIDs(combined)); got != "[claude-opus-4-6 gemini-3.6-flash gemini-3.7-flash gemini-3.8-flash gemini-web-search grok-4.5 grok-build-0.1]" {
 		t.Fatalf("combined models = %s", got)
 	}
 }
 
 func TestSelectAvailableAgentModelsIsolatesProviderFailure(t *testing.T) {
 	models, warnings := selectAvailableAgentModels(requiredTestModels(), true, true, false)
-	if got := fmt.Sprint(modelIDs(models)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-web-search]" {
+	if got := fmt.Sprint(modelIDs(models)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-3.8-flash gemini-web-search]" {
 		t.Fatalf("unexpected surviving provider models: %s", got)
 	}
 	if len(warnings) != 1 || !strings.Contains(warnings[0].Error(), "Grok") {
@@ -403,11 +414,11 @@ func TestConfigureZCodeBacksUpAndPreservesOtherProviders(t *testing.T) {
 	if ours["name"] != "Google" {
 		t.Fatalf("provider display name = %v, want Google", ours["name"])
 	}
-	if got := fmt.Sprint(sortedProviderModelIDs(ours)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-web-search]" {
+	if got := fmt.Sprint(sortedProviderModelIDs(ours)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-3.8-flash gemini-web-search]" {
 		t.Fatalf("model ids = %s", got)
 	}
 	configuredModels := ours["models"].(map[string]any)
-	gemini := configuredModels["gemini-3.7-flash"].(map[string]any)
+	gemini := configuredModels["gemini-3.8-flash"].(map[string]any)
 	limit := gemini["limit"].(map[string]any)
 	if fmt.Sprint(limit["context"]) != "1048576" {
 		t.Fatalf("Gemini context limit = %v", limit["context"])
@@ -422,6 +433,9 @@ func TestConfigureZCodeBacksUpAndPreservesOtherProviders(t *testing.T) {
 	}
 	if _, ok := configuredModels["gemini-3.6-flash"]; !ok {
 		t.Fatal("Gemini 3.6 Flash is missing")
+	}
+	if _, ok := configuredModels["gemini-3.7-flash"]; !ok {
+		t.Fatal("Gemini 3.7 Flash is missing")
 	}
 	if _, ok := configuredModels[zcodeWebSearchModelID]; !ok {
 		t.Fatal("Gemini Web Search is missing")
@@ -463,7 +477,7 @@ func TestConfigureZCodeModelAccessCanBeEnabledAndRemoved(t *testing.T) {
 	}
 	providers, _ := objectField(root, "provider")
 	ours := providers[providerID].(map[string]any)
-	if got := fmt.Sprint(sortedProviderModelIDs(ours)); got != "[claude-opus-4-6 gemini-3.6-flash gemini-3.7-flash gemini-web-search grok-4.5]" {
+	if got := fmt.Sprint(sortedProviderModelIDs(ours)); got != "[claude-opus-4-6 gemini-3.6-flash gemini-3.7-flash gemini-3.8-flash gemini-web-search grok-4.5]" {
 		t.Fatalf("enabled model ids = %s", got)
 	}
 
@@ -476,7 +490,7 @@ func TestConfigureZCodeModelAccessCanBeEnabledAndRemoved(t *testing.T) {
 	}
 	providers, _ = objectField(root, "provider")
 	ours = providers[providerID].(map[string]any)
-	if got := fmt.Sprint(sortedProviderModelIDs(ours)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-web-search]" {
+	if got := fmt.Sprint(sortedProviderModelIDs(ours)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-3.8-flash gemini-web-search]" {
 		t.Fatalf("Gemini-only model ids = %s", got)
 	}
 }
@@ -529,7 +543,7 @@ func TestConfigureZCodeAllowsNoOpWhileRunningButRefusesWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	changedModels := append([]modelInfo(nil), models...)
-	changedModels[0].DisplayName = "Gemini 3.7 Flash Updated"
+	changedModels[0].DisplayName = "Gemini 3.8 Flash Updated"
 	if _, _, err := a.configureZCode(18080, changedModels); err == nil {
 		t.Fatal("expected a running ZCode process to block a required provider write")
 	}

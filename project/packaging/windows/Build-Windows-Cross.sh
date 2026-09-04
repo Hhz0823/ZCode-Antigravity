@@ -6,7 +6,7 @@ project_dir=${script_dir:h:h}
 repo_root=${project_dir:h}
 backend_dir="$repo_root/third_party/CLIProxyAPI-7.2.132-patched"
 native_dir="$project_dir/native/windows"
-release_version=${VERSION:-1.0.0}
+release_version=${VERSION:-1.0.1-test}
 build_date=${BUILD_DATE:-$(date -u +%Y-%m-%d)}
 output_dir=${OUTPUT_DIR:-$repo_root/dist/windows}
 package_name="ZCode-Antigravity-Windows-x64-${release_version}"
@@ -71,7 +71,7 @@ sha256_upper() {
     -o "$package_root/ZCode-Antigravity.exe" ./cmd/zcode-antigravity
 )
 
-backend_ldflags="-s -w -X main.Version=7.2.132-zcode.13"
+backend_ldflags="-s -w -X main.Version=7.2.132-zcode.14"
 if [[ $env_oauth == true ]]; then
   backend_ldflags+=" -X github.com/router-for-me/CLIProxyAPI/v7/internal/auth/antigravitycredentials.embeddedClientID=$ANTIGRAVITY_OAUTH_CLIENT_ID"
   backend_ldflags+=" -X github.com/router-for-me/CLIProxyAPI/v7/internal/auth/antigravitycredentials.embeddedClientSecret=$ANTIGRAVITY_OAUTH_CLIENT_SECRET"

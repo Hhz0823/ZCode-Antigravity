@@ -9,7 +9,8 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-V1.0.0-2f6bff">
+  <img alt="Stable" src="https://img.shields.io/badge/stable-V1.0.0-2f6bff">
+  <img alt="Development" src="https://img.shields.io/badge/development-1.0.1--test-f59e0b">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-12%2B-111111?logo=apple">
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?logo=windows11">
   <img alt="Local only" src="https://img.shields.io/badge/API-loopback%20only-20a464">
@@ -26,13 +27,15 @@ ZCode Antigravity 是面向 Windows 与 macOS 的本地 AI 控制中心。它负
 ZCode / Agent 配置、额度监控与网络出口选择；默认只启用 Gemini，需要时可在设置中开启 Grok
 和其他文本模型。
 
+> 当前源码为 `1.0.1-test`，新增 Gemini 3.8 Flash；最新公开正式版仍为 V1.0.0。
+
 ## 核心功能
 
 | 功能 | 能做什么 |
 | --- | --- |
 | **Gemini 优先，Grok 可选** | 默认只向客户端暴露 Gemini；Grok / xAI 与其他文本模型按需开启，账号、额度和路由互不混淆。 |
 | **原生 Google 联网搜索** | 独立的 `gemini-web-search` 模型调用 Antigravity 原生 Google Search，返回网页引用和可检查的搜索请求数据。 |
-| **多模态输入** | 支持文本、图片、音频和视频输入转换；当前 Gemini 3.7 Flash 输出为文本。 |
+| **多模态输入** | 支持文本、图片、音频和视频输入转换；当前 Gemini Flash 模型输出为文本。 |
 | **一键接入更多 Agent** | 自动备份并合并 ZCode、DeepSeek Harness、Grok Build、Codex、Claude Code、Gemini CLI、Qwen Code、Kimi Code 与 OpenCode 配置。 |
 | **无需强制开启 TUN** | Windows 自动使用系统代理或运行中的 v2rayN mixed / HTTP 代理，均不可用时才直连；手动代理始终优先。 |
 | **额度与 Token 小组件** | macOS 菜单栏和 Windows 系统托盘直接查看 5 小时 / 本周额度、重置时间、最近输出 Token、推理 Token 与 Token/s。 |
@@ -43,6 +46,7 @@ ZCode / Agent 配置、额度监控与网络出口选择；默认只启用 Gemin
 
 默认的 Antigravity 模型：
 
+- `gemini-3.8-flash`：最新 Flash 路由，支持 Low / Medium / High 思考等级与多模态输入。
 - `gemini-3.7-flash`：通用对话、编程与多模态理解。
 - `gemini-3.6-flash`：兼容模型。
 - `gemini-web-search`：界面显示为 **Gemini Web Search (Google)**，固定走原生 Google Search 并返回来源引用。
@@ -177,7 +181,7 @@ npm run package:windows
 
 ### 为什么 Gemini 没有联网搜索？
 
-普通 Gemini 3.7 / 3.6 是对话模型。请在客户端明确选择 `Gemini Web Search (Google)`；若升级后看不到，
+普通 Gemini 3.8 / 3.7 / 3.6 是对话模型。请在客户端明确选择 `Gemini Web Search (Google)`；若升级后看不到，
 完全退出 ZCode，回到控制中心点击“修复并重新同步”。
 
 ### 为什么显示 401、403、429 或模型不可用？

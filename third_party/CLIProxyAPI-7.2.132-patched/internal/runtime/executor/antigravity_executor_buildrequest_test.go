@@ -351,20 +351,24 @@ func assertNonSchemaRequestPreserved(t *testing.T, body map[string]any) {
 	}
 }
 
-func TestBuildRequestPreservesGemini37MaxOutputTokens(t *testing.T) {
-	body := buildRequestBodyFromRawPayload(t, "gemini-3.7-flash-high", []byte(`{
-		"request": {
-			"contents": [{"role":"user","parts":[{"text":"hello"}]}],
-			"generationConfig": {"maxOutputTokens": 64}
-		}
-	}`))
-	request, ok := body["request"].(map[string]any)
-	if !ok {
-		t.Fatal("request missing")
-	}
-	generationConfig, ok := request["generationConfig"].(map[string]any)
-	if !ok || generationConfig["maxOutputTokens"] != float64(64) {
-		t.Fatalf("Gemini 3.7 maxOutputTokens was not preserved: %#v", generationConfig)
+func TestBuildRequestPreservesCurrentGeminiFlashMaxOutputTokens(t *testing.T) {
+	for _, model := range []string{"gemini-3.7-flash-high", "gemini-3.8-flash-high"} {
+		t.Run(model, func(t *testing.T) {
+			body := buildRequestBodyFromRawPayload(t, model, []byte(`{
+				"request": {
+					"contents": [{"role":"user","parts":[{"text":"hello"}]}],
+					"generationConfig": {"maxOutputTokens": 64}
+				}
+			}`))
+			request, ok := body["request"].(map[string]any)
+			if !ok {
+				t.Fatal("request missing")
+			}
+			generationConfig, ok := request["generationConfig"].(map[string]any)
+			if !ok || generationConfig["maxOutputTokens"] != float64(64) {
+				t.Fatalf("%s maxOutputTokens was not preserved: %#v", model, generationConfig)
+			}
+		})
 	}
 }
 

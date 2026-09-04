@@ -5,9 +5,9 @@ script_dir=${0:A:h}
 project_dir=${script_dir:h:h}
 repo_root=${project_dir:h}
 backend_dir="$repo_root/third_party/CLIProxyAPI-7.2.132-patched"
-release_version=${VERSION:-1.0.0}
-short_version=${SHORT_VERSION:-1.0.0}
-bundle_version=${BUNDLE_VERSION:-1000}
+release_version=${VERSION:-1.0.1-test}
+short_version=${SHORT_VERSION:-1.0.1}
+bundle_version=${BUNDLE_VERSION:-1001}
 output_dir=${OUTPUT_DIR:-$repo_root/dist/macos}
 package_name="ZCode-Antigravity-macOS-Universal-v${release_version}"
 build_root=$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/zcode-antigravity-macos.XXXXXX")
@@ -94,7 +94,7 @@ for target_arch in arm64 amd64; do
     -framework SwiftUI -framework AppKit -parse-as-library \
     -o "$build_root/$target_arch/ZCode-Antigravity" "$native_source"
 
-  backend_ldflags="-s -w -X main.Version=7.2.132-zcode.13 -X main.Commit=$commit -X main.BuildDate=$build_date"
+  backend_ldflags="-s -w -X main.Version=7.2.132-zcode.14 -X main.Commit=$commit -X main.BuildDate=$build_date"
   if [[ $env_oauth == true ]]; then
     backend_ldflags+=" -X github.com/router-for-me/CLIProxyAPI/v7/internal/auth/antigravitycredentials.embeddedClientID=$ANTIGRAVITY_OAUTH_CLIENT_ID"
     backend_ldflags+=" -X github.com/router-for-me/CLIProxyAPI/v7/internal/auth/antigravitycredentials.embeddedClientSecret=$ANTIGRAVITY_OAUTH_CLIENT_SECRET"

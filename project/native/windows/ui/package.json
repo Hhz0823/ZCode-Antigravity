@@ -1,7 +1,7 @@
 {
   "name": "zcode-antigravity-control-center",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1-test",
   "description": "Electron control center for ZCode Antigravity Bridge",
   "author": "ZCode Antigravity contributors",
   "main": "electron/main.cjs",

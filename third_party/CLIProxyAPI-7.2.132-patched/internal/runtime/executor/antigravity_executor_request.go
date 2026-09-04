@@ -156,7 +156,12 @@ func (e *AntigravityExecutor) buildRequest(ctx context.Context, auth *cliproxyau
 }
 
 func preserveAntigravityMaxOutputTokens(modelName string) bool {
-	return strings.EqualFold(strings.TrimSpace(modelName), "gemini-3.7-flash-high")
+	switch strings.ToLower(strings.TrimSpace(modelName)) {
+	case "gemini-3.7-flash-high", "gemini-3.8-flash-high":
+		return true
+	default:
+		return false
+	}
 }
 
 // sanitizeAntigravityRequestSchemas cleans the JSON schemas carried by an Antigravity request.

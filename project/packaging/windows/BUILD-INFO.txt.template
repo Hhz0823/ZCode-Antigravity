@@ -1,20 +1,20 @@
 ZCode Antigravity Bridge build information
 ===========================================
 
-Package: ZCode-Antigravity-Windows-x64-1.0.0
+Package: ZCode-Antigravity-Windows-x64-1.0.1-test
 Build date (UTC): __BUILD_DATE__
 Target: Windows x64 (PE32+ Go Core and Electron GUI control center)
 
 Manager
 -------
-Version: 1.0.0
+Version: 1.0.1-test
 Go: 1.26.4
 CGO: disabled
 SHA-256: __MANAGER_SHA256__
 
 Control center
 --------------
-Version: 1.0.0
+Version: 1.0.1-test
 UI: Electron 44.0.0, React 19.2.8, Tailwind CSS 4.3.3, shadcn-style components
 Native shell: Electron main/preload with context isolation and renderer sandbox
 Subsystem: Windows GUI (no console window)
@@ -28,7 +28,7 @@ Backend
 -------
 Upstream: router-for-me/CLIProxyAPI v7.2.132
 Upstream commit: 78f0c4079e3e6273d65d03b5549cffc898703264
-Local build version: 7.2.132-zcode.13
+Local build version: 7.2.132-zcode.14
 Go: 1.26.4
 CGO: disabled (dynamic plugins unavailable and disabled)
 SHA-256: __BACKEND_SHA256__
@@ -38,12 +38,12 @@ Local backend patches
 1. OAuth loopback, Host/state checks, and PKCE S256.
 2. Windows current-user DPAPI, atomic storage, and runtime watcher decryption.
 3. Bounded capability probe, current Antigravity client-version refresh, and direct browser selection.
-4. Preserve Gemini 3.7 maxOutputTokens and publish accurate model capabilities.
+4. Preserve Gemini 3.7/3.8 maxOutputTokens and publish accurate model capabilities.
 5. Finite onboarding propagation retry and side-effect-free auth reads.
 6. Close Windows git repository handles before recovery and preserve measured TTFT semantics.
 7. Translate ZCode base64 audio/video blocks to Gemini inlineData without weakening config-write guards.
 8. Publish thinking levels and map ZCode Low/Medium/High to Gemini thinkingLevel.
-9. Expose clean Gemini 3.7/3.6 Flash client IDs while routing to the exact upstream High entries.
+9. Expose clean Gemini 3.8/3.7/3.6 Flash client IDs while routing to the exact upstream High entries.
 10. Provide a SHA-256 verified installer with automatic Windows/v2rayN loopback proxy discovery, direct fallback, and no TUN requirement.
 11. Stage and verify the payload, safely stop the recorded gateway, then deploy so same-version reruns cannot overwrite a running backend.
 12. Add a no-console native control center that injects the Provider, manages the local bridge, and renders provider quota.
@@ -75,7 +75,9 @@ Local backend patches
 
 Verification evidence
 ---------------------
-Current v1.0.0 build-host checks:
+Current v1.0.1-test build-host checks:
+- Live 2026-09-04 Antigravity catalog: gemini-3.8-flash High/Medium/Low/Tiered discovered for the test account
+- Clean gemini-3.8-flash client alias routes only to gemini-3.8-flash-high with 1,048,576 context and 65,536 output tokens
 - Manager go test ./... and Windows x64 build: passed
 - Manager go test -race: passed on the macOS build host
 - CLIProxyAPI go mod verify, go test ./..., and Windows x64 build: passed
@@ -89,7 +91,7 @@ Current v1.0.0 build-host checks:
 - Windows child-process CREATE_NO_WINDOW test and Windows x64 test-binary cross-compile: passed
 - Provider/model selection, Grok billing proxy, tray state, and eight Agent connector tests: passed
 - Native SwiftUI macOS main executable and Electron Windows main executable build checks: passed
-- v1.0.0 defaults to Gemini-only, exposes Grok/other text models only after an explicit setting, and preserves the verified DPI-aware taskbar quota widget
+- v1.0.1-test defaults to Gemini-only, exposes Grok/other text models only after an explicit setting, and preserves the verified DPI-aware taskbar quota widget
 - ZCode and supported Agent connectors use the visible Provider name Google while retaining managed compatibility IDs
 - Electron mode uses one native DWM blur backdrop, zero active renderer animations, and high-contrast content surfaces; three 180-frame scroll runs measured p95 17.4-17.5 ms
 - Electron target-runtime retest is required on Windows; the following visual/runtime items are retained from the earlier v0.6.4 Tauri baseline and are not claimed for Electron until rerun
@@ -106,6 +108,7 @@ Current v1.0.0 build-host checks:
 - Historical target Windows stale/dead gateway state: automatically replaced with the matching backend
 - Forced gateway crash: new PID online within the recovery window; 32 ZCode connections re-established
 - Non-interactive OAuth preflight: login flow waiting for callback, no missing-client configuration error
+- Real target-account gemini-3.8-flash request: requested/response gemini-3.8-flash, exact ZCODE_SMOKE_OK
 - Real target-account gemini-3.7-flash request: exact ZCODE_SMOKE_OK
 
 Historical v0.2.6-test Windows/runtime checks retained as the regression baseline:

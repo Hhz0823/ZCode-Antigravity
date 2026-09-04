@@ -69,7 +69,7 @@ func preferredConnectorModel(provider string, models []modelInfo, backgroundMode
 	if provider != "xai" && strings.TrimSpace(backgroundModel) != "" {
 		preferred = append(preferred, strings.TrimSpace(backgroundModel))
 	}
-	preferred = append(preferred, "gemini-3.7-flash", "gemini-3.6-flash")
+	preferred = append(preferred, "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash")
 	if provider == "xai" {
 		preferred = []string{"grok-build-0.1", "grok-4.6", "grok-4.5", "grok-code-fast-1"}
 	}

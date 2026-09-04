@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const version = "1.0.0"
+const version = "1.0.1-test"
 
 var defaultCommand = "menu"
 
@@ -89,7 +89,7 @@ func run(args []string) int {
 	case "doctor", "self-test":
 		commandErr = app.doctor()
 	case "smoke", "test-model":
-		model := "gemini-3.7-flash"
+		model := "gemini-3.8-flash"
 		if len(rest) > 1 && strings.TrimSpace(rest[1]) != "" {
 			model = strings.TrimSpace(rest[1])
 		}
@@ -145,7 +145,7 @@ func (a *app) menu() error {
 		fmt.Println("5. 停止网关")
 		fmt.Println("6. 从 ZCode 删除本 Provider")
 		fmt.Println("7. 本机检查")
-		fmt.Println("8. 真实测试 Gemini 3.7 Flash")
+		fmt.Println("8. 真实测试 Gemini 3.8 Flash")
 		fmt.Println("9. 登录/添加 Grok / xAI 账号")
 		fmt.Println("0. 退出")
 		fmt.Print("请选择: ")
@@ -183,7 +183,7 @@ func (a *app) menu() error {
 				fmt.Printf("\n检查发现问题: %v\n", err)
 			}
 		case "8":
-			if err := a.smokeModel("gemini-3.7-flash"); err != nil {
+			if err := a.smokeModel("gemini-3.8-flash"); err != nil {
 				fmt.Printf("\n模型测试失败: %v\n", err)
 			}
 		case "9":

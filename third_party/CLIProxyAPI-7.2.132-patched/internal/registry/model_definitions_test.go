@@ -1,6 +1,9 @@
 package registry
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestModelOverrideHeadersFromEmbeddedModels(t *testing.T) {
 	const wantUA = "codex-tui/0.144.0 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11 (codex-tui; 0.144.0)"
@@ -33,6 +36,22 @@ func TestGeminiVertexModelsUseFlashLiteReleaseID(t *testing.T) {
 	}
 
 	t.Fatalf("Vertex models do not contain %q", releaseID)
+}
+
+func TestAntigravityModelsIncludeGemini38FlashHigh(t *testing.T) {
+	for _, model := range GetAntigravityModels() {
+		if model == nil || model.ID != "gemini-3.8-flash-high" {
+			continue
+		}
+		if model.ContextLength != 1048576 || model.MaxCompletionTokens != 65536 {
+			t.Fatalf("Gemini 3.8 limits = context %d, output %d", model.ContextLength, model.MaxCompletionTokens)
+		}
+		if got := strings.Join(model.SupportedInputModalities, ","); got != "text,image,audio,video" {
+			t.Fatalf("Gemini 3.8 input modalities = %q", got)
+		}
+		return
+	}
+	t.Fatal("Antigravity models do not contain gemini-3.8-flash-high")
 }
 
 func TestWithXAIBuiltinsIncludesImage20(t *testing.T) {
