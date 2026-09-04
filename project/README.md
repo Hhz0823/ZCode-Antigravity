@@ -1,6 +1,6 @@
 # ZCode Antigravity Bridge
 
-Cross-platform local bridge that exposes pinned Antigravity Gemini and xAI Grok accounts to
+Cross-platform local bridge that exposes Antigravity Gemini, Google-account Claude, and xAI Grok accounts to
 ZCode and other coding agents. Release packaging supports Windows x64 and macOS Universal
 (Apple Silicon plus Intel).
 
@@ -8,7 +8,7 @@ The manager provides Windows DPAPI or macOS Keychain-backed per-user credential 
 authentication, API and OAuth callback port scanning, ZCode data-directory resolution,
 bounded config backups/logs, atomic Windows replacement, model synchronization, real-model
 smoke testing, image/audio/video request translation, safe no-op reuse while ZCode is running,
-PID/path-safe stop, managed-provider removal, a strict Gemini plus Grok-text model selector,
+PID/path-safe stop, managed-provider removal, a Gemini-default selector with opt-in Google Claude and Grok text models,
 an explicit Gemini Web Search model with grounded Google Search citations,
 Grok billing, protocol-derived output-token and token/s metrics, detailed taskbar/menu-bar quota
 menus, backed-up one-click configuration for eight Agent/CLI clients, automatic v2rayN/Windows
@@ -64,7 +64,7 @@ Build the single-BAT installer from a verified expanded package:
 ```powershell
 .\packaging\windows\Build-Single-Bat.ps1 `
   -PackageDir C:\path\to\expanded-package `
-  -OutputFile C:\path\to\ZCode-Antigravity-OneClick-v1.0.1-test.bat
+  -OutputFile C:\path\to\ZCode-Antigravity-OneClick-v1.0.2-test.bat
 ```
 
 Build the native no-console EXE installer from the same verified package:
@@ -72,5 +72,5 @@ Build the native no-console EXE installer from the same verified package:
 ```powershell
 .\packaging\windows\Build-Exe-Installer.ps1 `
   -PackageDir C:\path\to\expanded-package `
-  -OutputFile C:\path\to\ZCode-Antigravity-Setup-v1.0.1-test.exe
+  -OutputFile C:\path\to\ZCode-Antigravity-Setup-v1.0.2-test.exe
 ```

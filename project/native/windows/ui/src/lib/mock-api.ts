@@ -3,10 +3,10 @@ const resetFive = new Date(now.getTime() + 3.4 * 60 * 60 * 1000).toISOString();
 const resetWeek = new Date(now.getTime() + 4.2 * 24 * 60 * 60 * 1000).toISOString();
 
 const status = {
-  version: "1.0.1-test",
+  version: "1.0.2-test",
   gateway: { ok: true, label: "网关在线", detail: "http://127.0.0.1:18080", running: true },
   proxy: { ok: true, label: "v2rayN 自动代理", detail: "127.0.0.1:10808 · 无需 TUN", running: true },
-  tun: { ok: true, label: "TUN 未启用（可选）", detail: "Gemini / Grok 可使用直连或专用代理", running: false },
+  tun: { ok: true, label: "TUN 未启用（可选）", detail: "Gemini / Claude / Grok 可使用直连或专用代理", running: false },
   zcode: { ok: true, label: "ZCode 已接入", detail: "http://127.0.0.1:18080", running: true },
   providerAccounts: { antigravity: 2, xai: 1 },
   selectedProvider: "antigravity",
@@ -31,7 +31,7 @@ const usage = {
 };
 
 const manager = {
-  version: "1.0.1-test",
+  version: "1.0.2-test",
   accounts: [{ id: "ag-demo", provider: "antigravity", label: "y*****g@gmail.com", plan: "Google AI Pro", status: "active", updatedAt: now.toISOString() }, { id: "xai-demo", provider: "xai", label: "g***@example.com", plan: "SuperGrok", status: "active", updatedAt: now.toISOString() }],
   proxy: { running: true, baseURL: "http://127.0.0.1:18080", port: 18080, protocols: [{ name: "OpenAI", path: "/v1/chat/completions", description: "Chat Completions / Responses 兼容" }, { name: "Anthropic", path: "/v1/messages", description: "Claude Code 原生消息协议" }, { name: "Gemini", path: "/v1beta/models", description: "Google SDK 兼容协议" }] },
   routing: { strategy: "round-robin", sessionAffinity: true, sessionAffinityTTL: "1h", requestRetry: 3, credentialRetry: 3, retryInterval: 30, backgroundModel: "gemini-3.7-flash" },

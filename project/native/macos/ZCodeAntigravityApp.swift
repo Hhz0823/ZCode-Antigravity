@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "1.0.1-test"
+private let appVersion = "1.0.2-test"
 
 private extension Notification.Name {
     static let selectBridgeProvider = Notification.Name("ZCodeSelectBridgeProvider")
@@ -1465,7 +1465,7 @@ struct DashboardView: View {
                         }
                     )).labelsHidden()
                 }
-                settingsRow(title: "其他 AI 文本模型", detail: "默认关闭；开启后可同步 Claude、GPT 等非 Gemini 文本模型") {
+                settingsRow(title: "Google Claude / 其他模型", detail: "默认关闭；开启后同步 Google 账号可用的 Claude Sonnet、Claude Opus 与其他文本模型") {
                     Toggle("", isOn: Binding(
                         get: { model.manager?.settings.enableOtherModels ?? false },
                         set: { value in Task { await model.updateManagerSettings(.init(enableOtherModels: value)) } }

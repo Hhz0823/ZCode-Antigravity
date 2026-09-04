@@ -1,6 +1,6 @@
 # ZCode Antigravity Bridge 源码与会话归档
 
-归档修复日期：2026-08-15（Asia/Shanghai）
+最新验证日期：2026-09-04（Asia/Shanghai）
 
 ## 目录
 
@@ -76,6 +76,10 @@ git apply --whitespace=error-all /path/to/ZCode-Antigravity/project/docs/CLIProx
     监听稳定处理应用内外点击，关闭后立即释放监听。
 18. ZCode 与支持自定义名称的 Agent 统一显示 Provider 名 `Google`，内部托管 ID 保持不变以兼容
     已有配置，并继续拒绝覆盖非本程序创建的同名条目。
+19. Gemini-only 保持为默认；设置中的可选文本模型入口明确标识 Google Claude，开启后才把
+    `claude-sonnet-4-6` 和 `claude-opus-4-6-thinking` 及账号其他可用文本模型同步到 ZCode / Agent。
+20. 增加 Claude Sonnet 双平台冒烟脚本与模型分类回归；2026-09-04 使用已登录 Google 测试账号实际
+    调用 Sonnet / Opus 的 Anthropic 兼容路径，两次 requested / response ID 一致且精确输出 `ZCODE_SMOKE_OK`。
 
 ## 构建
 

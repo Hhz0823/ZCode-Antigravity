@@ -129,6 +129,7 @@ func (g *guiRuntime) managerReport() managerReport {
 		},
 		Features: []managerFeature{
 			{ID: "accounts", Name: "多账号管家", Description: "OAuth 登录、账号发现和脱敏状态", Available: true},
+			{ID: "google-claude", Name: "Google Claude", Description: "使用 Antigravity Google 账号调用 Claude Sonnet / Opus", Available: true},
 			{ID: "auto-proxy", Name: "v2rayN 自动代理", Description: "无需 TUN，自动发现系统代理与本机端口", Available: true},
 			{ID: "protocols", Name: "三协议中继", Description: "OpenAI、Anthropic、Gemini", Available: true},
 			{ID: "connectors", Name: "Agent 一键接入", Description: "备份并合并 8 类 CLI 配置", Available: true},

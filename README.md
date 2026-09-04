@@ -5,12 +5,12 @@
 <h1 align="center">ZCode Antigravity</h1>
 
 <p align="center">
-  <strong>把 Gemini 与可选的 Grok 接入 ZCode 和更多 Agent / CLI，并在桌面直接查看额度、Token 与连接状态。</strong>
+  <strong>把 Gemini、Google 账号内的 Claude 与可选 Grok 接入 ZCode 和更多 Agent / CLI。</strong>
 </p>
 
 <p align="center">
   <img alt="Stable" src="https://img.shields.io/badge/stable-V1.0.0-2f6bff">
-  <img alt="Development" src="https://img.shields.io/badge/development-1.0.1--test-f59e0b">
+  <img alt="Development" src="https://img.shields.io/badge/development-1.0.2--test-f59e0b">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-12%2B-111111?logo=apple">
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?logo=windows11">
   <img alt="Local only" src="https://img.shields.io/badge/API-loopback%20only-20a464">
@@ -24,18 +24,18 @@
 </p>
 
 ZCode Antigravity 是面向 Windows 与 macOS 的本地 AI 控制中心。它负责账号授权、模型路由、
-ZCode / Agent 配置、额度监控与网络出口选择；默认只启用 Gemini，需要时可在设置中开启 Grok
-和其他文本模型。
+ZCode / Agent 配置、额度监控与网络出口选择；默认只启用 Gemini，需要时可在设置中开启
+Google Antigravity 账号内的 Claude、Grok 和其他文本模型。
 
-> 当前源码为 `1.0.1-test`，新增 Gemini 3.8 Flash；最新公开正式版仍为 V1.0.0。
+> 当前源码为 `1.0.2-test`，新增 Google Claude 显式接入与真实请求测试；最新公开正式版仍为 V1.0.0。
 
 ## 核心功能
 
 | 功能 | 能做什么 |
 | --- | --- |
-| **Gemini 优先，Grok 可选** | 默认只向客户端暴露 Gemini；Grok / xAI 与其他文本模型按需开启，账号、额度和路由互不混淆。 |
+| **Gemini 默认，Claude / Grok 可选** | 默认只向客户端暴露 Gemini；Google Claude、Grok / xAI 与其他文本模型按需开启。 |
 | **原生 Google 联网搜索** | 独立的 `gemini-web-search` 模型调用 Antigravity 原生 Google Search，返回网页引用和可检查的搜索请求数据。 |
-| **多模态输入** | 支持文本、图片、音频和视频输入转换；当前 Gemini Flash 模型输出为文本。 |
+| **多模态输入** | Gemini Flash 支持文本、图片、音频和视频；Google Claude 支持文本与图片输入，当前均为文本输出。 |
 | **一键接入更多 Agent** | 自动备份并合并 ZCode、DeepSeek Harness、Grok Build、Codex、Claude Code、Gemini CLI、Qwen Code、Kimi Code 与 OpenCode 配置。 |
 | **无需强制开启 TUN** | Windows 自动使用系统代理或运行中的 v2rayN mixed / HTTP 代理，均不可用时才直连；手动代理始终优先。 |
 | **额度与 Token 小组件** | macOS 菜单栏和 Windows 系统托盘直接查看 5 小时 / 本周额度、重置时间、最近输出 Token、推理 Token 与 Token/s。 |
@@ -52,8 +52,12 @@ ZCode / Agent 配置、额度监控与网络出口选择；默认只启用 Gemin
 - `gemini-web-search`：界面显示为 **Gemini Web Search (Google)**，固定走原生 Google Search 并返回来源引用。
 
 普通 Gemini 模型不会因为提示词中写了“搜索”就伪装成已联网。需要最新网页信息时，请明确选择
-`Gemini Web Search (Google)`。Grok 和其他 AI 文本模型默认关闭，可在“设置 → 模型”中开启并重新同步；
+`Gemini Web Search (Google)`。Google Claude、Grok 和其他 AI 文本模型默认关闭，可在“设置 → 模型”中开启并重新同步；
 图片 / 视频生成模型不会混入文本模型列表。
+
+开启“Google Claude / 其他模型”后，当前已验证的 Google Antigravity 模型为
+`claude-sonnet-4-6` 和 `claude-opus-4-6-thinking`。它们复用已登录的 Google 账号，
+不需要另外填写 Anthropic API Key；模型权限和额度以当前 Google 账号实时返回为准。
 
 ## 一键接入 Agent / CLI
 

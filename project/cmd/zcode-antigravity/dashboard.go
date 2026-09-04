@@ -317,7 +317,7 @@ func (g *guiRuntime) status() dashboardStatus {
 	if name, ok := detectTunAdapter(); ok {
 		status.TUN = dashboardItem{OK: true, Label: "TUN 已开启", Detail: name, Running: true}
 	} else {
-		status.TUN = dashboardItem{OK: true, Label: "TUN 未启用（可选）", Detail: "Gemini / Grok 可使用直连或专用代理", Running: false}
+		status.TUN = dashboardItem{OK: true, Label: "TUN 未启用（可选）", Detail: "Gemini / Claude / Grok 可使用直连或专用代理", Running: false}
 	}
 
 	configured, baseURL, errProvider := zcodeProviderStatus(g.app.paths.ZCodeConfig)
@@ -326,7 +326,7 @@ func (g *guiRuntime) status() dashboardStatus {
 	} else if errProvider != nil {
 		status.ZCode = dashboardItem{Label: "ZCode 配置不可读", Detail: errProvider.Error(), Running: g.app.zcodeRunning()}
 	} else {
-		status.ZCode = dashboardItem{Label: "ZCode 尚未接入", Detail: "可选择 Gemini 或 Grok 文本模型", Running: g.app.zcodeRunning()}
+		status.ZCode = dashboardItem{Label: "ZCode 尚未接入", Detail: "可选择 Gemini，并按需开启 Claude 或 Grok", Running: g.app.zcodeRunning()}
 	}
 
 	g.operationMu.Lock()
@@ -568,7 +568,7 @@ func operationStartMessage(action string) string {
 	case "login-grok":
 		return "正在打开 xAI 设备授权…"
 	case "sync":
-		return "正在同步 Gemini / Grok 模型…"
+		return "正在同步 Gemini / Claude / Grok 模型…"
 	case "recover":
 		return "检测到网关意外退出，正在自动恢复…"
 	case "stop":
@@ -590,7 +590,7 @@ func operationSuccessMessage(action string) string {
 	case "login-grok":
 		return "Grok / xAI 登录成功"
 	case "sync":
-		return "Gemini / Grok 模型已同步"
+		return "Gemini / Claude / Grok 模型已同步"
 	case "recover":
 		return "本地网关已自动恢复"
 	case "stop":

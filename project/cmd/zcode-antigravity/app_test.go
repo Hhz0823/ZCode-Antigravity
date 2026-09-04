@@ -356,6 +356,24 @@ func TestSelectAgentModelsSeparatesGrokFromMedia(t *testing.T) {
 	}
 }
 
+func TestGoogleClaudeModelsAreOptionalAntigravityTextModels(t *testing.T) {
+	tests := []struct {
+		model modelInfo
+		want  bool
+	}{
+		{model: modelInfo{ID: "claude-sonnet-4-6", OwnedBy: "antigravity", SupportedInputModalities: []string{"text", "image"}, SupportedOutputModalities: []string{"text"}}, want: true},
+		{model: modelInfo{ID: "claude-opus-4-6-thinking", OwnedBy: "antigravity", SupportedInputModalities: []string{"text", "image"}, SupportedOutputModalities: []string{"text"}}, want: true},
+		{model: modelInfo{ID: "claude-image-preview", OwnedBy: "antigravity", SupportedOutputModalities: []string{"image"}}, want: false},
+		{model: modelInfo{ID: "gemini-3.8-flash", OwnedBy: "antigravity", SupportedOutputModalities: []string{"text"}}, want: false},
+		{model: modelInfo{ID: "grok-4.5", OwnedBy: "xai", SupportedOutputModalities: []string{"text"}}, want: false},
+	}
+	for _, test := range tests {
+		if got := isOtherTextModel(test.model); got != test.want {
+			t.Errorf("isOtherTextModel(%q) = %v, want %v", test.model.ID, got, test.want)
+		}
+	}
+}
+
 func TestSelectAvailableAgentModelsIsolatesProviderFailure(t *testing.T) {
 	models, warnings := selectAvailableAgentModels(requiredTestModels(), true, true, false)
 	if got := fmt.Sprint(modelIDs(models)); got != "[gemini-3.6-flash gemini-3.7-flash gemini-3.8-flash gemini-web-search]" {
@@ -466,7 +484,8 @@ func TestConfigureZCodeModelAccessCanBeEnabledAndRemoved(t *testing.T) {
 	}
 	models := append(requiredTestModels(),
 		modelInfo{ID: "grok-4.5", SupportedOutputModalities: []string{"text"}},
-		modelInfo{ID: "claude-opus-4-6", SupportedOutputModalities: []string{"text"}},
+		modelInfo{ID: "claude-opus-4-6-thinking", DisplayName: "Claude Opus 4.6 (Thinking)", MaxInputTokens: 200000, MaxTokens: 64000, SupportedInputModalities: []string{"text", "image"}, SupportedOutputModalities: []string{"text"}},
+		modelInfo{ID: "claude-sonnet-4-6", DisplayName: "Claude Sonnet 4.6 (Thinking)", MaxInputTokens: 200000, MaxTokens: 64000, SupportedInputModalities: []string{"text", "image"}, SupportedOutputModalities: []string{"text"}},
 	)
 	if _, changed, err := a.configureZCodeWithAccess(18081, models, true, true); err != nil || !changed {
 		t.Fatalf("enable optional models: changed=%v err=%v", changed, err)
@@ -477,8 +496,19 @@ func TestConfigureZCodeModelAccessCanBeEnabledAndRemoved(t *testing.T) {
 	}
 	providers, _ := objectField(root, "provider")
 	ours := providers[providerID].(map[string]any)
-	if got := fmt.Sprint(sortedProviderModelIDs(ours)); got != "[claude-opus-4-6 gemini-3.6-flash gemini-3.7-flash gemini-3.8-flash gemini-web-search grok-4.5]" {
+	if got := fmt.Sprint(sortedProviderModelIDs(ours)); got != "[claude-opus-4-6-thinking claude-sonnet-4-6 gemini-3.6-flash gemini-3.7-flash gemini-3.8-flash gemini-web-search grok-4.5]" {
 		t.Fatalf("enabled model ids = %s", got)
+	}
+	configuredModels := ours["models"].(map[string]any)
+	claude := configuredModels["claude-sonnet-4-6"].(map[string]any)
+	if claude["name"] != "Claude Sonnet 4.6 (Thinking)" {
+		t.Fatalf("Claude display name = %v", claude["name"])
+	}
+	if fmt.Sprint(claude["limit"].(map[string]any)["context"]) != "200000" {
+		t.Fatalf("Claude context limit = %v", claude["limit"])
+	}
+	if fmt.Sprint(claude["modalities"].(map[string]any)["input"]) != "[text image]" {
+		t.Fatalf("Claude input modalities = %v", claude["modalities"])
 	}
 
 	if _, changed, err := a.configureZCode(18081, models); err != nil || !changed {

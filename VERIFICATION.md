@@ -2,6 +2,25 @@
 
 最新验证日期：2026-09-04（Asia/Shanghai）
 
+## v1.0.2-test Google 账号 Claude 模型
+
+- 通过已登录 Google 测试账号实时调用 Antigravity `fetchAvailableModels`：HTTP 200，明确返回
+  `claude-sonnet-4-6` 和 `claude-opus-4-6-thinking`，两者当次均有可用额度。
+- 两个 Claude 模型在 Anthropic 兼容目录中均声明 200,000 输入上限、64,000 输出上限、
+  text / image 输入与 text 输出；ZCode Provider 保留显示名、输入上下文与模态元数据。
+- 设置页将原本泛化的入口明确改为“Google Claude / 其他模型”。新安装仍默认仅显示 Gemini；
+  只有用户主动开启并应用模型开关后，Claude 才会同步到 ZCode 和 Agent。不需另外的
+  Anthropic API Key，复用当前 Antigravity Google OAuth 账号。
+- 新增 `Test-Claude-Sonnet-4.6.command` 与 `Test-Claude-Sonnet-4.6.bat`；同时增加 Claude 文本模型
+  识别、可选开关、显示名、上下文和图片输入元数据的回归测试。
+- 已安装的 macOS `1.0.2 (1002)` 通过本地 `/v1/messages` 路径分别实际调用 Sonnet 和 Opus；
+  requested / response 模型 ID 均精确一致，两次输出断言均为 `ZCODE_SMOKE_OK`。
+- 管理器 `go test ./...` / `go vet ./...` / `go test -race ./...`、Electron 5 项测试与生产构建、
+  Swift arm64 / x86_64 类型检查均通过。macOS Universal 与 Windows x64 包的 ZIP、逐文件哈希、
+  macOS 临时签名 / 双架构和 Windows PE32+ / GUI 子系统检查通过。
+- Windows 远程测试机 `192.168.1.9:22` 在本轮连接超时，因此没有声称新的 Windows 实机运行结果；
+  Windows 候选包仅完成了交叉构建、自动化回归和静态完整性验证。
+
 ## v1.0.1-test Gemini 3.8 Flash
 
 - 通过已登录 Google 测试账号直接调用 Antigravity `fetchAvailableModels`：HTTP 200、目录共 32 个模型，

@@ -374,7 +374,7 @@ func (a *app) startAndConfigure() (returnErr error) {
 		fmt.Printf("模型提供商警告: %v\n", warning)
 	}
 	if len(models) == 0 {
-		return fmt.Errorf("没有可同步的 Gemini / Grok 文本模型: %w", errors.Join(warnings...))
+		return fmt.Errorf("没有可同步的 Gemini / Claude / Grok 文本模型: %w", errors.Join(warnings...))
 	}
 	backup, changed, err := a.configureZCodeWithAccess(port, models, cfg.EnableGrokModels, cfg.EnableOtherModels)
 	if err != nil {
@@ -667,7 +667,7 @@ func (a *app) syncZCode() error {
 		fmt.Printf("模型提供商警告: %v\n", warning)
 	}
 	if len(models) == 0 {
-		return fmt.Errorf("没有可同步的 Gemini / Grok 文本模型: %w", errors.Join(warnings...))
+		return fmt.Errorf("没有可同步的 Gemini / Claude / Grok 文本模型: %w", errors.Join(warnings...))
 	}
 	backup, changed, err := a.configureZCodeWithAccess(current.Port, models, cfg.EnableGrokModels, cfg.EnableOtherModels)
 	if err != nil {
@@ -726,7 +726,7 @@ func (a *app) status() error {
 		fmt.Printf("模型提供商警告: %v\n", warning)
 	}
 	if len(models) == 0 {
-		return fmt.Errorf("没有可用的 Gemini / Grok 文本模型: %w", errors.Join(warnings...))
+		return fmt.Errorf("没有可用的 Gemini / Claude / Grok 文本模型: %w", errors.Join(warnings...))
 	}
 	fmt.Printf("网关状态: 正常 %s\n", a.gatewayURL(current.Port))
 	fmt.Printf("ZCode 可选模型: %d\n", len(models))
@@ -786,7 +786,7 @@ func (a *app) smokeModel(model string) error {
 		return fmt.Errorf("模型目录中不存在精确 ID %q", model)
 	}
 	if !isManagedAgentModel(selected) {
-		return fmt.Errorf("模型 %q 不是受支持的 Gemini / Grok 文本模型", model)
+		return fmt.Errorf("模型 %q 不是受支持的 Gemini / Claude / Grok 文本模型", model)
 	}
 	payload := map[string]any{
 		"model":      model,

@@ -1,7 +1,7 @@
 Windows acceptance checklist
 ============================
 
-[ ] ZCode-Antigravity-Setup-v1.0.1-test.exe opens a native confirmation dialog without a terminal.
+[ ] ZCode-Antigravity-Setup-v1.0.2-test.exe opens a native confirmation dialog without a terminal.
 [ ] Control-center refresh, login, sync, stop, port inspection, and ZCode launch never flash a console window.
 [ ] The native EXE writes install.ps1 with exactly one EF BB BF UTF-8 BOM before Windows PowerShell 5.1 parses it.
 [ ] A release build without injected or verified Antigravity OAuth desktop configuration fails before producing artifacts.
@@ -57,6 +57,8 @@ Windows acceptance checklist
 [ ] Test-Gemini-3.6-Flash.bat returns ZCODE_SMOKE_OK and writes last-smoke-test.json.
 [ ] In ZCode, one small gemini-3.6-flash prompt returns a real model response.
 [ ] Test-Gemini-3.7-Flash.bat returns ZCODE_SMOKE_OK and response model gemini-3.7-flash.
+[ ] After enabling Google Claude / other models, ZCode lists claude-sonnet-4-6 and claude-opus-4-6-thinking under Provider Google.
+[ ] Test-Claude-Sonnet-4.6.bat returns ZCODE_SMOKE_OK and response model claude-sonnet-4-6.
 [ ] Test-Grok-Build.bat returns ZCODE_SMOKE_OK and response model grok-build-0.1.
 [ ] Antigravity auth JSON contains dpapi:v1 markers and no plaintext token value.
 [ ] Status.bat reports the final port and model list.
