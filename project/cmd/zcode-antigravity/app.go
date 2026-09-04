@@ -112,7 +112,7 @@ func defaultSettings() settings {
 		QuotaWarningPercent:   20,
 		EnableGrokModels:      false,
 		EnableOtherModels:     false,
-		BackgroundModel:       "gemini-3.6-flash",
+		BackgroundModel:       "gemini-3.8-flash",
 		Theme:                 "system",
 		LiquidGlass:           true,
 	}

@@ -48,13 +48,14 @@ Windows acceptance checklist
 [ ] The widget's Open Control Center button and tray context-menu item explicitly reopen the panel; provider switch changes quota/model cards; Exit removes the tray and releases the local API.
 [ ] One-click setup for DeepSeek Harness, Grok Build, Codex, Claude Code, Gemini CLI, Qwen Code,
     Kimi Code, and OpenCode preserves unrelated settings, creates backups, and selects the current model.
-[ ] Model list contains gemini-3.7-flash with 1,048,576 context tokens and no redundant -high suffix.
-[ ] Model list contains gemini-3.6-flash and contains no Claude, GPT, agent, image, or other Gemini model.
-[ ] Gemini 3.7 Flash reasoning dropdown contains Low, Medium, and High.
-[ ] One request at each Gemini 3.7 reasoning level completes successfully.
+[ ] Model list contains gemini-3.8-flash, gemini-3.7-flash, and gemini-3.6-flash with 1,048,576 context tokens and no redundant -high suffix.
+[ ] Model list contains gemini-web-search and contains no Claude, GPT, agent, image, or other unmanaged model unless enabled in settings.
+[ ] Gemini 3.8 and 3.7 Flash reasoning dropdown contains Low, Medium, and High.
+[ ] One request at each Gemini 3.8 and 3.7 reasoning level completes successfully.
 [ ] Test-Gemini-3.6-Flash.bat returns ZCODE_SMOKE_OK and writes last-smoke-test.json.
 [ ] In ZCode, one small gemini-3.6-flash prompt returns a real model response.
 [ ] Test-Gemini-3.7-Flash.bat returns ZCODE_SMOKE_OK and response model gemini-3.7-flash.
+[ ] Test-Gemini-3.8-Flash.bat returns ZCODE_SMOKE_OK and response model gemini-3.8-flash.
 [ ] Test-Grok-Build.bat returns ZCODE_SMOKE_OK and response model grok-build-0.1.
 [ ] Antigravity auth JSON contains dpapi:v1 markers and no plaintext token value.
 [ ] Status.bat reports the final port and model list.

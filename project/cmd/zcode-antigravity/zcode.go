@@ -16,6 +16,7 @@ import (
 const zcodeWebSearchModelID = "gemini-web-search"
 
 var zcodeModelAllowlist = []string{
+	"gemini-3.8-flash",
 	"gemini-3.7-flash",
 	"gemini-3.6-flash",
 	zcodeWebSearchModelID,
@@ -28,6 +29,7 @@ type zcodeModelAlias struct {
 }
 
 var zcodeModelAliases = []zcodeModelAlias{
+	{UpstreamID: "gemini-3.8-flash-high", ClientID: "gemini-3.8-flash", DisplayName: "Gemini 3.8 Flash"},
 	{UpstreamID: "gemini-3.7-flash-high", ClientID: "gemini-3.7-flash", DisplayName: "Gemini 3.7 Flash"},
 	{UpstreamID: "gemini-3.6-flash-high", ClientID: "gemini-3.6-flash", DisplayName: "Gemini 3.6 Flash"},
 	{UpstreamID: "gemini-3.1-flash-lite", ClientID: zcodeWebSearchModelID, DisplayName: "Gemini Web Search (Google)"},

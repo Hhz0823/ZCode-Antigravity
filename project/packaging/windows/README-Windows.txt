@@ -256,9 +256,9 @@ maps them to the exact upstream High catalog entries before inference and maps r
 
 ZCode model selection
 ---------------------
-Antigravity exposes gemini-3.7-flash and gemini-3.6-flash, mapped to their exact upstream High
+Antigravity exposes gemini-3.8-flash, gemini-3.7-flash, and gemini-3.6-flash, mapped to their exact upstream High
 entries, plus gemini-web-search (Gemini Web Search (Google)) for native Google Search with source
-citations. Use the dedicated search model for current web information; ordinary Gemini 3.7/3.6
+citations. Use the dedicated search model for current web information; ordinary Gemini 3.8/3.7/3.6
 requests remain normal chat/coding requests. Grok exposes the text models returned for the logged-in xAI account. Imagine image
 and video models and unrelated providers are excluded. Missing required Gemini or Grok text models
 cause a clear setup error instead of silently substituting another model.

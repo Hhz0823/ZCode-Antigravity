@@ -897,7 +897,8 @@ index c8d3141a69d0bb0b2b883559ea008c29eb333478..fdba310a183fc39a34fff8bb47168c9d
  }
  
 +func preserveAntigravityMaxOutputTokens(modelName string) bool {
-+	return strings.EqualFold(strings.TrimSpace(modelName), "gemini-3.7-flash-high")
++	trimmed := strings.TrimSpace(modelName)
++	return strings.EqualFold(trimmed, "gemini-3.7-flash-high") || strings.EqualFold(trimmed, "gemini-3.8-flash-high")
 +}
 +
  // sanitizeAntigravityRequestSchemas cleans the JSON schemas carried by an Antigravity request.

@@ -119,6 +119,7 @@ func TestInPlaceByteWritesAreReviewed(t *testing.T) {
 	found := make(map[string][]string)
 	forEachSourceFile(t, root, func(rel string, data []byte) {
 		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimRight(line, "")
 			for _, pattern := range inPlaceByteWritePatterns {
 				if pattern.MatchString(line) {
 					found[rel] = append(found[rel], strings.TrimSpace(line))
