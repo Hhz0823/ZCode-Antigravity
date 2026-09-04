@@ -1,6 +1,6 @@
 # ZCode Antigravity Bridge 源码与会话归档
 
-最新验证日期：2026-09-04（Asia/Shanghai）
+最新验证日期：2026-09-05（Asia/Shanghai）
 
 ## 目录
 
@@ -80,6 +80,10 @@ git apply --whitespace=error-all /path/to/ZCode-Antigravity/project/docs/CLIProx
     `claude-sonnet-4-6` 和 `claude-opus-4-6-thinking` 及账号其他可用文本模型同步到 ZCode / Agent。
 20. 增加 Claude Sonnet 双平台冒烟脚本与模型分类回归；2026-09-04 使用已登录 Google 测试账号实际
     调用 Sonnet / Opus 的 Anthropic 兼容路径，两次 requested / response ID 一致且精确输出 `ZCODE_SMOKE_OK`。
+21. 增加 macOS / Windows 正式版自动更新：固定读取本仓库 GitHub Latest Release，按平台选择精确
+    资产并用 GitHub SHA-256 双重校验；两端启动后及每 6 小时检查，支持手动更新与默认关闭的自动安装。
+    macOS 使用独立助手完成安全解压、App 签名/版本复核、备份、回滚和更新后同步；Windows 复用现有
+    无终端 EXE 安装器的 `--update` 模式，保留当前用户数据并在新版本启动后重新同步网关。
 
 ## 构建
 
@@ -107,7 +111,7 @@ cd third_party/CLIProxyAPI-7.2.132-patched
 go mod verify
 $env:CGO_ENABLED='0'; $env:GOOS='windows'; $env:GOARCH='amd64'
 go build -buildvcs=false -trimpath `
-  -ldflags='-s -w -X main.Version=7.2.132-zcode.10 -X main.Commit=78f0c4079e3e6273d65d03b5549cffc898703264 -X main.BuildDate=<UTC>' `
+  -ldflags='-s -w -X main.Version=7.2.132-zcode.14 -X main.Commit=78f0c4079e3e6273d65d03b5549cffc898703264 -X main.BuildDate=<UTC>' `
   -o cli-proxy-api.exe ./cmd/server
 ```
 

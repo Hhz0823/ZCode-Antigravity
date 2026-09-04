@@ -29,6 +29,7 @@ type guiRuntime struct {
 	autoSetup      bool
 	operationMu    sync.Mutex
 	operation      guiOperation
+	updateMu       sync.Mutex
 	quotaMu        sync.Mutex
 	providerMu     sync.RWMutex
 	provider       string
@@ -116,6 +117,7 @@ func (a *app) runUIHost(autoSetup, launchBrowser bool) error {
 	mux.HandleFunc("/api/connectors", runtime.authorized(runtime.serveConnectors))
 	mux.HandleFunc("/api/manager", runtime.authorized(runtime.serveManager))
 	mux.HandleFunc("/api/manager/settings", runtime.authorized(runtime.serveManagerSettings))
+	mux.HandleFunc("/api/update", runtime.authorized(runtime.serveUpdate))
 	mux.HandleFunc("/api/action", runtime.authorized(runtime.serveAction))
 	mux.HandleFunc("/api/heartbeat", runtime.authorized(runtime.serveHeartbeat))
 	mux.HandleFunc("/api/close", runtime.authorized(runtime.serveClose))

@@ -1,6 +1,7 @@
 "use strict";
 
 const { spawn } = require("node:child_process");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const {
@@ -17,7 +18,7 @@ const {
   shell,
   Tray,
 } = require("electron");
-const { assertApiPath, assertXaiURL, normalizeConnection, trayTooltip } = require("./protocol.cjs");
+const { assertApiPath, assertUpdateInstaller, assertXaiURL, normalizeConnection, trayTooltip } = require("./protocol.cjs");
 const { version } = require("../package.json");
 
 const WIDGET_WIDTH = 430;
@@ -31,6 +32,7 @@ let nativeChild;
 let nativeConnection;
 let quitting = false;
 let autoSetupPending = process.argv.includes("--auto-setup");
+let postUpdatePending = process.argv.includes("--post-update");
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -139,7 +141,7 @@ async function apiRequest(method, apiPath, body) {
   const options = {
     method,
     headers: { "X-ZCAB-Session": nativeConnection.session },
-    signal: AbortSignal.timeout(safePath.startsWith("/api/quota") ? 120_000 : 30_000),
+    signal: AbortSignal.timeout(safePath === "/api/update" && method === "POST" ? 20 * 60_000 : safePath.startsWith("/api/quota") ? 120_000 : 30_000),
     cache: "no-store",
   };
   if (method === "POST") {
@@ -170,7 +172,33 @@ function registerIPC() {
     assertRenderer(event);
     const autoSetup = autoSetupPending;
     autoSetupPending = false;
-    return { version, autoSetup };
+    const postUpdate = postUpdatePending;
+    postUpdatePending = false;
+    return { version, autoSetup, postUpdate };
+  });
+  ipcMain.handle("app:install-update", async (event, download) => {
+    assertRenderer(event);
+    if (process.platform !== "win32") throw new Error("当前平台不能启动 Windows 更新安装器");
+    const dataRoot = process.env.ZCODE_ANTIGRAVITY_DATA_DIR || path.join(process.env.LOCALAPPDATA || "", "ZCodeAntigravity");
+    const updatesRoot = path.join(dataRoot, "updates");
+    let installer = assertUpdateInstaller(download, updatesRoot);
+    const info = fs.lstatSync(installer);
+    if (!info.isFile() || info.isSymbolicLink() || info.size <= 0) throw new Error("更新安装器不是普通文件");
+    const realRoot = fs.realpathSync(updatesRoot);
+    installer = fs.realpathSync(installer);
+    assertUpdateInstaller({ ...download, path: installer }, realRoot);
+    const digest = await new Promise((resolve, reject) => {
+      const hash = crypto.createHash("sha256");
+      const stream = fs.createReadStream(installer);
+      stream.on("error", reject);
+      stream.on("data", (chunk) => hash.update(chunk));
+      stream.on("end", () => resolve(hash.digest("hex")));
+    });
+    if (digest.toLowerCase() !== download.sha256.toLowerCase()) throw new Error("更新安装器 SHA-256 复核失败");
+    const child = spawn(installer, ["--update"], { cwd: path.dirname(installer), detached: true, windowsHide: true, stdio: "ignore" });
+    child.unref();
+    setImmediate(() => app.quit());
+    return { status: "started" };
   });
   ipcMain.handle("tray:update-summary", (event, summary) => {
     assertRenderer(event);

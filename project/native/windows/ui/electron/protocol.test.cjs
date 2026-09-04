@@ -4,13 +4,30 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { assertApiPath, assertXaiURL, normalizeConnection, trayTooltip } = require("./protocol.cjs");
+const { assertApiPath, assertUpdateInstaller, assertXaiURL, normalizeConnection, trayTooltip } = require("./protocol.cjs");
 
 test("accepts only the fixed local API allowlist", () => {
   assert.equal(assertApiPath("GET", "/api/status"), "/api/status");
   assert.equal(assertApiPath("POST", "/api/action"), "/api/action");
+  assert.equal(assertApiPath("GET", "/api/update"), "/api/update");
+  assert.equal(assertApiPath("POST", "/api/update"), "/api/update");
   assert.throws(() => assertApiPath("GET", "/api/action"), /不允许/);
   assert.throws(() => assertApiPath("GET", "http://example.com"), /不允许/);
+});
+
+test("accepts only a verified-shape installer inside the update directory", () => {
+  const download = {
+    version: "1.1.0",
+    platform: "windows",
+    assetName: "ZCode-Antigravity-Setup-v1.1.0.exe",
+    path: "C:\\Users\\test\\AppData\\Local\\ZCodeAntigravity\\updates\\1.1.0\\ZCode-Antigravity-Setup-v1.1.0.exe",
+    sha256: "a".repeat(64),
+  };
+  const root = "C:\\Users\\test\\AppData\\Local\\ZCodeAntigravity\\updates";
+  assert.equal(assertUpdateInstaller(download, root), download.path);
+  assert.throws(() => assertUpdateInstaller({ ...download, path: "C:\\Windows\\System32\\cmd.exe" }, root), /专用目录|名称/);
+  assert.throws(() => assertUpdateInstaller({ ...download, platform: "darwin" }, root), /平台/);
+  assert.throws(() => assertUpdateInstaller({ ...download, sha256: "bad" }, root), /校验值/);
 });
 
 test("normalizes the Go native-host connection acronym", () => {

@@ -9,6 +9,7 @@ import {
   Cloud,
   Copy,
   Cpu,
+  Download,
   ExternalLink,
   Gauge,
   GlassWater,
@@ -65,11 +66,13 @@ interface ManagerReport {
   accounts: Array<{ id: string; provider: Provider; label: string; plan?: string; status: string; updatedAt: string }>;
   proxy: { running: boolean; baseURL?: string; port?: number; protocols: Array<{ name: string; path: string; description: string }> };
   routing: { strategy: string; sessionAffinity: boolean; sessionAffinityTTL: string; requestRetry: number; credentialRetry: number; retryInterval: number; backgroundModel: string };
-  settings: { autoRefreshMinutes: number; quotaWarningPercent: number; enableGrokModels: boolean; enableOtherModels: boolean; proxyURL: string; theme: string; liquidGlass: boolean; settingsPath: string };
+  settings: { autoRefreshMinutes: number; quotaWarningPercent: number; enableGrokModels: boolean; enableOtherModels: boolean; autoInstallUpdates: boolean; proxyURL: string; theme: string; liquidGlass: boolean; settingsPath: string };
   features: Array<{ id: string; name: string; description: string; available: boolean }>;
 }
 interface ConnectorResponse { provider: Provider; baseURL: string; model: string; connectors: Array<{ id: string; name: string; description: string; model: string; action?: string; snippets: Record<string, string> }> }
-interface StartupInfo { version: string; autoSetup: boolean }
+interface UpdateReport { currentVersion: string; latestVersion: string; available: boolean; publishedAt?: string; releaseURL: string; assetName: string; assetSize: number; checkedAt: string }
+interface UpdateDownload { version: string; platform: string; assetName: string; path: string; sha256: string }
+interface StartupInfo { version: string; autoSetup: boolean; postUpdate: boolean }
 
 async function apiGet<T>(path: string): Promise<T> {
   if (!hasDesktopBridge()) return mockGet(path) as Promise<T>;
@@ -322,8 +325,37 @@ function AnalyticsView({ usage }: { usage?: UsageReport }) {
   return <div className="space-y-4"><div className="grid gap-3 md:grid-cols-4"><StatCard icon={Zap} label="输出 Token" value={formatNumber(usage?.total.outputTokens)} /><StatCard icon={Sparkles} label="推理 Token" value={formatNumber(usage?.total.reasoningTokens)} /><StatCard icon={Gauge} label="平均速度" value={`${(usage?.total.averageTokensPerSecond ?? 0).toFixed(1)} tok/s`} /><StatCard icon={Activity} label="请求数量" value={formatNumber(usage?.total.requests)} /></div><Card><CardHeader eyebrow="THROUGHPUT" title="Token 输出速度" description="按生成阶段耗时计算，不把首 Token 等待时间混入速度" /><div className="p-5"><div className="chart-grid">{(usage?.recent.slice(-18) ?? []).map((sample, index) => <div className="chart-column" key={`${sample.timestamp}-${index}`} title={`${sample.model}: ${sample.outputTokensPerSecond.toFixed(1)} tok/s`}><span style={{ height: `${Math.max(5, sample.outputTokensPerSecond / maxSpeed * 100)}%` }} /></div>)}</div>{!usage?.recent.length && <Empty icon={BarChart3} title="暂无 Token 记录" text="通过本地网关调用模型后会自动统计" />}</div></Card><Card><CardHeader title="最近请求" /><div className="divide-y divide-white/[.06] px-5 pb-4">{usage?.recent.slice(-8).reverse().map((sample, index) => <div className="usage-row" key={`${sample.timestamp}-${index}`}><div className="min-w-0"><p className="truncate">{sample.model}</p><small>{formatTime(sample.timestamp)} · {sample.latencyMs} ms</small></div><span>{formatNumber(sample.outputTokens)} tok</span><strong>{sample.outputTokensPerSecond.toFixed(1)} tok/s</strong></div>)}</div></Card></div>;
 }
 
-function SettingsView({ manager, saveSetting, saving, syncing, onSync }: { manager?: ManagerReport; saveSetting: (body: Record<string, unknown>) => void; saving: boolean; syncing: boolean; onSync: () => void }) {
-  return <div className="grid gap-4 md:grid-cols-[1fr_.85fr]"><Card><CardHeader eyebrow="MODEL ACCESS" title="模型与界面设置" description="默认仅暴露 Gemini；Claude、Grok 与其他模型需主动开启并重新同步" action={saving ? <LoaderCircle className="size-4 animate-spin" /> : undefined} /><div className="space-y-3 p-5"><Switch checked={manager?.settings.enableGrokModels ?? false} onChange={(value) => saveSetting({ enableGrokModels: value })} label="Grok 模型" /><Switch checked={manager?.settings.enableOtherModels ?? false} onChange={(value) => saveSetting({ enableOtherModels: value })} label="Google Claude / 其他 AI 文本模型" /><Button className="w-full" variant="primary" disabled={saving || syncing} onClick={onSync}><RefreshCw className={cn("size-4", syncing && "animate-spin")} />应用模型开关</Button><Switch checked={manager?.settings.liquidGlass ?? true} onChange={(value) => saveSetting({ liquidGlass: value })} label="白色液态玻璃背景" /><div className="setting-row"><div><p>额度自动刷新</p><small>默认每 5 分钟，不影响 5 秒状态探测</small></div><div className="segmented">{[5, 10].map((value) => <button className={cn(manager?.settings.autoRefreshMinutes === value && "active")} onClick={() => saveSetting({ autoRefreshMinutes: value })} key={value}>{value} 分钟</button>)}</div></div><InfoLine label="网络模式" value={manager?.settings.proxyURL || "自动 v2rayN / 系统代理 / 直连"} /><InfoLine label="低额度警告" value={`${manager?.settings.quotaWarningPercent ?? 20}%`} /><InfoLine label="设置文件" value={manager?.settings.settingsPath || "当前用户目录"} /></div></Card><Card><CardHeader eyebrow="FEATURES" title="Antigravity Tools 能力" description="当前原生管理核心提供的功能" /><div className="space-y-2 p-5">{manager?.features.map((feature) => <div className="feature-row" key={feature.id}><span className={cn("feature-check", feature.available && "active")}>{feature.available && <Check />}</span><div><p>{feature.name}</p><small>{feature.description}</small></div></div>)}</div></Card></div>;
+function SettingsView({ manager, saveSetting, saving, syncing, onSync, update, updateChecking, updateInstalling, updateError, onUpdate }: { manager?: ManagerReport; saveSetting: (body: Record<string, unknown>) => void; saving: boolean; syncing: boolean; onSync: () => void; update?: UpdateReport; updateChecking: boolean; updateInstalling: boolean; updateError?: string; onUpdate: () => void }) {
+  const updateBusy = updateChecking || updateInstalling;
+  return (
+    <div className="grid gap-4 md:grid-cols-[1fr_.85fr]">
+      <Card>
+        <CardHeader eyebrow="MODEL ACCESS" title="模型与界面设置" description="默认仅暴露 Gemini；Claude、Grok 与其他模型需主动开启并重新同步" action={saving ? <LoaderCircle className="size-4 animate-spin" /> : undefined} />
+        <div className="space-y-3 p-5">
+          <Switch checked={manager?.settings.enableGrokModels ?? false} onChange={(value) => saveSetting({ enableGrokModels: value })} label="Grok 模型" />
+          <Switch checked={manager?.settings.enableOtherModels ?? false} onChange={(value) => saveSetting({ enableOtherModels: value })} label="Google Claude / 其他 AI 文本模型" />
+          <Button className="w-full" variant="primary" disabled={saving || syncing} onClick={onSync}><RefreshCw className={cn("size-4", syncing && "animate-spin")} />应用模型开关</Button>
+          <Switch checked={manager?.settings.liquidGlass ?? true} onChange={(value) => saveSetting({ liquidGlass: value })} label="白色液态玻璃背景" />
+          <div className="setting-row"><div><p>额度自动刷新</p><small>默认每 5 分钟，不影响 5 秒状态探测</small></div><div className="segmented">{[5, 10].map((value) => <button className={cn(manager?.settings.autoRefreshMinutes === value && "active")} onClick={() => saveSetting({ autoRefreshMinutes: value })} key={value}>{value} 分钟</button>)}</div></div>
+          <InfoLine label="网络模式" value={manager?.settings.proxyURL || "自动 v2rayN / 系统代理 / 直连"} />
+          <InfoLine label="低额度警告" value={`${manager?.settings.quotaWarningPercent ?? 20}%`} />
+          <InfoLine label="设置文件" value={manager?.settings.settingsPath || "当前用户目录"} />
+        </div>
+      </Card>
+      <div className="space-y-4">
+        <Card>
+          <CardHeader eyebrow="UPDATES" title="软件更新" description="启动后及每 6 小时检查 GitHub 正式版" action={<Badge tone={update?.available ? "blue" : updateError ? "bad" : "good"}>{update?.available ? "有新版本" : updateError ? "检查失败" : "稳定通道"}</Badge>} />
+          <div className="space-y-3 p-5">
+            <Switch checked={manager?.settings.autoInstallUpdates ?? false} onChange={(value) => saveSetting({ autoInstallUpdates: value })} label="自动下载并安装正式版" />
+            <div className="setting-row"><div><p>{update?.available ? `可更新到 v${update.latestVersion}` : "当前版本状态"}</p><small>{updateError || (update ? `当前 v${update.currentVersion} · 最新 v${update.latestVersion}` : "等待首次自动检查")}</small></div><Download className="size-5 text-sky-300" /></div>
+            <Button className="w-full" variant="primary" disabled={updateBusy} onClick={onUpdate}>{updateBusy ? <LoaderCircle className="size-4 animate-spin" /> : update?.available ? <Download className="size-4" /> : <RefreshCw className="size-4" />}{updateInstalling ? "正在下载并校验…" : updateChecking ? "正在检查…" : update?.available ? "立即更新" : "检查更新"}</Button>
+            <p className="text-[11px] leading-5 text-slate-500">安装前需完全退出 ZCode。更新包会核对平台、文件大小和 GitHub SHA-256，完成后自动重启并重新同步网关。</p>
+          </div>
+        </Card>
+        <Card><CardHeader eyebrow="FEATURES" title="Antigravity Tools 能力" description="当前原生管理核心提供的功能" /><div className="space-y-2 p-5">{manager?.features.map((feature) => <div className="feature-row" key={feature.id}><span className={cn("feature-check", feature.available && "active")}>{feature.available && <Check />}</span><div><p>{feature.name}</p><small>{feature.description}</small></div></div>)}</div></Card>
+      </div>
+    </div>
+  );
 }
 
 function InfoLine({ label, value }: { label: string; value: string }) { return <div className="info-line"><span>{label}</span><strong title={value}>{value}</strong></div>; }
@@ -459,7 +491,11 @@ function ControlCenterApp() {
   const [usage, setUsage] = useState<UsageReport>();
   const [manager, setManager] = useState<ManagerReport>();
   const [connectors, setConnectors] = useState<ConnectorResponse>();
-  const [version, setVersion] = useState("1.0.2-test");
+  const [version, setVersion] = useState("1.0.3-test");
+  const [updateReport, setUpdateReport] = useState<UpdateReport>();
+  const [updateChecking, setUpdateChecking] = useState(false);
+  const [updateInstalling, setUpdateInstalling] = useState(false);
+  const [updateError, setUpdateError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
@@ -468,6 +504,8 @@ function ControlCenterApp() {
   const refreshRef = useRef<((forceQuota?: boolean, requestedProvider?: Provider) => Promise<void>) | undefined>(undefined);
   const initialized = useRef(false);
   const scrollIdleTimer = useRef<number | undefined>(undefined);
+  const updateOperation = useRef(false);
+  const autoUpdateAttempted = useRef("");
 
   const refresh = useCallback(async (forceQuota = false, requestedProvider?: Provider) => {
     if (refreshing.current) {
@@ -591,15 +629,64 @@ function ControlCenterApp() {
     catch { setNotice({ text: "无法写入剪贴板", error: true }); }
   }, []);
 
+  const checkForUpdates = useCallback(async (manual = false) => {
+    if (updateOperation.current) return;
+    updateOperation.current = true;
+    setUpdateChecking(true);
+    try {
+      const latest = await apiGet<UpdateReport>("/api/update");
+      setUpdateReport(latest);
+      setUpdateError(undefined);
+      if (manual) setNotice({ text: latest.available ? `发现新版本 v${latest.latestVersion}` : "当前已是最新版" });
+    } catch (error) {
+      const message = normalizeError(error);
+      setUpdateError(message);
+      if (manual) setNotice({ text: `检查更新失败：${message}`, error: true });
+    } finally {
+      setUpdateChecking(false);
+      updateOperation.current = false;
+    }
+  }, []);
+
+  const installLatestUpdate = useCallback(async () => {
+    if (updateOperation.current || !updateReport?.available) return;
+    if (status?.zcode.running !== false) {
+      const message = status ? "请先完全退出 ZCode，再安装更新" : "正在确认 ZCode 运行状态，请稍后重试";
+      setUpdateError(message);
+      setNotice({ text: message, error: true });
+      return;
+    }
+    if (!hasDesktopBridge()) {
+      setNotice({ text: "只有已安装的 Windows 桌面版可以自动更新", error: true });
+      return;
+    }
+    updateOperation.current = true;
+    setUpdateInstalling(true);
+    setUpdateError(undefined);
+    setNotice({ text: "正在下载并校验更新…" });
+    try {
+      const download = await apiPost<UpdateDownload>("/api/update", { action: "download" });
+      setNotice({ text: "更新已验证，正在重启安装…" });
+      await desktopBridge()!.installUpdate(download);
+    } catch (error) {
+      const message = normalizeError(error);
+      setUpdateError(message);
+      setNotice({ text: `自动更新失败：${message}`, error: true });
+      setUpdateInstalling(false);
+      updateOperation.current = false;
+    }
+  }, [status?.zcode.running, updateReport]);
+
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
     void (async () => {
       try {
-        const startup: StartupInfo = hasDesktopBridge() ? await desktopBridge()!.startupInfo() : { version: "1.0.2-test", autoSetup: false };
+        const startup: StartupInfo = hasDesktopBridge() ? await desktopBridge()!.startupInfo() : { version: "1.0.3-test", autoSetup: false, postUpdate: false };
         setVersion(startup.version);
         await refresh(true);
-        if (startup.autoSetup) await runAction("setup");
+        if (startup.postUpdate) await runAction("sync");
+        else if (startup.autoSetup) await runAction("setup");
       } catch (error) { setNotice({ text: normalizeError(error), error: true }); }
     })();
   }, [refresh, runAction]);
@@ -620,6 +707,19 @@ function ControlCenterApp() {
       desktopBridge()?.removeRefreshListener();
     };
   }, [manager?.settings.autoRefreshMinutes, refresh]);
+
+  useEffect(() => {
+    const firstCheck = window.setTimeout(() => void checkForUpdates(false), 3_000);
+    const updateTimer = window.setInterval(() => void checkForUpdates(false), 6 * 60 * 60_000);
+    return () => { clearTimeout(firstCheck); clearInterval(updateTimer); };
+  }, [checkForUpdates]);
+
+  useEffect(() => {
+    if (!manager?.settings.autoInstallUpdates || !updateReport?.available || !status || status.zcode.running !== false || updateOperation.current) return;
+    if (autoUpdateAttempted.current === updateReport.latestVersion) return;
+    autoUpdateAttempted.current = updateReport.latestVersion;
+    void installLatestUpdate();
+  }, [installLatestUpdate, manager?.settings.autoInstallUpdates, status, updateReport]);
 
   useEffect(() => {
     if (!quota && !usage) return;
@@ -653,7 +753,7 @@ function ControlCenterApp() {
     : section === "routing" ? <RoutingView {...{ manager, saveSetting, saving }} />
     : section === "connectors" ? <ConnectorsView connectors={connectors} onCopy={copy} onAction={runAction} busy={busy} />
     : section === "analytics" ? <AnalyticsView usage={usage} />
-    : <SettingsView manager={manager} saveSetting={saveSetting} saving={saving} syncing={busy} onSync={() => void runAction("sync")} />;
+    : <SettingsView manager={manager} saveSetting={saveSetting} saving={saving} syncing={busy} onSync={() => void runAction("sync")} update={updateReport} updateChecking={updateChecking} updateInstalling={updateInstalling} updateError={updateError} onUpdate={() => void (updateReport?.available ? installLatestUpdate() : checkForUpdates(true))} />;
 
   return (
     <div className={cn("app-shell", manager?.settings.liquidGlass === false && "solid-mode")}>

@@ -15,6 +15,9 @@ menus, backed-up one-click configuration for eight Agent/CLI clients, automatic 
 system-proxy discovery without TUN, a hidden native-host API, SwiftUI/AppKit macOS UI, Electron 44 +
 React/Tailwind Windows UI, an authenticated manager API for accounts/protocols/routing/retry/UI settings,
 Codex U-inspired liquid-glass native dashboards, and SHA-256 verified Windows installers.
+Both native clients check the latest stable GitHub Release after startup and every six hours,
+support an opt-in automatic install mode, verify the exact platform asset against GitHub's SHA-256
+digest, and restart into a post-update gateway synchronization.
 
 Build and package the macOS Universal App:
 
@@ -64,7 +67,7 @@ Build the single-BAT installer from a verified expanded package:
 ```powershell
 .\packaging\windows\Build-Single-Bat.ps1 `
   -PackageDir C:\path\to\expanded-package `
-  -OutputFile C:\path\to\ZCode-Antigravity-OneClick-v1.0.2-test.bat
+  -OutputFile C:\path\to\ZCode-Antigravity-OneClick-v1.0.3-test.bat
 ```
 
 Build the native no-console EXE installer from the same verified package:
@@ -72,5 +75,5 @@ Build the native no-console EXE installer from the same verified package:
 ```powershell
 .\packaging\windows\Build-Exe-Installer.ps1 `
   -PackageDir C:\path\to\expanded-package `
-  -OutputFile C:\path\to\ZCode-Antigravity-Setup-v1.0.2-test.exe
+  -OutputFile C:\path\to\ZCode-Antigravity-Setup-v1.0.3-test.exe
 ```

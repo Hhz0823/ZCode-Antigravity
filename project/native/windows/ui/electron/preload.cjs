@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld("zcodeNative", Object.freeze({
   apiGet: (path) => ipcRenderer.invoke("api:get", path),
   apiPost: (path, body) => ipcRenderer.invoke("api:post", path, body),
   startupInfo: () => ipcRenderer.invoke("app:startup-info"),
+  installUpdate: (download) => ipcRenderer.invoke("app:install-update", download),
   updateTraySummary: (summary) => ipcRenderer.invoke("tray:update-summary", summary),
   showMainWindow: () => ipcRenderer.invoke("window:show-main"),
   openXaiVerificationURL: (url) => ipcRenderer.invoke("shell:open-xai", url),

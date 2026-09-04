@@ -5,7 +5,8 @@ type DesktopWindowAction = "minimize" | "maximize" | "hide";
 interface ZCodeNativeBridge {
   apiGet<T = unknown>(path: string): Promise<T>;
   apiPost<T = unknown>(path: string, body: Record<string, unknown>): Promise<T>;
-  startupInfo(): Promise<{ version: string; autoSetup: boolean }>;
+  startupInfo(): Promise<{ version: string; autoSetup: boolean; postUpdate: boolean }>;
+  installUpdate(download: { version: string; platform: string; assetName: string; path: string; sha256: string }): Promise<{ status: string }>;
   updateTraySummary(summary: {
     provider: "antigravity" | "xai";
     fiveHour?: number;

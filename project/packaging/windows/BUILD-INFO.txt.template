@@ -1,20 +1,20 @@
 ZCode Antigravity Bridge build information
 ===========================================
 
-Package: ZCode-Antigravity-Windows-x64-1.0.2-test
+Package: ZCode-Antigravity-Windows-x64-1.0.3-test
 Build date (UTC): __BUILD_DATE__
 Target: Windows x64 (PE32+ Go Core and Electron GUI control center)
 
 Manager
 -------
-Version: 1.0.2-test
+Version: 1.0.3-test
 Go: 1.26.4
 CGO: disabled
 SHA-256: __MANAGER_SHA256__
 
 Control center
 --------------
-Version: 1.0.2-test
+Version: 1.0.3-test
 UI: Electron 44.0.0, React 19.2.8, Tailwind CSS 4.3.3, shadcn-style components
 Native shell: Electron main/preload with context isolation and renderer sandbox
 Subsystem: Windows GUI (no console window)
@@ -75,7 +75,7 @@ Local backend patches
 
 Verification evidence
 ---------------------
-Current v1.0.2-test build-host checks:
+Current v1.0.3-test build-host checks:
 - Live 2026-09-04 Antigravity catalog: gemini-3.8-flash High/Medium/Low/Tiered discovered for the test account
 - Clean gemini-3.8-flash client alias routes only to gemini-3.8-flash-high with 1,048,576 context and 65,536 output tokens
 - Manager go test ./... and Windows x64 build: passed
@@ -91,7 +91,7 @@ Current v1.0.2-test build-host checks:
 - Windows child-process CREATE_NO_WINDOW test and Windows x64 test-binary cross-compile: passed
 - Provider/model selection, Grok billing proxy, tray state, and eight Agent connector tests: passed
 - Native SwiftUI macOS main executable and Electron Windows main executable build checks: passed
-- v1.0.2-test defaults to Gemini-only, exposes Google Claude/Grok/other text models only after an explicit setting, and preserves the verified DPI-aware taskbar quota widget
+- v1.0.3-test defaults to Gemini-only, exposes Google Claude/Grok/other text models only after an explicit setting, preserves the verified DPI-aware taskbar quota widget, and adds SHA-256 verified stable-channel updates
 - ZCode and supported Agent connectors use the visible Provider name Google while retaining managed compatibility IDs
 - Electron mode uses one native DWM blur backdrop, zero active renderer animations, and high-contrast content surfaces; three 180-frame scroll runs measured p95 17.4-17.5 ms
 - Electron target-runtime retest is required on Windows; the following visual/runtime items are retained from the earlier v0.6.4 Tauri baseline and are not claimed for Electron until rerun

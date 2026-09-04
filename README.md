@@ -10,7 +10,7 @@
 
 <p align="center">
   <img alt="Stable" src="https://img.shields.io/badge/stable-V1.0.0-2f6bff">
-  <img alt="Development" src="https://img.shields.io/badge/development-1.0.2--test-f59e0b">
+  <img alt="Development" src="https://img.shields.io/badge/development-1.0.3--test-f59e0b">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-12%2B-111111?logo=apple">
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?logo=windows11">
   <img alt="Local only" src="https://img.shields.io/badge/API-loopback%20only-20a464">
@@ -27,7 +27,7 @@ ZCode Antigravity 是面向 Windows 与 macOS 的本地 AI 控制中心。它负
 ZCode / Agent 配置、额度监控与网络出口选择；默认只启用 Gemini，需要时可在设置中开启
 Google Antigravity 账号内的 Claude、Grok 和其他文本模型。
 
-> 当前源码为 `1.0.2-test`，新增 Google Claude 显式接入与真实请求测试；最新公开正式版仍为 V1.0.0。
+> 当前源码为 `1.0.3-test`，新增经过 SHA-256 校验的双平台自动更新；最新公开正式版仍为 V1.0.0。
 
 ## 核心功能
 
@@ -39,6 +39,7 @@ Google Antigravity 账号内的 Claude、Grok 和其他文本模型。
 | **一键接入更多 Agent** | 自动备份并合并 ZCode、DeepSeek Harness、Grok Build、Codex、Claude Code、Gemini CLI、Qwen Code、Kimi Code 与 OpenCode 配置。 |
 | **无需强制开启 TUN** | Windows 自动使用系统代理或运行中的 v2rayN mixed / HTTP 代理，均不可用时才直连；手动代理始终优先。 |
 | **额度与 Token 小组件** | macOS 菜单栏和 Windows 系统托盘直接查看 5 小时 / 本周额度、重置时间、最近输出 Token、推理 Token 与 Token/s。 |
+| **自动检测与安全更新** | 启动后及每 6 小时检查 GitHub 正式版；可手动更新或开启自动安装，下载后核对平台、大小与 GitHub SHA-256。 |
 | **本地安全边界** | API、OAuth 回调和管理接口只监听 `127.0.0.1`；配置写入前自动备份，凭据使用系统安全能力加密。 |
 | **双平台精美界面** | macOS 使用 SwiftUI + AppKit 原生界面，Windows 使用 Electron + React + Tailwind；背景玻璃化，内容层保持高对比度。 |
 
@@ -108,6 +109,10 @@ Google Antigravity 账号内的 Claude、Grok 和其他文本模型。
 
 如需 Grok，在设置中启用 Grok 后完成 xAI 设备授权。Windows 会在软件内显示临时验证码；把它输入官方
 授权页后，程序会自动轮询授权结果，无需粘贴回调内容。
+
+两端均会在启动后自动检查 GitHub 正式版，之后每 6 小时检查一次。可在“设置 → 软件更新”手动检查，
+或开启自动安装。为避免 Provider 和网关文件被占用，安装更新前请先完全退出 ZCode；程序会验证下载包
+的文件名、平台、大小和 GitHub SHA-256，更新后自动重启并重新同步网关。
 
 ## 网络出口与本地端口
 

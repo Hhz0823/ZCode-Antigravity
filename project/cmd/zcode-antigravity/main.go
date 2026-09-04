@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const version = "1.0.2-test"
+const version = "1.0.3-test"
 
 var defaultCommand = "menu"
 
@@ -39,6 +39,13 @@ func run(args []string) int {
 	}
 	if command == "help" || command == "--help" || command == "-h" {
 		printHelp()
+		return 0
+	}
+	if command == "apply-update" {
+		if errUpdate := runUpdateHelper(rest[1:]); errUpdate != nil {
+			fmt.Fprintf(os.Stderr, "更新安装失败: %v\n", errUpdate)
+			return 1
+		}
 		return 0
 	}
 

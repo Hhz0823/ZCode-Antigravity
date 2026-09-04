@@ -1,6 +1,29 @@
 # 修复与验证记录
 
-最新验证日期：2026-09-04（Asia/Shanghai）
+最新验证日期：2026-09-05（Asia/Shanghai）
+
+## v1.0.3-test 双平台自动更新
+
+- 新增随机会话密钥保护的 `GET/POST /api/update`：仅查询 GitHub `releases/latest` 正式版，
+  精确选择当前平台资产，拒绝草稿、预发布、不可信域名、错误文件名、异常大小和无 GitHub
+  `sha256:` 摘要的资产。下载采用 600 MiB 上限、临时文件、落盘同步和原子替换。
+- macOS SwiftUI 与 Windows Electron 均在启动约 3 秒后检查，之后每 6 小时检查；设置页可手动
+  检查、立即安装或开启自动安装。自动安装默认关闭；ZCode 运行状态未知或仍在运行时不会覆盖。
+- macOS 更新助手会再次核对 ZIP 名称、版本、大小与 SHA-256，拒绝路径穿越和符号链接，限制
+  解压文件数/总大小，检查 App 版本、三个可执行文件、Core 版本和深度签名；安装前安全停止旧网关，
+  备份当前 App，失败时回滚，成功后强制新实例启动并自动同步网关。
+- 最终候选通过真实自替换流程安装到 `/Applications/ZCode Antigravity.app`：版本 `1.0.3 (1003)`，
+  UI、Core、CLIProxyAPI 三个进程恢复，`127.0.0.1:18080/healthz` 返回 HTTP 200；ZCode 保持退出，
+  更新助手与 post-update 标记均自动清理。旧 App 保存在当前用户的 `App Backups`，可恢复。
+- 在线更新接口实测返回当前 `1.0.3-test`、GitHub 最新正式版 `1.0.0`、`available=false`，并精确选择
+  `ZCode-Antigravity-macOS-Universal-v1.0.0.zip`，证明测试版不会错误降级到旧正式版。
+- Windows Electron IPC 会在启动安装器前再次限制更新目录、解析真实路径、拒绝符号链接并复算
+  SHA-256；安装器 `--update` 模式静默部署新版本目录，完成后以 `--post-update` 启动并同步网关。
+- 管理器 `go test ./...`、`go vet ./...`、`go test -race ./...`、Windows x64 交叉编译、Electron
+  6 项 IPC/安全测试与生产构建、Swift arm64/x86_64 类型检查、固定后端 `go mod verify` 和全量测试通过。
+  双平台包的 ZIP CRC、逐文件哈希、macOS Universal/签名、Windows PE32+ GUI/ASAR 结构通过。
+- Windows 测试机 `192.168.1.9:22` 本轮 TCP/SSH 均超时，因此没有声称新的 Windows 目标机更新实测；
+  Windows 候选仅完成交叉构建、自动化回归与静态完整性验证。
 
 ## v1.0.2-test Google 账号 Claude 模型
 

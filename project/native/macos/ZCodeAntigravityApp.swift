@@ -2,7 +2,17 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "1.0.2-test"
+private let appVersion = "1.0.3-test"
+
+private func consumePostUpdateMarker() -> Bool {
+    guard let supportRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+        return false
+    }
+    let marker = supportRoot.appendingPathComponent("ZCodeAntigravity/post-update")
+    guard let value = try? String(contentsOf: marker, encoding: .utf8) else { return false }
+    try? FileManager.default.removeItem(at: marker)
+    return value.trimmingCharacters(in: .whitespacesAndNewlines) == appVersion
+}
 
 private extension Notification.Name {
     static let selectBridgeProvider = Notification.Name("ZCodeSelectBridgeProvider")
@@ -186,6 +196,7 @@ struct ManagerSettings: Decodable {
     let quotaWarningPercent: Int
     let enableGrokModels: Bool
     let enableOtherModels: Bool
+    let autoInstallUpdates: Bool
     let proxyURL: String
     let theme: String
     let liquidGlass: Bool
@@ -206,6 +217,7 @@ struct ManagerSettingsUpdate: Encodable {
     var quotaWarningPercent: Int?
     var enableGrokModels: Bool?
     var enableOtherModels: Bool?
+    var autoInstallUpdates: Bool?
     var theme: String?
     var liquidGlass: Bool?
 
@@ -216,6 +228,7 @@ struct ManagerSettingsUpdate: Encodable {
         quotaWarningPercent: Int? = nil,
         enableGrokModels: Bool? = nil,
         enableOtherModels: Bool? = nil,
+        autoInstallUpdates: Bool? = nil,
         theme: String? = nil,
         liquidGlass: Bool? = nil
     ) {
@@ -225,6 +238,7 @@ struct ManagerSettingsUpdate: Encodable {
         self.quotaWarningPercent = quotaWarningPercent
         self.enableGrokModels = enableGrokModels
         self.enableOtherModels = enableOtherModels
+        self.autoInstallUpdates = autoInstallUpdates
         self.theme = theme
         self.liquidGlass = liquidGlass
     }
@@ -232,6 +246,25 @@ struct ManagerSettingsUpdate: Encodable {
 
 struct APIError: Decodable {
     let error: String
+}
+
+struct UpdateReport: Decodable {
+    let currentVersion: String
+    let latestVersion: String
+    let available: Bool
+    let publishedAt: String?
+    let releaseURL: String
+    let assetName: String
+    let assetSize: Int64
+    let checkedAt: String
+}
+
+struct UpdateDownload: Decodable {
+    let version: String
+    let platform: String
+    let assetName: String
+    let path: String
+    let sha256: String
 }
 
 enum BridgeError: LocalizedError {
@@ -339,6 +372,72 @@ final class NativeHost: @unchecked Sendable {
         return environment
     }
 
+    @MainActor
+    func installUpdate(_ download: UpdateDownload) throws {
+        guard download.platform == "darwin" else {
+            throw BridgeError.message("下载的更新不属于 macOS")
+        }
+        let versionPattern = try NSRegularExpression(pattern: #"^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"#)
+        let versionRange = NSRange(download.version.startIndex..., in: download.version)
+        guard versionPattern.firstMatch(in: download.version, range: versionRange)?.range == versionRange else {
+            throw BridgeError.message("更新版本号无效")
+        }
+        let expectedName = "ZCode-Antigravity-macOS-Universal-v\(download.version).zip"
+        guard download.assetName == expectedName else {
+            throw BridgeError.message("更新资产名称与版本不匹配")
+        }
+        let digestPattern = try NSRegularExpression(pattern: #"^[0-9a-fA-F]{64}$"#)
+        let digestRange = NSRange(download.sha256.startIndex..., in: download.sha256)
+        guard digestPattern.firstMatch(in: download.sha256, range: digestRange)?.range == digestRange else {
+            throw BridgeError.message("更新资产校验值无效")
+        }
+        guard let supportRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            throw BridgeError.message("无法定位更新目录")
+        }
+        let updatesRoot = supportRoot.appendingPathComponent("ZCodeAntigravity/updates", isDirectory: true).standardizedFileURL.resolvingSymlinksInPath()
+        let archive = URL(fileURLWithPath: download.path).standardizedFileURL.resolvingSymlinksInPath()
+        guard archive.path.hasPrefix(updatesRoot.path + "/"), archive.lastPathComponent == expectedName else {
+            throw BridgeError.message("更新资产超出应用专用目录")
+        }
+        let attributes = try FileManager.default.attributesOfItem(atPath: archive.path)
+        guard attributes[.type] as? FileAttributeType == .typeRegular else {
+            throw BridgeError.message("更新资产不是普通文件")
+        }
+        guard let executableDirectory = Bundle.main.executableURL?.deletingLastPathComponent() else {
+            throw BridgeError.message("无法定位当前 App")
+        }
+        let core = executableDirectory.appendingPathComponent("ZCode-Antigravity-Core")
+        guard FileManager.default.isExecutableFile(atPath: core.path) else {
+            throw BridgeError.message("缺少更新辅助程序")
+        }
+        let helper = archive.deletingLastPathComponent().appendingPathComponent("ZCode-Antigravity-Updater-\(UUID().uuidString)")
+        try FileManager.default.copyItem(at: core, to: helper)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: helper.path)
+        let logURL = archive.deletingLastPathComponent().appendingPathComponent("update-install.log")
+        if !FileManager.default.fileExists(atPath: logURL.path) {
+            FileManager.default.createFile(atPath: logURL.path, contents: nil, attributes: [.posixPermissions: 0o600])
+        }
+        let log = try FileHandle(forWritingTo: logURL)
+        try log.seekToEnd()
+        let child = Process()
+        child.executableURL = helper
+        child.arguments = [
+            "apply-update",
+            "--archive", archive.path,
+            "--target", Bundle.main.bundleURL.path,
+            "--version", download.version,
+            "--sha256", download.sha256,
+            "--parent-pid", String(ProcessInfo.processInfo.processIdentifier),
+        ]
+        child.currentDirectoryURL = archive.deletingLastPathComponent()
+        child.standardOutput = log
+        child.standardError = log
+        child.standardInput = FileHandle.nullDevice
+        child.environment = childEnvironment()
+        try child.run()
+        NSApp.terminate(nil)
+    }
+
     func stop() {
         lock.lock()
         let child = process
@@ -369,13 +468,24 @@ final class BridgeModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var quotaError: String?
     @Published var lastQuotaRefresh: Date?
+    @Published var updateReport: UpdateReport?
+    @Published var updateChecking = false
+    @Published var updateInstalling = false
+    @Published var updateError: String?
 
     private var connection: NativeConnection?
     private var pollingTask: Task<Void, Never>?
+    private var updatePollingTask: Task<Void, Never>?
     private var lastQuotaRefreshAttempt: Date?
     private var quotaCache: [String: QuotaReport] = [:]
     private var usageCache: [String: UsageReport] = [:]
     private var notificationTokens: [NSObjectProtocol] = []
+    private var postUpdatePending: Bool = {
+        let launchedForUpdate = ProcessInfo.processInfo.arguments.contains("--post-update")
+        let markerPending = consumePostUpdateMarker()
+        return launchedForUpdate || markerPending
+    }()
+    private var pendingAutomaticUpdate = false
 
     init() {
         notificationTokens.append(NotificationCenter.default.addObserver(forName: .selectBridgeProvider, object: nil, queue: .main) { [weak self] note in
@@ -390,6 +500,7 @@ final class BridgeModel: ObservableObject {
     deinit {
         for token in notificationTokens { NotificationCenter.default.removeObserver(token) }
         pollingTask?.cancel()
+        updatePollingTask?.cancel()
     }
 
     func start() {
@@ -400,10 +511,21 @@ final class BridgeModel: ObservableObject {
                 connection = try await NativeHost.shared.start()
                 message = "本地核心已连接"
                 await refreshAll()
+                if postUpdatePending {
+                    postUpdatePending = false
+                    await runAction("sync")
+                }
                 pollingTask = Task { [weak self] in
                     while !Task.isCancelled {
                         try? await Task.sleep(nanoseconds: 5_000_000_000)
                         await self?.refreshAll(showLoading: false, forceQuota: false)
+                    }
+                }
+                updatePollingTask = Task { [weak self] in
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    while !Task.isCancelled {
+                        await self?.checkForUpdates()
+                        try? await Task.sleep(nanoseconds: 6 * 60 * 60 * 1_000_000_000)
                     }
                 }
             } catch {
@@ -416,7 +538,57 @@ final class BridgeModel: ObservableObject {
 
     func stop() {
         pollingTask?.cancel()
+        updatePollingTask?.cancel()
         NativeHost.shared.stop()
+    }
+
+    func checkForUpdates(manual: Bool = false) async {
+        guard !updateChecking, !updateInstalling else { return }
+        updateChecking = true
+        defer { updateChecking = false }
+        do {
+            let latest: UpdateReport = try await request(path: "/api/update")
+            updateReport = latest
+            updateError = nil
+            if latest.available {
+                message = "发现新版本 \(latest.latestVersion)"
+                if manager?.settings.autoInstallUpdates == true {
+                    if status?.zcode.running != false {
+                        pendingAutomaticUpdate = true
+                        message = "v\(latest.latestVersion) 已就绪；确认 ZCode 已退出后自动安装"
+                    } else {
+                        await installLatestUpdate()
+                    }
+                }
+            } else if manual {
+                message = "当前已是最新版"
+            }
+        } catch {
+            updateError = error.localizedDescription
+            if manual { errorMessage = "检查更新失败：\(error.localizedDescription)" }
+        }
+    }
+
+    func installLatestUpdate() async {
+        guard updateReport?.available == true, !updateInstalling else { return }
+        guard status?.zcode.running == false else {
+            pendingAutomaticUpdate = manager?.settings.autoInstallUpdates == true
+            updateError = status == nil ? "正在确认 ZCode 运行状态，请稍后重试" : "请先完全退出 ZCode，再安装更新"
+            errorMessage = updateError
+            return
+        }
+        pendingAutomaticUpdate = false
+        updateInstalling = true
+        message = "正在下载并校验更新…"
+        do {
+            let download: UpdateDownload = try await request(path: "/api/update", method: "POST", body: ["action": "download"])
+            message = "更新已验证，正在重启安装…"
+            try NativeHost.shared.installUpdate(download)
+        } catch {
+            updateInstalling = false
+            updateError = error.localizedDescription
+            errorMessage = "自动更新失败：\(error.localizedDescription)"
+        }
     }
 
     func refreshAll(showLoading: Bool = true, forceQuota: Bool = true) async {
@@ -454,6 +626,13 @@ final class BridgeModel: ObservableObject {
             }
             message = latest.operation.message ?? (latest.gateway.ok ? "网关在线" : "等待接入")
             StatusBarController.shared.update(provider: provider, quota: quota, usage: usage, status: latest, grokEnabled: manager?.settings.enableGrokModels ?? false)
+            if pendingAutomaticUpdate,
+               manager?.settings.autoInstallUpdates == true,
+               latest.zcode.running == false,
+               updateReport?.available == true,
+               !updateInstalling {
+                await installLatestUpdate()
+            }
         } catch {
             errorMessage = error.localizedDescription
             message = "状态刷新失败"
@@ -508,6 +687,16 @@ final class BridgeModel: ObservableObject {
             manager = latest
             errorMessage = nil
             message = "设置已保存；路由设置将在下次重新同步时生效"
+            if update.autoInstallUpdates == false {
+                pendingAutomaticUpdate = false
+            } else if update.autoInstallUpdates == true, updateReport?.available == true {
+                if status?.zcode.running == true {
+                    pendingAutomaticUpdate = true
+                    message = "已开启自动更新；完全退出 ZCode 后将安装最新版"
+                } else {
+                    await installLatestUpdate()
+                }
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -536,7 +725,7 @@ final class BridgeModel: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.timeoutInterval = 40
+        request.timeoutInterval = path == "/api/update" && method == "POST" ? 20 * 60 : 40
         request.setValue(connection.session, forHTTPHeaderField: "X-ZCAB-Session")
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -562,7 +751,7 @@ final class BridgeModel: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.timeoutInterval = 40
+        request.timeoutInterval = path == "/api/update" && method == "POST" ? 20 * 60 : 40
         request.setValue(connection.session, forHTTPHeaderField: "X-ZCAB-Session")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(encodableBody)
@@ -1508,6 +1697,41 @@ struct DashboardView: View {
                     }
                     .frame(width: 110)
                 }
+                settingsRow(title: "自动安装更新", detail: "启动后及每 6 小时检查 GitHub 正式版；开启后会自动下载、校验并重启安装") {
+                    Toggle("", isOn: Binding(
+                        get: { model.manager?.settings.autoInstallUpdates ?? false },
+                        set: { value in Task { await model.updateManagerSettings(.init(autoInstallUpdates: value)) } }
+                    )).labelsHidden()
+                }
+                HStack(spacing: 14) {
+                    Image(systemName: model.updateReport?.available == true ? "arrow.down.circle.fill" : "checkmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(model.updateReport?.available == true ? CodexUPalette.accent : Color.green)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(model.updateReport?.available == true ? "可更新到 v\(model.updateReport?.latestVersion ?? "")" : "软件更新")
+                            .font(.headline)
+                        Text(model.updateError ?? (model.updateReport.map { "当前 v\($0.currentVersion) · 最新 v\($0.latestVersion)" } ?? "等待首次自动检查"))
+                            .font(.caption).foregroundStyle(model.updateError == nil ? Color.secondary : Color.red)
+                    }
+                    Spacer()
+                    Button {
+                        Task {
+                            if model.updateReport?.available == true { await model.installLatestUpdate() }
+                            else { await model.checkForUpdates(manual: true) }
+                        }
+                    } label: {
+                        if model.updateChecking || model.updateInstalling {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Text(model.updateReport?.available == true ? "立即更新" : "检查更新")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(model.updateChecking || model.updateInstalling)
+                }
+                .padding(12)
+                .background(CodexUPalette.glassFillLight, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(CodexUPalette.border))
                 settingsRow(title: "本机安全边界", detail: "管理端口和模型网关均只监听 127.0.0.1") {
                     Label("已启用", systemImage: "checkmark.shield.fill").foregroundStyle(.green)
                 }

@@ -1,7 +1,7 @@
 ZCode Antigravity Bridge - macOS Universal test build
 ====================================================
 
-版本：1.0.2-test
+版本：1.0.3-test
 架构：Apple Silicon (arm64) + Intel (x86_64)
 最低系统：macOS 12
 
@@ -19,6 +19,9 @@ Qwen Code、Kimi Code 与 OpenCode；通用客户端配置仍可复制。
 单击菜单栏图标只显示独立额度 Popover（5 小时 / 本周余量与重置时间），不会把
 主窗口带到其他应用上层；点击 Popover 外部的窗口或桌面空白处会自动收起。主界面显示协议返回的
 最近输出 Token、推理 Token、Token/s 和本地累计输出，不保存提示词或回复。
+软件启动 3 秒后检查 GitHub 最新正式版，之后每 6 小时检查一次；“设置”页可手动检查、
+立即更新或开启自动安装。下载包会严格核对平台、文件名、大小与 GitHub SHA-256。
+更新前必须完全退出 ZCode；安装器会停止旧网关、保留旧 App 备份，并在新版本启动后重新同步。
 
 这是非官方测试版，会使用未公开的 Antigravity 接口。Google 可能限流、暂停
 API 权限或封禁账号。请只使用专门的测试账号，不要使用主 Gmail、Workspace

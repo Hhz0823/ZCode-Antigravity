@@ -3,7 +3,7 @@ const resetFive = new Date(now.getTime() + 3.4 * 60 * 60 * 1000).toISOString();
 const resetWeek = new Date(now.getTime() + 4.2 * 24 * 60 * 60 * 1000).toISOString();
 
 const status = {
-  version: "1.0.2-test",
+  version: "1.0.3-test",
   gateway: { ok: true, label: "网关在线", detail: "http://127.0.0.1:18080", running: true },
   proxy: { ok: true, label: "v2rayN 自动代理", detail: "127.0.0.1:10808 · 无需 TUN", running: true },
   tun: { ok: true, label: "TUN 未启用（可选）", detail: "Gemini / Claude / Grok 可使用直连或专用代理", running: false },
@@ -31,11 +31,11 @@ const usage = {
 };
 
 const manager = {
-  version: "1.0.2-test",
+  version: "1.0.3-test",
   accounts: [{ id: "ag-demo", provider: "antigravity", label: "y*****g@gmail.com", plan: "Google AI Pro", status: "active", updatedAt: now.toISOString() }, { id: "xai-demo", provider: "xai", label: "g***@example.com", plan: "SuperGrok", status: "active", updatedAt: now.toISOString() }],
   proxy: { running: true, baseURL: "http://127.0.0.1:18080", port: 18080, protocols: [{ name: "OpenAI", path: "/v1/chat/completions", description: "Chat Completions / Responses 兼容" }, { name: "Anthropic", path: "/v1/messages", description: "Claude Code 原生消息协议" }, { name: "Gemini", path: "/v1beta/models", description: "Google SDK 兼容协议" }] },
   routing: { strategy: "round-robin", sessionAffinity: true, sessionAffinityTTL: "1h", requestRetry: 3, credentialRetry: 3, retryInterval: 30, backgroundModel: "gemini-3.7-flash" },
-  settings: { autoRefreshMinutes: 5, quotaWarningPercent: 20, enableGrokModels: false, enableOtherModels: false, proxyURL: "", theme: "dark", liquidGlass: true, settingsPath: "%LOCALAPPDATA%\\ZCodeAntigravity\\settings.json" },
+  settings: { autoRefreshMinutes: 5, quotaWarningPercent: 20, enableGrokModels: false, enableOtherModels: false, autoInstallUpdates: false, proxyURL: "", theme: "dark", liquidGlass: true, settingsPath: "%LOCALAPPDATA%\\ZCodeAntigravity\\settings.json" },
   features: [{ id: "accounts", name: "多账号管家", description: "OAuth 登录、账号发现和脱敏状态", available: true }, { id: "protocols", name: "三协议中继", description: "OpenAI、Anthropic、Gemini", available: true }, { id: "routing", name: "模型路由", description: "轮询、加权与填满优先", available: true }, { id: "retry", name: "自动自愈", description: "401/429 重试与凭据轮换", available: true }, { id: "usage", name: "用量统计", description: "输出 Token、推理 Token 与 tok/s", available: true }],
 };
 
@@ -45,6 +45,7 @@ export async function mockGet(path: string): Promise<unknown> {
   if (path.startsWith("/api/quota")) return quota(path.includes("xai") ? "xai" : "antigravity");
   if (path.startsWith("/api/usage")) return { ...usage, provider: path.includes("xai") ? "xai" : "antigravity" };
   if (path === "/api/connectors") return { provider: "antigravity", baseURL: "http://127.0.0.1:18080", model: "gemini-3.7-flash", connectors: [{ id: "deepseek-harness", name: "DeepSeek Harness", description: "自动写入 DSH Provider、凭据和默认模型", model: "gemini-3.7-flash", action: "connect-agent-deepseek-harness", snippets: { "settings.yaml": "provider: zcode-bridge" } }, { id: "codex", name: "OpenAI Codex", description: "Responses API 自定义模型提供商", model: "gemini-3.7-flash", action: "connect-agent-codex", snippets: { "config.toml": "model_provider = \"zcode_bridge\"" } }, { id: "claude-code", name: "Claude Code", description: "Anthropic 兼容接口", model: "gemini-3.7-flash", action: "connect-agent-claude-code", snippets: { "PowerShell": "$env:ANTHROPIC_BASE_URL = \"http://127.0.0.1:18080\"" } }, { id: "gemini-cli", name: "Gemini CLI", description: "Gemini 原生协议", model: "gemini-3.7-flash", action: "connect-agent-gemini-cli", snippets: { ".env": "GOOGLE_GEMINI_BASE_URL=http://127.0.0.1:18080" } }, { id: "qwen-code", name: "Qwen Code", description: "OpenAI-compatible Provider", model: "gemini-3.7-flash", action: "connect-agent-qwen-code", snippets: { "settings.json": "provider: zcode-bridge" } }, { id: "kimi-code", name: "Kimi Code", description: "OpenAI-compatible Provider", model: "gemini-3.7-flash", action: "connect-agent-kimi-code", snippets: { "config.toml": "provider = \"zcode-bridge\"" } }] };
+  if (path === "/api/update") return { currentVersion: "1.0.3-test", latestVersion: "1.0.3-test", available: false, releaseURL: "https://github.com/Hhz0823/ZCode-Antigravity/releases", assetName: "ZCode-Antigravity-Setup-v1.0.3-test.exe", assetSize: 1, checkedAt: now.toISOString() };
   throw new Error("Unknown mock path");
 }
 

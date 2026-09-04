@@ -47,6 +47,7 @@ type settings struct {
 	QuotaWarningPercent   int    `json:"quotaWarningPercent"`
 	EnableGrokModels      bool   `json:"enableGrokModels"`
 	EnableOtherModels     bool   `json:"enableOtherModels"`
+	AutoInstallUpdates    bool   `json:"autoInstallUpdates"`
 	BackgroundModel       string `json:"backgroundModel"`
 	Theme                 string `json:"theme"`
 	LiquidGlass           bool   `json:"liquidGlass"`
@@ -112,6 +113,7 @@ func defaultSettings() settings {
 		QuotaWarningPercent:   20,
 		EnableGrokModels:      false,
 		EnableOtherModels:     false,
+		AutoInstallUpdates:    false,
 		BackgroundModel:       "gemini-3.6-flash",
 		Theme:                 "system",
 		LiquidGlass:           true,

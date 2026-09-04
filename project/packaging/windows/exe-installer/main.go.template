@@ -56,21 +56,24 @@ func main() {
 		}
 		return
 	}
-	if len(os.Args) != 1 {
-		showMessage("用法错误：请直接双击安装，或使用 --extract-only <空目录>。", messageOK|messageIconError)
+	updateMode := len(os.Args) == 2 && strings.EqualFold(os.Args[1], "--update")
+	if len(os.Args) != 1 && !updateMode {
+		showMessage("用法错误：请直接双击安装，或使用 --update / --extract-only <空目录>。", messageOK|messageIconError)
 		os.Exit(2)
 	}
 
-	answer := showMessage(
-		"将为当前 Windows 用户安装 ZCode Antigravity Bridge "+packageVersion+"。\n\n"+
-			"安装前请确认：\n"+
-			"1. 已启动 v2rayN 即可自动使用其本机代理，无需开启 TUN；未运行时会尝试直连；\n"+
-			"2. 已从系统托盘完全退出 ZCode。\n\n"+
-			"安装器不会删除账号、聊天、项目或其它 Provider。是否继续？",
-		messageYesNo|messageIconQuestion,
-	)
-	if answer != messageResultYes {
-		return
+	if !updateMode {
+		answer := showMessage(
+			"将为当前 Windows 用户安装 ZCode Antigravity Bridge "+packageVersion+"。\n\n"+
+				"安装前请确认：\n"+
+				"1. 已启动 v2rayN 即可自动使用其本机代理，无需开启 TUN；未运行时会尝试直连；\n"+
+				"2. 已从系统托盘完全退出 ZCode。\n\n"+
+				"安装器不会删除账号、聊天、项目或其它 Provider。是否继续？",
+			messageYesNo|messageIconQuestion,
+		)
+		if answer != messageResultYes {
+			return
+		}
 	}
 
 	controlCenter, output, err := install()
@@ -85,11 +88,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	showMessage(
-		"安装完成。\n\n已创建桌面和开始菜单快捷方式，接下来将打开原生控制中心并开始接入 ZCode。",
-		messageOK|messageIconInfo,
-	)
-	if err := launchControlCenter(controlCenter); err != nil {
+	if !updateMode {
+		showMessage(
+			"安装完成。\n\n已创建桌面和开始菜单快捷方式，接下来将打开原生控制中心并开始接入 ZCode。",
+			messageOK|messageIconInfo,
+		)
+	}
+	if err := launchControlCenter(controlCenter, updateMode); err != nil {
 		showMessage("安装已完成，但控制中心未能自动打开：\n\n"+displayError(err)+"\n\n可使用桌面快捷方式手动打开。", messageOK|messageIconError)
 		os.Exit(1)
 	}
@@ -241,8 +246,12 @@ func verifyExecutables(root string) error {
 	return nil
 }
 
-func launchControlCenter(path string) error {
-	cmd := exec.Command(path, "--auto-setup")
+func launchControlCenter(path string, postUpdate bool) error {
+	argument := "--auto-setup"
+	if postUpdate {
+		argument = "--post-update"
+	}
+	cmd := exec.Command(path, argument)
 	cmd.Dir = filepath.Dir(path)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNoWindow}
 	return cmd.Start()

@@ -64,6 +64,7 @@ type managerPublicSettings struct {
 	QuotaWarningPercent int    `json:"quotaWarningPercent"`
 	EnableGrokModels    bool   `json:"enableGrokModels"`
 	EnableOtherModels   bool   `json:"enableOtherModels"`
+	AutoInstallUpdates  bool   `json:"autoInstallUpdates"`
 	ProxyURL            string `json:"proxyURL"`
 	Theme               string `json:"theme"`
 	LiquidGlass         bool   `json:"liquidGlass"`
@@ -88,6 +89,7 @@ type managerSettingsUpdate struct {
 	QuotaWarningPercent *int    `json:"quotaWarningPercent,omitempty"`
 	EnableGrokModels    *bool   `json:"enableGrokModels,omitempty"`
 	EnableOtherModels   *bool   `json:"enableOtherModels,omitempty"`
+	AutoInstallUpdates  *bool   `json:"autoInstallUpdates,omitempty"`
 	BackgroundModel     *string `json:"backgroundModel,omitempty"`
 	Theme               *string `json:"theme,omitempty"`
 	LiquidGlass         *bool   `json:"liquidGlass,omitempty"`
@@ -124,11 +126,13 @@ func (g *guiRuntime) managerReport() managerReport {
 		Settings: managerPublicSettings{
 			AutoRefreshMinutes: cfg.AutoRefreshMinutes, QuotaWarningPercent: cfg.QuotaWarningPercent,
 			EnableGrokModels: cfg.EnableGrokModels, EnableOtherModels: cfg.EnableOtherModels,
-			ProxyURL: redactURLUserinfo(cfg.ProxyURL), Theme: cfg.Theme, LiquidGlass: cfg.LiquidGlass,
+			AutoInstallUpdates: cfg.AutoInstallUpdates,
+			ProxyURL:           redactURLUserinfo(cfg.ProxyURL), Theme: cfg.Theme, LiquidGlass: cfg.LiquidGlass,
 			SettingsPath: g.app.paths.UserSettings,
 		},
 		Features: []managerFeature{
 			{ID: "accounts", Name: "多账号管家", Description: "OAuth 登录、账号发现和脱敏状态", Available: true},
+			{ID: "updates", Name: "安全自动更新", Description: "GitHub 正式版检测与 SHA-256 双重校验", Available: true},
 			{ID: "google-claude", Name: "Google Claude", Description: "使用 Antigravity Google 账号调用 Claude Sonnet / Opus", Available: true},
 			{ID: "auto-proxy", Name: "v2rayN 自动代理", Description: "无需 TUN，自动发现系统代理与本机端口", Available: true},
 			{ID: "protocols", Name: "三协议中继", Description: "OpenAI、Anthropic、Gemini", Available: true},
@@ -190,6 +194,9 @@ func (g *guiRuntime) serveManagerSettings(w http.ResponseWriter, r *http.Request
 	}
 	if update.EnableOtherModels != nil {
 		cfg.EnableOtherModels = *update.EnableOtherModels
+	}
+	if update.AutoInstallUpdates != nil {
+		cfg.AutoInstallUpdates = *update.AutoInstallUpdates
 	}
 	if update.BackgroundModel != nil {
 		cfg.BackgroundModel = *update.BackgroundModel

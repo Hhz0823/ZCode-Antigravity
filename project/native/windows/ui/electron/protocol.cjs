@@ -1,9 +1,12 @@
 "use strict";
 
+const path = require("node:path");
+
 const GET_PATHS = new Set([
   "/api/status",
   "/api/connectors",
   "/api/manager",
+  "/api/update",
   "/api/quota?provider=antigravity",
   "/api/quota?provider=xai",
   "/api/usage?provider=antigravity",
@@ -14,6 +17,7 @@ const POST_PATHS = new Set([
   "/api/action",
   "/api/provider",
   "/api/manager/settings",
+  "/api/update",
   "/api/heartbeat",
   "/api/close",
 ]);
@@ -65,4 +69,19 @@ function trayTooltip(summary) {
   return parts.join(" · ");
 }
 
-module.exports = { assertApiPath, assertXaiURL, normalizeConnection, trayTooltip };
+function assertUpdateInstaller(value, updatesRoot) {
+  if (!value || typeof value !== "object" || value.platform !== "windows") throw new Error("更新资产平台无效");
+  if (typeof value.version !== "string" || !/^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/.test(value.version)) throw new Error("更新版本号无效");
+  const expectedName = `ZCode-Antigravity-Setup-v${value.version}.exe`;
+  if (value.assetName !== expectedName || typeof value.path !== "string") throw new Error("更新资产名称无效");
+  if (typeof value.sha256 !== "string" || !/^[0-9a-fA-F]{64}$/.test(value.sha256)) throw new Error("更新资产校验值无效");
+  if (typeof updatesRoot !== "string" || !updatesRoot.trim()) throw new Error("更新目录无效");
+  const root = path.win32.resolve(updatesRoot);
+  const installer = path.win32.resolve(value.path);
+  const relative = path.win32.relative(root, installer);
+  if (!relative || relative.startsWith(`..${path.win32.sep}`) || relative === ".." || path.win32.isAbsolute(relative)) throw new Error("更新资产超出应用专用目录");
+  if (path.win32.basename(installer) !== expectedName || path.win32.basename(path.win32.dirname(installer)) !== value.version) throw new Error("更新资产路径无效");
+  return installer;
+}
+
+module.exports = { assertApiPath, assertUpdateInstaller, assertXaiURL, normalizeConnection, trayTooltip };
