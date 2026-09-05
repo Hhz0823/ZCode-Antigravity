@@ -1,7 +1,7 @@
 Windows acceptance checklist
 ============================
 
-[ ] ZCode-Antigravity-Setup-v1.0.3-test.exe opens a native confirmation dialog without a terminal.
+[ ] ZCode-Antigravity-Setup-v1.0.3.exe opens a native confirmation dialog without a terminal.
 [ ] Startup checks GitHub latest after about 3 seconds, then every 6 hours; Settings can also check manually.
 [ ] Update download accepts only the exact Windows Setup asset and rejects a wrong platform, path, size, or GitHub SHA-256.
 [ ] With ZCode running, manual/automatic install asks the user to exit ZCode and does not replace files.

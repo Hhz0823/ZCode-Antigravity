@@ -2,6 +2,22 @@
 
 最新验证日期：2026-09-05（Asia/Shanghai）
 
+## V1.0.3 正式版发布
+
+- Go Core、macOS SwiftUI 客户端、Windows Electron 客户端和打包默认版本统一为 `1.0.3`；
+  macOS `CFBundleShortVersionString=1.0.3`、`CFBundleVersion=1003`，正式资产名称不含 `-test`。
+- 管理器 `go test ./...`、`go vet ./...`、`go test -race ./...` 与 Windows x64 交叉编译通过；
+  固定 CLIProxyAPI `go mod verify` 和全量测试通过；Electron 6 项 IPC/安全测试、生产构建、
+  `npm audit --omit=dev` 以及 Swift arm64/x86_64 类型检查通过。
+- macOS Universal 正式包的 ZIP CRC、27 个包内文件哈希、三个 Universal Mach-O、App 深度签名、
+  Core `1.0.3` 与 Bundle `1.0.3 (1003)` 校验通过。
+- Windows 正式 ZIP 的 CRC、48 个包内文件哈希、Electron ASAR 必需入口与 `1.0.3` 元数据、
+  x64 PE 结构、控制中心/安装器 GUI 子系统及 ZIP/EXE/BAT 外层哈希通过。
+- 公开源码与双平台包敏感信息检查继续要求 OAuth 客户端字面量、用户 token、账号文件、本地 API key、
+  运行状态和日志为 0；源码快照只使用 Git 已跟踪内容生成。
+- V1.0.3 继承下节已经完成的 Apple Silicon 自替换、备份、重启和网关自动同步实测。Windows
+  测试机 `192.168.1.9:22` 本轮仍超时，因此 Windows 正式包只声明交叉构建、自动化与静态验证。
+
 ## v1.0.3-test 双平台自动更新
 
 - 新增随机会话密钥保护的 `GET/POST /api/update`：仅查询 GitHub `releases/latest` 正式版，

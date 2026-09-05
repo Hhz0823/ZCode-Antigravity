@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "1.0.3-test"
+private let appVersion = "1.0.3"
 
 private func consumePostUpdateMarker() -> Bool {
     guard let supportRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {

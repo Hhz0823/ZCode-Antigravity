@@ -1,7 +1,7 @@
-ZCode Antigravity Bridge - macOS Universal test build
-====================================================
+ZCode Antigravity Bridge - macOS Universal stable build
+=======================================================
 
-版本：1.0.3-test
+版本：1.0.3
 架构：Apple Silicon (arm64) + Intel (x86_64)
 最低系统：macOS 12
 
@@ -23,7 +23,7 @@ Qwen Code、Kimi Code 与 OpenCode；通用客户端配置仍可复制。
 立即更新或开启自动安装。下载包会严格核对平台、文件名、大小与 GitHub SHA-256。
 更新前必须完全退出 ZCode；安装器会停止旧网关、保留旧 App 备份，并在新版本启动后重新同步。
 
-这是非官方测试版，会使用未公开的 Antigravity 接口。Google 可能限流、暂停
+这是非官方第三方软件，会使用未公开的 Antigravity 接口。Google 可能限流、暂停
 API 权限或封禁账号。请只使用专门的测试账号，不要使用主 Gmail、Workspace
 或 Google Cloud 所有者账号。
 
