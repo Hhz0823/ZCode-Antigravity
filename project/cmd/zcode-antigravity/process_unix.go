@@ -98,6 +98,12 @@ func openZCodeApplication() error {
 	return fmt.Errorf("自动打开 ZCode 仅支持 Windows")
 }
 
+func antigravityApplicationPath() string { return "" }
+
+func openAntigravityApplication() error {
+	return fmt.Errorf("自动打开 Antigravity 仅支持 Windows 和 macOS")
+}
+
 func detectTunAdapter() (string, bool) {
 	return "", false
 }

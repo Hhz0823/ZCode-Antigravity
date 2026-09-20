@@ -41,13 +41,15 @@ type quotaReport struct {
 }
 
 type quotaAccount struct {
-	Account       string       `json:"account"`
-	Plan          string       `json:"plan,omitempty"`
-	Status        string       `json:"status"`
-	StatusMessage string       `json:"statusMessage,omitempty"`
-	Groups        []quotaGroup `json:"groups,omitempty"`
-	Credits       *creditInfo  `json:"credits,omitempty"`
-	Error         string       `json:"error,omitempty"`
+	ID                   string       `json:"id,omitempty"`
+	Account              string       `json:"account"`
+	Plan                 string       `json:"plan,omitempty"`
+	Status               string       `json:"status"`
+	StatusMessage        string       `json:"statusMessage,omitempty"`
+	Groups               []quotaGroup `json:"groups,omitempty"`
+	Credits              *creditInfo  `json:"credits,omitempty"`
+	Error                string       `json:"error,omitempty"`
+	VerificationRequired bool         `json:"verificationRequired,omitempty"`
 }
 
 type quotaGroup struct {
@@ -77,6 +79,7 @@ type creditInfo struct {
 
 type managementAuthFiles struct {
 	Files []struct {
+		Name          string `json:"name"`
 		AuthIndex     string `json:"auth_index"`
 		Provider      string `json:"provider"`
 		Email         string `json:"email"`
@@ -134,11 +137,61 @@ type upstreamAvailableModelQuota struct {
 }
 
 type upstreamCallError struct {
-	StatusCode int
+	StatusCode           int
+	VerificationRequired bool
 }
 
 func (e upstreamCallError) Error() string {
+	if e.VerificationRequired {
+		return "Google 要求验证此账号；请打开 Antigravity，登录同一 Google 账号并按官方提示完成验证"
+	}
 	return fmt.Sprintf("上游额度接口返回 HTTP %d", e.StatusCode)
+}
+
+func requiresGoogleVerification(message string) bool {
+	var payload any
+	if json.Unmarshal([]byte(message), &payload) == nil {
+		return googleVerificationValue(payload)
+	}
+	return googleVerificationText(message)
+}
+
+func googleVerificationValue(value any) bool {
+	switch typed := value.(type) {
+	case string:
+		return googleVerificationText(typed)
+	case map[string]any:
+		for key, item := range typed {
+			if required, ok := item.(bool); ok && required && (key == "validation_required" || key == "verification_required") {
+				return true
+			}
+			if googleVerificationValue(item) {
+				return true
+			}
+		}
+	case []any:
+		for _, item := range typed {
+			if googleVerificationValue(item) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func googleVerificationText(message string) bool {
+	message = strings.ToLower(message)
+	for _, marker := range []string{"validation_required", "verification_required", "verify your account", "verify your identity", "verify your age", "age verification required", "验证您的账号", "验证你的账号", "完成身份验证"} {
+		if strings.Contains(message, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func isGoogleVerificationError(err error) bool {
+	var upstream upstreamCallError
+	return errors.As(err, &upstream) && upstream.VerificationRequired
 }
 
 func (a *app) quotaCachePath() string {
@@ -186,9 +239,18 @@ func (a *app) fetchQuotaReport() (quotaReport, error) {
 			continue
 		}
 		account := quotaAccount{
+			ID:            managerAccountID("antigravity", authFile.Name),
 			Account:       maskEmail(firstText(authFile.Email, authFile.Label, "Antigravity account")),
 			Status:        normalizedAccountStatus(authFile.Status, authFile.Disabled, authFile.Unavailable),
 			StatusMessage: strings.TrimSpace(authFile.StatusMessage),
+		}
+		if requiresGoogleVerification(authFile.StatusMessage) {
+			account.VerificationRequired = true
+			account.Status = "verification_required"
+			account.StatusMessage = upstreamCallError{VerificationRequired: true}.Error()
+			account.Error = account.StatusMessage
+			report.Accounts = append(report.Accounts, account)
+			continue
 		}
 		if authFile.Disabled || authFile.Unavailable {
 			account.Error = "账号当前不可用"
@@ -205,6 +267,12 @@ func (a *app) fetchQuotaReport() (quotaReport, error) {
 		summary, quotaSource, errSummary := a.retrieveQuotaSummary(current.Port, authFile.AuthIndex, projectID)
 		if errSummary != nil {
 			account.Error = errSummary.Error()
+			if isGoogleVerificationError(errSummary) {
+				account.VerificationRequired = true
+				account.Status = "verification_required"
+				report.Accounts = append(report.Accounts, account)
+				continue
+			}
 		} else {
 			account.Groups = convertQuotaGroups(summary)
 			if quotaSource != "retrieveUserQuotaSummary" {
@@ -216,6 +284,10 @@ func (a *app) fetchQuotaReport() (quotaReport, error) {
 		if errCredits == nil {
 			account.Plan = plan
 			account.Credits = credits
+		} else if isGoogleVerificationError(errCredits) {
+			account.VerificationRequired = true
+			account.Status = "verification_required"
+			account.Error = errCredits.Error()
 		} else if account.Error == "" {
 			account.StatusMessage = "模型额度已读取；套餐与 AI Credits 暂时不可用"
 		}
@@ -227,7 +299,14 @@ func (a *app) fetchQuotaReport() (quotaReport, error) {
 		return report, nil
 	}
 	sort.Slice(report.Accounts, func(i, j int) bool { return report.Accounts[i].Account < report.Accounts[j].Account })
-	if !quotaReportHasBuckets(report) {
+	verificationRequired := false
+	for _, account := range report.Accounts {
+		verificationRequired = verificationRequired || account.VerificationRequired
+	}
+	if verificationRequired {
+		report.Warning = "部分 Google 账号需要验证，请前往“账号管家”查看处理步骤"
+	}
+	if !quotaReportHasBuckets(report) && !verificationRequired {
 		cause := errors.New("实时额度接口没有返回可用额度")
 		for _, account := range report.Accounts {
 			if strings.TrimSpace(account.Error) != "" {
@@ -268,6 +347,9 @@ func (a *app) retrieveQuotaSummary(port int, authIndex, projectID string) (upstr
 			body, errCall := a.managementAPICall(port, authIndex, endpoint, payload)
 			if errCall != nil {
 				lastErr = errCall
+				if isGoogleVerificationError(errCall) {
+					return upstreamQuotaSummary{}, "", errCall
+				}
 				var upstreamErr upstreamCallError
 				if attempt == 0 && errors.As(errCall, &upstreamErr) && upstreamErr.StatusCode == http.StatusForbidden {
 					payload = `{}`
@@ -311,6 +393,9 @@ func (a *app) retrieveAvailableModelQuota(port int, authIndex, projectID string)
 			body, errCall := a.managementAPICall(port, authIndex, endpoint, payload)
 			if errCall != nil {
 				lastErr = errCall
+				if isGoogleVerificationError(errCall) {
+					return upstreamQuotaSummary{}, errCall
+				}
 				var upstreamErr upstreamCallError
 				if attempt == 0 && errors.As(errCall, &upstreamErr) && upstreamErr.StatusCode == http.StatusForbidden {
 					payload = `{}`
@@ -424,7 +509,7 @@ func (a *app) managementAPICallRequest(port int, authIndex, method, endpoint, da
 		return nil, err
 	}
 	if result.StatusCode < http.StatusOK || result.StatusCode >= http.StatusMultipleChoices {
-		return nil, upstreamCallError{StatusCode: result.StatusCode}
+		return nil, upstreamCallError{StatusCode: result.StatusCode, VerificationRequired: (result.StatusCode == http.StatusForbidden || result.StatusCode == http.StatusBadRequest) && requiresGoogleVerification(result.Body)}
 	}
 	return []byte(result.Body), nil
 }

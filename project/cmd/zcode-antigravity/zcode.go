@@ -13,13 +13,11 @@ import (
 	"strings"
 )
 
-const zcodeWebSearchModelID = "gemini-web-search"
+const geminiContextLimit = 384 * 1024
 
 var zcodeModelAllowlist = []string{
 	"gemini-3.8-flash",
 	"gemini-3.7-flash",
-	"gemini-3.6-flash",
-	zcodeWebSearchModelID,
 }
 
 type zcodeModelAlias struct {
@@ -31,8 +29,6 @@ type zcodeModelAlias struct {
 var zcodeModelAliases = []zcodeModelAlias{
 	{UpstreamID: "gemini-3.8-flash-high", ClientID: "gemini-3.8-flash", DisplayName: "Gemini 3.8 Flash"},
 	{UpstreamID: "gemini-3.7-flash-high", ClientID: "gemini-3.7-flash", DisplayName: "Gemini 3.7 Flash"},
-	{UpstreamID: "gemini-3.6-flash-high", ClientID: "gemini-3.6-flash", DisplayName: "Gemini 3.6 Flash"},
-	{UpstreamID: "gemini-3.1-flash-lite", ClientID: zcodeWebSearchModelID, DisplayName: "Gemini Web Search (Google)"},
 }
 
 func (a *app) configureZCode(port int, models []modelInfo) (backup string, changed bool, err error) {
@@ -79,6 +75,9 @@ func (a *app) configureZCodeWithAccess(port int, models []modelInfo, includeGrok
 		if contextLimit <= 0 {
 			contextLimit = 200000
 		}
+		if isAllowedZCodeModel(model.ID) && (model.MaxInputTokens <= 0 || contextLimit > geminiContextLimit) {
+			contextLimit = geminiContextLimit
+		}
 		inputModalities := normalizedModalities(model.SupportedInputModalities)
 		outputModalities := normalizedModalities(model.SupportedOutputModalities)
 		entry := map[string]any{
@@ -119,34 +118,28 @@ func (a *app) configureZCodeWithAccess(port int, models []modelInfo, includeGrok
 		"models":                      modelMap,
 		"x-zcode-antigravity-managed": 1,
 	}
-	if existing, ok := providers[providerID]; ok && jsonSemanticallyEqual(existing, provider) {
+	legacy := zcodeConfigWrite{path: a.paths.ZCodeConfig, reason: "before-sync", before: raw, existed: true}
+	existing, owned := providers[providerID]
+	if !jsonSemanticallyEqual(existing, provider) {
+		providers[providerID] = provider
+		root["provider"] = providers
+		legacy.after, err = marshalJSONObject(root)
+		if err != nil {
+			return "", false, err
+		}
+	}
+	personal, err := a.preparePersonalProvider(port, models, owned)
+	if err != nil {
+		return "", false, err
+	}
+	if legacy.after == nil && personal.after == nil {
 		return "", false, nil
 	}
 	if a.zcodeRunning != nil && a.zcodeRunning() {
 		return "", false, fmt.Errorf("检测到 ZCode 仍在运行；Provider 需要更新，请彻底退出 ZCode 后重试同步")
 	}
-	backup, err = a.backupZCodeConfig(raw, "before-sync")
-	if err != nil {
-		return "", false, fmt.Errorf("备份 ZCode 配置失败，未修改原文件: %w", err)
-	}
-	providers[providerID] = provider
-	root["provider"] = providers
-	encoded, err := marshalJSONObject(root)
-	if err != nil {
-		return backup, false, err
-	}
-	if err := writeAtomic(a.paths.ZCodeConfig, encoded, 0o600); err != nil {
-		return backup, false, fmt.Errorf("写入 ZCode 配置失败；原文件备份在 %s: %w", backup, err)
-	}
-	_, verifiedRoot, verifyErr := readJSONObject(a.paths.ZCodeConfig)
-	if verifyErr != nil {
-		return backup, false, fmt.Errorf("写后校验失败；请从备份 %s 手工恢复: %w", backup, verifyErr)
-	}
-	verifiedProviders, verifyErr := objectField(verifiedRoot, "provider")
-	if verifyErr != nil || !jsonSemanticallyEqual(verifiedProviders[providerID], provider) {
-		return backup, false, fmt.Errorf("写后校验失败；请从备份 %s 手工恢复", backup)
-	}
-	return backup, true, nil
+	backup, err = a.commitZCodeConfigs(legacy, personal)
+	return backup, err == nil, err
 }
 
 func selectZCodeModels(catalog []modelInfo) ([]modelInfo, error) {
@@ -344,18 +337,20 @@ func (a *app) removeZCodeProvider() error {
 	if !isManagedProvider(providers[providerID]) {
 		return fmt.Errorf("同名 Provider 没有本程序管理标记，拒绝删除")
 	}
-	backup, err := a.backupZCodeConfig(raw, "before-remove")
-	if err != nil {
-		return fmt.Errorf("备份失败，未修改 ZCode: %w", err)
-	}
 	delete(providers, providerID)
 	root["provider"] = providers
 	encoded, err := marshalJSONObject(root)
 	if err != nil {
 		return err
 	}
-	if err := writeAtomic(a.paths.ZCodeConfig, encoded, 0o600); err != nil {
-		return fmt.Errorf("删除 Provider 失败；备份在 %s: %w", backup, err)
+	personal, err := a.preparePersonalProvider(0, nil, true)
+	if err != nil {
+		return err
+	}
+	personal.reason = "provider-before-remove"
+	backup, err := a.commitZCodeConfigs(zcodeConfigWrite{path: a.paths.ZCodeConfig, reason: "before-remove", before: raw, after: encoded, existed: true}, personal)
+	if err != nil {
+		return err
 	}
 	fmt.Printf("已只删除 %s；其他 ZCode 配置未删除。\n", providerName)
 	fmt.Printf("删除前备份: %s\n", backup)

@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("zcodeNative", Object.freeze({
   updateTraySummary: (summary) => ipcRenderer.invoke("tray:update-summary", summary),
   showMainWindow: () => ipcRenderer.invoke("window:show-main"),
   openXaiVerificationURL: (url) => ipcRenderer.invoke("shell:open-xai", url),
+  openGoogleHelp: (page) => ipcRenderer.invoke("shell:google-help", page),
   windowAction: (action) => ipcRenderer.invoke("window:action", action),
   writeClipboard: (value) => ipcRenderer.invoke("clipboard:write", value),
   onRefresh: (callback) => {

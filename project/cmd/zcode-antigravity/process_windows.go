@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"golang.org/x/sys/windows/registry"
 )
 
 const (
@@ -232,6 +234,47 @@ func openZCodeApplication() error {
 		return cmd.Process.Release()
 	}
 	return fmt.Errorf("未找到 ZCode.exe，请先安装 ZCode")
+}
+
+func antigravityApplicationPath() string {
+	var candidates []string
+	for _, base := range []string{os.Getenv("LOCALAPPDATA"), os.Getenv("PROGRAMFILES"), os.Getenv("PROGRAMFILES(X86)")} {
+		if base == "" {
+			continue
+		}
+		candidates = append(candidates, filepath.Join(base, "Programs", "Antigravity", "Antigravity.exe"), filepath.Join(base, "Antigravity", "Antigravity.exe"))
+	}
+	for _, hive := range []registry.Key{registry.CURRENT_USER, registry.LOCAL_MACHINE} {
+		key, err := registry.OpenKey(hive, `SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\Antigravity.exe`, registry.QUERY_VALUE)
+		if err == nil {
+			value, _, _ := key.GetStringValue("")
+			_ = key.Close()
+			candidates = append(candidates, strings.Trim(value, `"`))
+		}
+	}
+	if value, err := exec.LookPath("Antigravity.exe"); err == nil {
+		candidates = append(candidates, value)
+	}
+	for _, candidate := range candidates {
+		if filepath.IsAbs(candidate) {
+			if info, err := os.Stat(candidate); err == nil && info.Mode().IsRegular() {
+				return candidate
+			}
+		}
+	}
+	return ""
+}
+
+func openAntigravityApplication() error {
+	path := antigravityApplicationPath()
+	if path == "" {
+		return fmt.Errorf("未找到官方 Antigravity，请先通过界面的“下载 Antigravity”安装")
+	}
+	cmd := exec.Command(path)
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("打开 Antigravity: %w", err)
+	}
+	return cmd.Process.Release()
 }
 
 func detectTunAdapter() (string, bool) {

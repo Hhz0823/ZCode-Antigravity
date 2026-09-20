@@ -6,7 +6,6 @@ import {
   Check,
   ChevronRight,
   CircleGauge,
-  Cloud,
   Copy,
   Cpu,
   Download,
@@ -25,7 +24,6 @@ import {
   ShieldCheck,
   Sparkles,
   Users,
-  Wifi,
   X,
   Zap,
   type LucideIcon,
@@ -57,12 +55,13 @@ interface DashboardStatus {
 }
 interface QuotaBucket { name: string; window: string; remainingPercent?: number; resetTime?: string }
 interface QuotaGroup { name: string; buckets: QuotaBucket[] }
-interface QuotaAccount { account: string; plan?: string; status: string; statusMessage?: string; groups?: QuotaGroup[]; credits?: { available: boolean; amount: number; creditType: string }; error?: string }
+interface QuotaAccount { id?: string; verificationRequired?: boolean; account: string; plan?: string; status: string; statusMessage?: string; groups?: QuotaGroup[]; credits?: { available: boolean; amount: number; creditType: string }; error?: string }
 interface QuotaReport { fetchedAt?: string; provider: Provider; source: string; stale: boolean; accounts: QuotaAccount[]; warning?: string }
 interface UsageSample { timestamp: string; model: string; outputTokens: number; reasoningTokens: number; totalTokens?: number; latencyMs: number; ttftMs: number; generationMs: number; outputTokensPerSecond: number; speedBasis: string }
 interface UsageReport { provider: Provider; available: boolean; latest?: UsageSample; total: { requests: number; outputTokens: number; reasoningTokens: number; averageTokensPerSecond: number }; recent: UsageSample[]; warning?: string }
 interface ManagerReport {
   version: string;
+  antigravityInstalled: boolean;
   accounts: Array<{ id: string; provider: Provider; label: string; plan?: string; status: string; updatedAt: string }>;
   proxy: { running: boolean; baseURL?: string; port?: number; protocols: Array<{ name: string; path: string; description: string }> };
   routing: { strategy: string; sessionAffinity: boolean; sessionAffinityTTL: string; requestRetry: number; credentialRetry: number; retryInterval: number; backgroundModel: string };
@@ -129,7 +128,6 @@ function WindowChrome() {
       <div className="flex items-center gap-2.5 pointer-events-none">
         <img src={brandMark} alt="" className="size-6 rounded-lg" />
         <span className="text-xs font-medium tracking-wide text-slate-200">ZCode · Antigravity</span>
-        <Badge tone="blue">Electron</Badge>
       </div>
       <div className="window-controls">
         <button aria-label="最小化" onClick={() => windowAction("minimize")}><Minimize2 /></button>
@@ -159,10 +157,6 @@ function HorizontalNavigation({ section, setSection }: { section: Section; setSe
           return <button key={item.id} onClick={() => setSection(item.id)} className={cn("nav-item", section === item.id && "active")}><Icon /><span>{item.label}</span></button>;
         })}
       </div>
-      <div className="nav-signature">
-        <ShieldCheck />
-        <span>Antigravity Tools 核心功能</span>
-      </div>
     </nav>
   );
 }
@@ -184,7 +178,7 @@ function ProviderTabs({ provider, counts, busy, grokEnabled, onSelect }: { provi
 
 function StatusStrip({ status }: { status?: DashboardStatus }) {
   const items = [
-    ["TUN", status?.tun, Wifi], ["PROXY", status?.proxy, Cloud], ["BRIDGE", status?.gateway, Cpu], ["ZCODE", status?.zcode, Bot],
+    ["本地网关", status?.gateway, Cpu], ["ZCode", status?.zcode, Bot],
   ] as const;
   return (
     <div className="status-strip">
@@ -219,10 +213,11 @@ function QuotaHero({ quota, provider, warningPercent = 20 }: { quota?: QuotaRepo
   );
 }
 
-function ActionPanel({ busy, grokEnabled, onAction }: { busy: boolean; grokEnabled: boolean; onAction: (action: string) => void }) {
+function ActionPanel({ busy, grokEnabled, antigravityInstalled, onAction }: { busy: boolean; grokEnabled: boolean; antigravityInstalled: boolean; onAction: (action: string) => void }) {
   const actions = [
     ["setup", "一键接入 ZCode", "启动网关并同步当前提供商", Sparkles, "primary"],
-    ["login", "登录 Antigravity", "通过浏览器完成 Google OAuth", KeyRound, "secondary"],
+    ["login", "添加 Google 账号", "在浏览器中完成账号授权", KeyRound, "secondary"],
+    [antigravityInstalled ? "open-antigravity" : "download-antigravity", antigravityInstalled ? "打开 Antigravity" : "下载 Antigravity", antigravityInstalled ? "使用同一账号完成首次使用与验证" : "前往 Google 官网安装官方客户端", ExternalLink, "secondary"],
     ["login-grok", "登录 Grok / xAI", "通过官方 xAI 设备授权", Zap, "secondary"],
     ["sync", "修复并重新同步", "校验网关和 ZCode Provider", RotateCcw, "secondary"],
     ["open-zcode", "打开 ZCode", "接入完成后开始使用", ExternalLink, "secondary"],
@@ -275,11 +270,12 @@ function AuthenticationOverlay({ operation, provider, onCopy, onError }: { opera
   );
 }
 
-function Overview({ status, quota, usage, manager, provider, busy, onAction }: { status?: DashboardStatus; quota?: QuotaReport; usage?: UsageReport; manager?: ManagerReport; provider: Provider; busy: boolean; onAction: (action: string) => void }) {
+function Overview({ status, quota, usage, manager, provider, busy, onAction, onRefresh }: { status?: DashboardStatus; quota?: QuotaReport; usage?: UsageReport; manager?: ManagerReport; provider: Provider; busy: boolean; onAction: (action: string) => void; onRefresh: () => void }) {
   const latest = usage?.latest;
   return (
     <div className="content-grid">
-      <Card className="min-h-[450px]">
+      {provider === "antigravity" && quota?.accounts.some((account) => account.verificationRequired || account.error) && <GoogleAccountGuide quota={quota} installed={manager?.antigravityInstalled ?? false} busy={busy} onAction={onAction} onRefresh={onRefresh} />}
+      <Card>
         <CardHeader eyebrow={provider === "xai" ? "GROK USAGE" : "ANTIGRAVITY USAGE"} title={provider === "xai" ? "Grok 模型额度" : "Gemini 模型额度"} description={quota?.fetchedAt ? `上次额度刷新 ${formatTime(quota.fetchedAt)}` : "每 5 分钟自动刷新；切换提供商立即刷新"} action={<Badge tone={quota?.warning ? "warn" : "good"}>{quota?.warning ? "需注意" : "额度监控"}</Badge>} />
         <div className="p-5">
           <div className="overview-metrics">
@@ -293,7 +289,7 @@ function Overview({ status, quota, usage, manager, provider, busy, onAction }: {
           {quota?.warning && <p className="mt-3 text-xs leading-5 text-amber-200/80">{quota.warning}</p>}
         </div>
       </Card>
-      <Card><CardHeader eyebrow="LOCAL ACTIONS" title="接入控制" description={status?.operation.message || status?.operation.error || "所有操作均在本机完成"} action={busy ? <LoaderCircle className="size-4 animate-spin text-sky-300" /> : undefined} /><div className="p-5"><ActionPanel busy={busy} grokEnabled={manager?.settings.enableGrokModels ?? false} onAction={onAction} /></div></Card>
+      <Card><CardHeader eyebrow="LOCAL ACTIONS" title="接入控制" description={status?.operation.message || status?.operation.error || "所有操作均在本机完成"} action={busy ? <LoaderCircle className="size-4 animate-spin text-sky-300" /> : undefined} /><div className="p-5"><ActionPanel busy={busy} grokEnabled={manager?.settings.enableGrokModels ?? false} antigravityInstalled={manager?.antigravityInstalled ?? false} onAction={onAction} /></div></Card>
     </div>
   );
 }
@@ -302,9 +298,35 @@ function Metric({ label, value, suffix }: { label: string; value: string; suffix
   return <div className="px-4"><p className="text-[11px] text-slate-500">{label}</p><p className="mt-1 text-xl font-semibold tracking-tight text-white">{value} <span className="text-xs font-normal text-slate-500">{suffix}</span></p></div>;
 }
 
-function AccountsView({ manager, quota, provider }: { manager?: ManagerReport; quota?: QuotaReport; provider: Provider }) {
+function GoogleAccountGuide({ quota, installed, busy, onAction, onRefresh }: { quota?: QuotaReport; installed: boolean; busy: boolean; onAction: (action: string) => void; onRefresh: () => void }) {
+  const verification = quota?.accounts.some((account) => account.verificationRequired) ?? false;
+  return <details className={cn("google-account-guide", verification && "needs-verification")} open={verification} aria-label="Google 账号首次使用指引">
+    <summary className="guide-heading"><span className="guide-icon"><ShieldCheck /></span><div><h2>{verification ? "Google 要求完成账号验证" : "新账号无法使用模型？"}</h2><p>在 Antigravity 登录同一账号；如 Google 要求验证，完成后再刷新。</p></div><Badge tone={verification ? "warn" : "blue"}>{verification ? "需要你操作" : "查看步骤"}</Badge></summary>
+    <ol className="guide-steps"><li><span>1</span><div><strong>打开 Antigravity</strong><p>在官方客户端登录刚刚添加的 Google 账号。</p></div></li><li><span>2</span><div><strong>按 Google 提示验证</strong><p>尝试发送一条消息；如出现身份或年龄验证，在官方页面由你本人完成。</p></div></li><li><span>3</span><div><strong>返回并刷新额度</strong><p>先确认官方客户端可以使用模型，再返回这里刷新；授权过期时重新添加账号。</p></div></li></ol>
+    <div className="guide-actions"><Button size="sm" variant="primary" disabled={busy} onClick={() => onAction(installed ? "open-antigravity" : "download-antigravity")}><ExternalLink className="size-4" />{installed ? "打开 Antigravity" : "下载 Antigravity"}</Button><Button size="sm" disabled={busy} onClick={onRefresh}><RefreshCw className="size-4" />已完成，刷新额度</Button><Button size="sm" variant="ghost" onClick={() => onAction("google-verification-help")}>Google 官方说明</Button></div>
+    <p className="guide-note">如果没有验证提示，请按具体错误检查账号资格、地区、额度或网络。刷新额度不会替你完成验证。</p>
+  </details>;
+}
+
+function AccountsView({ manager, quota, provider, busy, onAction, onRefresh }: { manager?: ManagerReport; quota?: QuotaReport; provider: Provider; busy: boolean; onAction: (action: string) => void; onRefresh: () => void }) {
   const accounts = manager?.accounts.filter((account) => account.provider === provider) ?? [];
-  return <Card><CardHeader eyebrow="ACCOUNT MANAGER" title={`${providerName(provider)} 账号`} description="仅显示脱敏账号信息，不在界面中暴露凭据" action={<Badge tone="blue">{accounts.length} 个账号</Badge>} /><div className="grid gap-3 p-5 md:grid-cols-2">{accounts.length ? accounts.map((account) => { const live = quota?.accounts.find((item) => item.account === account.label); return <div className="account-card" key={account.id}><div className="flex items-start justify-between"><div className="account-avatar"><Users /></div><Badge tone={account.status === "active" ? "good" : "warn"}>{account.status}</Badge></div><h3>{account.label}</h3><p>{account.plan || live?.plan || "未识别订阅"}</p><div className="mt-4 flex items-center gap-2 text-[11px] text-slate-500"><ShieldCheck className="size-3.5 text-emerald-300" /> 当前用户加密存储 · {formatTime(account.updatedAt)}</div></div>; }) : <Empty icon={Users} title="尚未发现账号" text={`请先登录 ${providerName(provider)}`} />}</div></Card>;
+  return <div className="account-workspace">
+    {provider === "antigravity" && <GoogleAccountGuide quota={quota} installed={manager?.antigravityInstalled ?? false} busy={busy} onAction={onAction} onRefresh={onRefresh} />}
+    <Card><CardHeader eyebrow="ACCOUNT MANAGER" title={`${providerName(provider)} 账号`} description="授权状态与实时额度分别显示" action={<Button size="sm" variant="primary" disabled={busy} onClick={() => onAction(provider === "xai" ? "login-grok" : "login")}><KeyRound className="size-4" />{provider === "xai" ? "添加 xAI 账号" : "添加 Google 账号"}</Button>} />
+      <div className="grid gap-3 p-5 md:grid-cols-2">{accounts.length ? accounts.map((account) => {
+        const live = quota?.accounts.find((item) => item.id === account.id || item.account === account.label);
+        const needsVerification = live?.verificationRequired;
+        const label = needsVerification ? "需要 Google 验证" : live?.error ? "额度读取失败" : account.status === "disabled" ? "已停用" : live?.groups?.length ? "额度已读取" : "授权已保存";
+        return <div className={cn("account-card", needsVerification && "verification-card")} key={account.id}>
+          <div className="flex items-start justify-between"><div className="account-avatar"><Users /></div><Badge tone={needsVerification || live?.error ? "warn" : live?.groups?.length && !quota?.stale ? "good" : "neutral"}>{quota?.stale && live ? `缓存 · ${label}` : label}</Badge></div>
+          <h3>{account.label}</h3><p>{account.plan || live?.plan || "未识别订阅"}</p>
+          {(live?.error || live?.statusMessage) && <p className="account-status-message">{live.error || live.statusMessage}</p>}
+          {needsVerification && <Button className="mt-3" size="sm" disabled={busy} onClick={() => onAction(manager?.antigravityInstalled ? "open-antigravity" : "download-antigravity")}><ExternalLink className="size-4" />前往官方客户端验证</Button>}
+          <div className="mt-4 flex items-center gap-2 text-[11px] text-slate-500"><ShieldCheck className="size-3.5 text-emerald-300" /> 当前用户加密存储 · {formatTime(account.updatedAt)}</div>
+        </div>;
+      }) : <Empty icon={Users} title="尚未添加账号" text="点击右上方添加账号，完成授权后在这里查看状态" />}</div>
+    </Card>
+  </div>;
 }
 
 function ProxyView({ manager, status }: { manager?: ManagerReport; status?: DashboardStatus }) {
@@ -330,12 +352,11 @@ function SettingsView({ manager, saveSetting, saving, syncing, onSync, update, u
   return (
     <div className="grid gap-4 md:grid-cols-[1fr_.85fr]">
       <Card>
-        <CardHeader eyebrow="MODEL ACCESS" title="模型与界面设置" description="默认仅暴露 Gemini；Claude、Grok 与其他模型需主动开启并重新同步" action={saving ? <LoaderCircle className="size-4 animate-spin" /> : undefined} />
+        <CardHeader eyebrow="MODEL ACCESS" title="模型与偏好" description="Gemini 3.7 / 3.8 默认使用 384K 和 High；其他模型可按需开启" action={saving ? <LoaderCircle className="size-4 animate-spin" /> : undefined} />
         <div className="space-y-3 p-5">
           <Switch checked={manager?.settings.enableGrokModels ?? false} onChange={(value) => saveSetting({ enableGrokModels: value })} label="Grok 模型" />
           <Switch checked={manager?.settings.enableOtherModels ?? false} onChange={(value) => saveSetting({ enableOtherModels: value })} label="Google Claude / 其他 AI 文本模型" />
           <Button className="w-full" variant="primary" disabled={saving || syncing} onClick={onSync}><RefreshCw className={cn("size-4", syncing && "animate-spin")} />应用模型开关</Button>
-          <Switch checked={manager?.settings.liquidGlass ?? true} onChange={(value) => saveSetting({ liquidGlass: value })} label="白色液态玻璃背景" />
           <div className="setting-row"><div><p>额度自动刷新</p><small>默认每 5 分钟，不影响 5 秒状态探测</small></div><div className="segmented">{[5, 10].map((value) => <button className={cn(manager?.settings.autoRefreshMinutes === value && "active")} onClick={() => saveSetting({ autoRefreshMinutes: value })} key={value}>{value} 分钟</button>)}</div></div>
           <InfoLine label="网络模式" value={manager?.settings.proxyURL || "自动 v2rayN / 系统代理 / 直连"} />
           <InfoLine label="低额度警告" value={`${manager?.settings.quotaWarningPercent ?? 20}%`} />
@@ -491,7 +512,7 @@ function ControlCenterApp() {
   const [usage, setUsage] = useState<UsageReport>();
   const [manager, setManager] = useState<ManagerReport>();
   const [connectors, setConnectors] = useState<ConnectorResponse>();
-  const [version, setVersion] = useState("1.0.3");
+  const [version, setVersion] = useState("1.1.0");
   const [updateReport, setUpdateReport] = useState<UpdateReport>();
   const [updateChecking, setUpdateChecking] = useState(false);
   const [updateInstalling, setUpdateInstalling] = useState(false);
@@ -576,7 +597,18 @@ function ControlCenterApp() {
     if (busy) return;
     setBusy(true); setNotice({ text: action === "setup" ? "正在启动网关并接入 ZCode…" : "本机操作正在进行…" });
     try {
+      if (action === "download-antigravity" || action === "google-verification-help") {
+        const page = action === "download-antigravity" ? "download" : "verification";
+        if (hasDesktopBridge()) await desktopBridge()!.openGoogleHelp(page);
+        else window.open(page === "download" ? "https://antigravity.google/download" : "https://www.antigravity.google/docs/faq/", "_blank", "noopener,noreferrer");
+        setNotice({ text: "已打开 Google 官方页面" });
+        return;
+      }
       await apiPost("/api/action", { action });
+      if (action === "open-antigravity" || action === "open-zcode") {
+        setNotice({ text: action === "open-antigravity" ? "已打开 Antigravity，请确认使用同一 Google 账号" : "已打开 ZCode" });
+        return;
+      }
       const interactiveLogin = action === "login" || action === "login-grok" || action === "setup";
       const deadline = Date.now() + (interactiveLogin ? 10 * 60_000 : 120_000);
       let completed = false;
@@ -682,7 +714,7 @@ function ControlCenterApp() {
     initialized.current = true;
     void (async () => {
       try {
-        const startup: StartupInfo = hasDesktopBridge() ? await desktopBridge()!.startupInfo() : { version: "1.0.3", autoSetup: false, postUpdate: false };
+        const startup: StartupInfo = hasDesktopBridge() ? await desktopBridge()!.startupInfo() : { version: "1.1.0", autoSetup: false, postUpdate: false };
         setVersion(startup.version);
         await refresh(true);
         if (startup.postUpdate) await runAction("sync");
@@ -747,8 +779,8 @@ function ControlCenterApp() {
   }, []);
 
   const subtitle = useMemo(() => status?.operation.running ? status.operation.message || "本机操作正在进行" : status?.gateway.ok ? "本地安全核心在线" : "请选择提供商并执行一键接入", [status]);
-  const content = section === "overview" ? <Overview {...{ status, quota, usage, manager, provider, busy, onAction: runAction }} />
-    : section === "accounts" ? <AccountsView {...{ manager, quota, provider }} />
+  const content = section === "overview" ? <Overview {...{ status, quota, usage, manager, provider, busy, onAction: runAction }} onRefresh={() => void refresh(true)} />
+    : section === "accounts" ? <AccountsView {...{ manager, quota, provider, busy, onAction: runAction }} onRefresh={() => void refresh(true)} />
     : section === "proxy" ? <ProxyView {...{ manager, status }} />
     : section === "routing" ? <RoutingView {...{ manager, saveSetting, saving }} />
     : section === "connectors" ? <ConnectorsView connectors={connectors} onCopy={copy} onAction={runAction} busy={busy} />
@@ -762,15 +794,14 @@ function ControlCenterApp() {
       <div className="app-body">
         <main className="main-panel" onScroll={handleMainScroll}>
           <header className="mac-brand-bar">
-            <div className="mac-brand-identity"><img className="mac-brand-logo" src={brandMark} alt="ZCode Antigravity" /><div><h1>ZCode Antigravity</h1><p>Updated {status?.updatedAt ? formatTime(status.updatedAt) : "等待首次刷新"}</p></div></div>
-            <div className="mac-brand-actions"><Badge tone={status?.gateway.ok ? "good" : "neutral"}>{status?.gateway.ok ? "本地在线" : "Local only"}</Badge><Button size="icon" aria-label="刷新额度" onClick={() => void refresh(true)} disabled={busy}><RefreshCw className={cn("size-4", refreshing.current && "animate-spin")} /></Button></div>
+            <div className="mac-brand-identity"><img className="mac-brand-logo" src={brandMark} alt="ZCode Antigravity" /><div><h1>ZCode Antigravity</h1><p>Gemini 默认 384K 上下文 · High 思考</p></div></div>
+            <div className="mac-brand-actions"><span className="header-account-count">{providerName(provider)} · {provider === "xai" ? status?.providerAccounts.xai ?? 0 : status?.providerAccounts.antigravity ?? 0} 个账号</span><Button size="icon" aria-label="刷新额度" onClick={() => void refresh(true)} disabled={busy}><RefreshCw className={cn("size-4", refreshing.current && "animate-spin")} /></Button></div>
           </header>
-          <div className="mac-meta-row"><div><span className={cn("status-dot", status?.gateway.ok && "online")} /><strong>{providerName(provider)}</strong><span>· {provider === "xai" ? status?.providerAccounts.xai ?? 0 : status?.providerAccounts.antigravity ?? 0} 个账号</span></div><div><Activity /><span>额度每 {manager?.settings.autoRefreshMinutes ?? 5} 分钟 · Token 每 5 秒</span></div></div>
           <HorizontalNavigation section={section} setSection={setSection} />
-          <ProviderTabs provider={provider} counts={status?.providerAccounts} busy={busy} grokEnabled={manager?.settings.enableGrokModels ?? false} onSelect={(value) => void selectProvider(value)} />
+          {manager?.settings.enableGrokModels && <ProviderTabs provider={provider} counts={status?.providerAccounts} busy={busy} grokEnabled={manager?.settings.enableGrokModels ?? false} onSelect={(value) => void selectProvider(value)} />}
           <StatusStrip status={status} />
           <div className="page-content">{content}</div>
-          <footer className="mac-app-footer"><span>127.0.0.1 · 当前用户密钥</span><span>{subtitle} · v{version}</span></footer>
+          <footer className="mac-app-footer"><span>上次更新 {status?.updatedAt ? formatTime(status.updatedAt) : "等待刷新"} · 自动刷新</span><span>{subtitle} · v{version}</span></footer>
         </main>
       </div>
       <AuthenticationOverlay operation={status?.operation} provider={provider} onCopy={(value) => void copy(value, "xAI 验证码已复制")} onError={(text) => setNotice({ text, error: true })} />

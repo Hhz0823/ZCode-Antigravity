@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private let appVersion = "1.0.3"
+private let appVersion = "1.1.0"
 
 private func consumePostUpdateMarker() -> Bool {
     guard let supportRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
@@ -1556,7 +1556,7 @@ struct DashboardView: View {
                     SettingsMetric(title: "请求重试", value: "\(model.manager?.routing.requestRetry ?? 2) 次", icon: "arrow.clockwise")
                     SettingsMetric(title: "凭据轮换", value: "\(model.manager?.routing.credentialRetry ?? 2) 个", icon: "person.2.arrow.trianglehead.counterclockwise")
                     SettingsMetric(title: "最大退避", value: "\(model.manager?.routing.retryInterval ?? 20) 秒", icon: "timer")
-                    SettingsMetric(title: "Agent 默认模型", value: model.manager?.routing.backgroundModel ?? "gemini-3.6-flash", icon: "bolt.fill")
+                    SettingsMetric(title: "Agent 默认模型", value: model.manager?.routing.backgroundModel ?? "gemini-3.7-flash", icon: "bolt.fill")
                 }
                 Toggle(isOn: Binding(
                     get: { model.manager?.routing.sessionAffinity ?? true },

@@ -148,6 +148,20 @@ func openZCodeApplication() error {
 	return nil
 }
 
+func antigravityApplicationPath() string {
+	home, _ := os.UserHomeDir()
+	for _, path := range []string{"/Applications/Antigravity.app", filepath.Join(home, "Applications", "Antigravity.app")} {
+		if info, err := os.Stat(path); err == nil && info.IsDir() {
+			return path
+		}
+	}
+	return ""
+}
+
+func openAntigravityApplication() error {
+	return exec.Command("/usr/bin/open", "-a", "Antigravity").Run()
+}
+
 func detectTunAdapter() (string, bool) {
 	output, err := exec.Command("/sbin/ifconfig").Output()
 	if err != nil {

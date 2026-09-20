@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { assertApiPath, assertUpdateInstaller, assertXaiURL, normalizeConnection, trayTooltip } = require("./protocol.cjs");
+const { assertApiPath, assertUpdateInstaller, assertXaiURL, googleHelpURL, normalizeConnection, trayTooltip } = require("./protocol.cjs");
 
 test("accepts only the fixed local API allowlist", () => {
   assert.equal(assertApiPath("GET", "/api/status"), "/api/status");
@@ -43,6 +43,13 @@ test("opens only the official xAI authorization origin", () => {
   assert.throws(() => assertXaiURL("https://accounts.x.ai.evil.example/sign-in"), /官方/);
 });
 
+test("Google help accepts fixed destinations, never a renderer-supplied URL", () => {
+  assert.equal(googleHelpURL("download"), "https://antigravity.google/download");
+  assert.equal(googleHelpURL("verification"), "https://www.antigravity.google/docs/faq/");
+  assert.throws(() => googleHelpURL("https://accounts.google.com.evil.example"));
+  assert.throws(() => googleHelpURL("file:///C:/Windows/System32/cmd.exe"));
+});
+
 test("builds the independent tray quota summary", () => {
   assert.equal(
     trayTooltip({ provider: "antigravity", fiveHour: 92.4, week: 78.2, tokensPerSecond: 43.26 }),
@@ -51,11 +58,10 @@ test("builds the independent tray quota summary", () => {
   assert.equal(trayTooltip({ provider: "xai" }), "ZCode · Grok · 额度暂不可用");
 });
 
-test("delegates desktop blur to DWM without animated renderer blur", () => {
+test("keeps native windows free of animated renderer blur", () => {
   const css = fs.readFileSync(path.join(__dirname, "..", "src", "index.css"), "utf8");
   assert.match(css, /\.electron-shell \.app-shell,[\s\S]*?backdrop-filter: none;/);
   assert.match(css, /\.electron-shell \.liquid-orb,[\s\S]*?\.electron-shell \.noise-layer \{ display: none; \}/);
   assert.match(css, /\.electron-shell \.page-content \{ animation: none; \}/);
   assert.match(css, /\.electron-shell \.main-panel \{[\s\S]*?contain: layout paint style;/);
-  assert.match(css, /\.glass-card \{[^\n]*background: rgba\(250,251,255,\.96\);/);
 });

@@ -2,6 +2,41 @@
 
 最新验证日期：2026-09-05（Asia/Shanghai）
 
+
+## v1.1.0 验收（2026-09-20）
+
+- 管理器、Windows 控制中心与 macOS App 版本统一为 `1.1.0`，macOS Bundle 为 `1100`。
+- 默认仅保留 Gemini 3.8 Flash / 3.7 Flash；旧 3.6 和基于 3.1 的搜索别名从托管配置中移除。
+- 新旧两种 ZCode 配置均写入 384K（393,216 tokens）；新版思考开关开启明确映射 High，
+  关闭发送 disabled。同步前完成两份配置的校验和备份，写入失败回退。
+- Go Core 全量测试和 `go vet ./...` 通过；覆盖模型迁移、幂等同步、其他提供商保留、
+  无效配置保护、运行中 ZCode 写入拦截，以及 Google 验证错误分类。
+- 后端 `go mod verify` 通过，全量回归重跑通过。首次并行构建期间，上游
+  `TestEnsureClientsWaitsForPreviousTargetClose` 的 1 秒计时检查超时；该测试单独连续三次
+  及后续完整回归均通过。本次未修改该后端。
+- Windows Electron IPC 测试、TypeScript/Vite 构建及 x64 打包通过；ZIP CRC、47 个包内文件
+  SHA-256、ASAR `1.1.0` 元数据与运行数据路径排除检查通过。
+- macOS Universal 交叉编译通过；在非云同步的临时目录解包后，27 个包内文件哈希及
+  `codesign --verify --deep --strict` 通过。Apple Silicon Core 版本和本机 `doctor` 通过。
+  Intel 仅验证编译与 Universal 切片，未进行 Intel 实机测试。
+- 本轮上下文比较使用 Windows 正式网关、Gemini 3.8 Flash High、两个固定种子，每轮 13 个
+  合成任务计分字段。约 231K / 361K 输入各得 26/26，约 491K 得 24/26，约 989K 得 25/26，
+  其中一轮接近 1M 触及输出预算。这支持本次选择 384K 默认值，但不证明所有任务的最优档位，
+  也不覆盖大型真实仓库、多轮工具调用与客户端自动压缩全过程。
+- Windows 11 x64 已安装 v1.1.0，Core 返回 `1.1.0`；安装器、Core、ASAR 的 SHA-256
+  与本地构建一致。管理器完整原生测试通过。
+- 使用目标 Windows 已安装的 ZCode 3.14.0 内置 CLI 配置解析器验证：托管模型恰好为 3.8 / 3.7，
+  两者解析后的上下文均为 393216；开启思考得到 adaptive + High，关闭得到 disabled 且清除 effort。
+  Gemini 3.8 与 3.7 各一条真实请求均精确返回 `ZCODE_SMOKE_OK`。
+- Windows 新控制中心总览已实机检查，网关和 ZCode 接入正常、模型仅两项，额度与操作按钮可见。
+- 小组件焦点、托盘再次点击和点击外部隐藏逻辑沿用同日已完成实机验收的修复：去除方形
+  Acrylic 底层、打开后获取焦点，失焦隐藏，并过滤托盘点击的 blur/click 竞争。
+  v1.1.0 保留这些逻辑；最终复核时远程链路持续高延迟，未重复完整的小组件交互矩阵。
+- Google 验证错误分支通过模拟响应回归；当前真实账号可正常调用模型，没有触发 Google 验证。
+  Windows 未安装官方 Antigravity，已验证下载入口和安装路径发现测试，尚未实测启动已安装客户端。
+
+以下为历史版本验证记录，不代表 v1.1.0 继续提供已移除的旧模型。
+
 ## V1.0.3 正式版发布
 
 - Go Core、macOS SwiftUI 客户端、Windows Electron 客户端和打包默认版本统一为 `1.0.3`；

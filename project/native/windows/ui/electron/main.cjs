@@ -18,7 +18,7 @@ const {
   shell,
   Tray,
 } = require("electron");
-const { assertApiPath, assertUpdateInstaller, assertXaiURL, normalizeConnection, trayTooltip } = require("./protocol.cjs");
+const { assertApiPath, assertUpdateInstaller, assertXaiURL, googleHelpURL, normalizeConnection, trayTooltip } = require("./protocol.cjs");
 const { version } = require("../package.json");
 
 const WIDGET_WIDTH = 430;
@@ -27,6 +27,7 @@ const rendererIDs = new Set();
 
 let mainWindow;
 let quotaWidget;
+let widgetTrayBlurAt = 0;
 let tray;
 let nativeChild;
 let nativeConnection;
@@ -212,6 +213,10 @@ function registerIPC() {
     assertRenderer(event);
     await shell.openExternal(assertXaiURL(url));
   });
+  ipcMain.handle("shell:google-help", async (event, page) => {
+    assertRenderer(event);
+    await shell.openExternal(googleHelpURL(page));
+  });
   ipcMain.handle("window:action", (event, action) => {
     assertRenderer(event);
     const window = BrowserWindow.fromWebContents(event.sender);
@@ -244,7 +249,7 @@ function commonWindowOptions() {
     frame: false,
     transparent: true,
     backgroundColor: "#00FFFFFF",
-    backgroundMaterial: "acrylic",
+    backgroundMaterial: "none",
     roundedCorners: true,
     hasShadow: true,
     show: false,
@@ -295,6 +300,10 @@ function createMainWindow() {
 function createQuotaWidget() {
   quotaWidget = new BrowserWindow({
     ...commonWindowOptions(),
+    // DWM acrylic fills the native rectangle outside the renderer's rounded corners.
+    backgroundMaterial: "none",
+    backgroundColor: "#00000000",
+    hasShadow: false,
     title: "ZCode · 当前额度",
     width: WIDGET_WIDTH,
     height: WIDGET_HEIGHT,
@@ -313,7 +322,13 @@ function createQuotaWidget() {
   quotaWidget.removeMenu();
   quotaWidget.setAlwaysOnTop(true, "pop-up-menu");
   quotaWidget.on("blur", () => {
-    if (!quitting && !quotaWidget.webContents.isDevToolsOpened()) quotaWidget.hide();
+    if (quitting || quotaWidget.webContents.isDevToolsOpened()) return;
+    const cursor = screen.getCursorScreenPoint();
+    const bounds = tray?.getBounds();
+    if (bounds && cursor.x >= bounds.x && cursor.x < bounds.x + bounds.width && cursor.y >= bounds.y && cursor.y < bounds.y + bounds.height) {
+      widgetTrayBlurAt = Date.now();
+    }
+    quotaWidget.hide();
   });
   quotaWidget.on("close", (event) => {
     if (quitting) return;
@@ -339,6 +354,8 @@ function sendRefresh() {
 
 function toggleQuotaWidget() {
   if (!quotaWidget || quotaWidget.isDestroyed()) return;
+  // Windows blurs the popup before delivering the same tray click's mouse-up.
+  if (Date.now() - widgetTrayBlurAt < 250) return;
   if (quotaWidget.isVisible()) {
     quotaWidget.hide();
     return;
@@ -354,7 +371,8 @@ function toggleQuotaWidget() {
   const y = Math.max(top, Math.min(bottom, Math.round(preferredY)));
   quotaWidget.setPosition(x, y, false);
   quotaWidget.webContents.send("zcode:refresh");
-  quotaWidget.showInactive();
+  quotaWidget.show();
+  quotaWidget.focus();
 }
 
 function createTray() {

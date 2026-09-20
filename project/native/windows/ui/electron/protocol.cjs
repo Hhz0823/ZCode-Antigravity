@@ -52,6 +52,12 @@ function assertXaiURL(value) {
   return parsed.href;
 }
 
+function googleHelpURL(page) {
+  if (page === "download") return "https://antigravity.google/download";
+  if (page === "verification") return "https://www.antigravity.google/docs/faq/";
+  throw new Error("不支持的 Google 帮助页面");
+}
+
 function finiteNumber(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
@@ -84,4 +90,4 @@ function assertUpdateInstaller(value, updatesRoot) {
   return installer;
 }
 
-module.exports = { assertApiPath, assertUpdateInstaller, assertXaiURL, normalizeConnection, trayTooltip };
+module.exports = { assertApiPath, assertUpdateInstaller, assertXaiURL, googleHelpURL, normalizeConnection, trayTooltip };

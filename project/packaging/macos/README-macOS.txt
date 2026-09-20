@@ -1,7 +1,7 @@
 ZCode Antigravity Bridge - macOS Universal stable build
 =======================================================
 
-版本：1.0.3
+版本：1.1.0
 架构：Apple Silicon (arm64) + Intel (x86_64)
 最低系统：macOS 12
 
@@ -108,3 +108,6 @@ ALLOW_RUNTIME_OAUTH_CONFIG=1 跳过该发布门禁。
 - Intel 切片通过交叉编译和结构验证，但没有 Intel 实机启动测试。
 - 当前没有 Apple Developer ID 签名或 Apple 公证；Gatekeeper 可能提示开发者未知。
 - 账号资格、上游模型目录、额度和风控以用户第一次真实请求为准。
+
+Gemini 默认仅保留 3.8 / 3.7，注入 384K 上下文并开启 High 思考。
+同步同时兼容新版 provider_config.json 与旧版 config.json，修改前自动备份。

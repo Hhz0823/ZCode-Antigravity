@@ -114,7 +114,7 @@ func defaultSettings() settings {
 		EnableGrokModels:      false,
 		EnableOtherModels:     false,
 		AutoInstallUpdates:    false,
-		BackgroundModel:       "gemini-3.6-flash",
+		BackgroundModel:       "gemini-3.7-flash",
 		Theme:                 "system",
 		LiquidGlass:           true,
 	}
@@ -326,6 +326,9 @@ func overlaySettings(path string, base settings) (settings, error) {
 	s.SessionAffinityTTL = strings.TrimSpace(s.SessionAffinityTTL)
 	s.ProxyURL = strings.TrimSpace(s.ProxyURL)
 	s.BackgroundModel = strings.TrimSpace(s.BackgroundModel)
+	if strings.HasPrefix(s.BackgroundModel, "gemini-") && !isAllowedZCodeModel(s.BackgroundModel) {
+		s.BackgroundModel = defaultSettings().BackgroundModel
+	}
 	s.Theme = strings.ToLower(strings.TrimSpace(s.Theme))
 	if err := validateSettings(s); err != nil {
 		return s, err
@@ -378,6 +381,9 @@ func (a *app) saveUserSettings(s settings) error {
 	s.SessionAffinityTTL = strings.TrimSpace(s.SessionAffinityTTL)
 	s.ProxyURL = strings.TrimSpace(s.ProxyURL)
 	s.BackgroundModel = strings.TrimSpace(s.BackgroundModel)
+	if strings.HasPrefix(s.BackgroundModel, "gemini-") && !isAllowedZCodeModel(s.BackgroundModel) {
+		s.BackgroundModel = defaultSettings().BackgroundModel
+	}
 	s.Theme = strings.ToLower(strings.TrimSpace(s.Theme))
 	if err := validateSettings(s); err != nil {
 		return err

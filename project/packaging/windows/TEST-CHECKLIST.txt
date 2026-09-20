@@ -1,7 +1,7 @@
 Windows acceptance checklist
 ============================
 
-[ ] ZCode-Antigravity-Setup-v1.0.3.exe opens a native confirmation dialog without a terminal.
+[ ] ZCode-Antigravity-Setup-v1.1.0.exe opens a native confirmation dialog without a terminal.
 [ ] Startup checks GitHub latest after about 3 seconds, then every 6 hours; Settings can also check manually.
 [ ] Update download accepts only the exact Windows Setup asset and rejects a wrong platform, path, size, or GitHub SHA-256.
 [ ] With ZCode running, manual/automatic install asks the user to exit ZCode and does not replace files.
@@ -21,10 +21,10 @@ Windows acceptance checklist
 [ ] Weekly and five-hour remaining quota show exact percentages, reset times, and native progress state.
 [ ] A single left-click on the taskbar icon opens only the independent quota widget, showing provider switching, account count, quota/reset data, output tokens, and token/s without restoring or raising the main window.
 [ ] Overview, Accounts, API Proxy, Model Routing, Agent Connectors, Analytics, and Settings switch in place without opening a browser or console.
-[ ] In light and dark Windows themes, the liquid-glass background keeps headings, metrics, buttons, and progress bars legible.
-[ ] With a high-contrast window behind the app, native Acrylic continuously blurs it; a recorded drag contains no white/black frames or background-capture tearing.
+[ ] In light and dark Windows themes, the light background keeps headings, metrics, buttons, and progress bars legible.
+[ ] Main-window and widget rounded edges have no square backdrop; dragging and scrolling keep text readable.
 [ ] Account labels and stable IDs are redacted; the manager API contains no OAuth token, API key, prompt, or reply.
-[ ] Routing, session affinity, liquid glass, and 5/10 minute refresh settings persist to manager-settings.json and survive restart.
+[ ] Routing, session affinity, and 5/10 minute refresh settings persist to manager-settings.json and survive restart.
 [ ] After one successful model response, the main panel shows protocol-reported output/reasoning tokens and generation token/s; it never derives tokens from text length.
 [ ] Switching Antigravity/Grok shows a switching state, keeps provider-specific cached quota and Token data, and ignores stale results from the previous provider.
 [ ] Keep the panel open for at least 15 seconds; connection state may update but quota fetchedAt must not change before the five-minute interval.
@@ -54,12 +54,12 @@ Windows acceptance checklist
     Kimi Code, and OpenCode preserves unrelated settings, creates backups, and selects the current model.
 [ ] Model list contains gemini-3.8-flash with 1,048,576 context tokens and no redundant -high suffix.
 [ ] Model list contains gemini-3.7-flash with 1,048,576 context tokens and no redundant -high suffix.
-[ ] Gemini-only mode contains exactly 3.8, 3.7, 3.6 and gemini-web-search; it contains no Claude, GPT, agent or image model.
+[ ] Gemini-only mode contains exactly Gemini 3.8 and 3.7 with 393216 context tokens and High reasoning by default; it contains no Claude, GPT, agent or image model.
 [ ] Gemini 3.8 and 3.7 Flash reasoning dropdowns contain Low, Medium, and High.
 [ ] One request at each Gemini 3.8 reasoning level completes successfully.
 [ ] Test-Gemini-3.8-Flash.bat returns ZCODE_SMOKE_OK and response model gemini-3.8-flash.
-[ ] Test-Gemini-3.6-Flash.bat returns ZCODE_SMOKE_OK and writes last-smoke-test.json.
-[ ] In ZCode, one small gemini-3.6-flash prompt returns a real model response.
+[ ] Test-Gemini-3.7-Flash.bat returns ZCODE_SMOKE_OK and writes last-smoke-test.json.
+[ ] In ZCode, one small gemini-3.7-flash prompt returns a real model response.
 [ ] Test-Gemini-3.7-Flash.bat returns ZCODE_SMOKE_OK and response model gemini-3.7-flash.
 [ ] After enabling Google Claude / other models, ZCode lists claude-sonnet-4-6 and claude-opus-4-6-thinking under Provider Google.
 [ ] Test-Claude-Sonnet-4.6.bat returns ZCODE_SMOKE_OK and response model claude-sonnet-4-6.
@@ -77,3 +77,7 @@ When reporting a failure, attach only:
 - %LOCALAPPDATA%\ZCodeAntigravity\logs\gateway-console.log
 
 Review logs before sharing. Never share files from the auth directory or local-api-key.
+
+[ ] Current ZCode provider_config.json accepts both model rules; reasoning enabled resolves to High.
+[ ] Clicking outside the Windows quota widget hides it; rounded corners have no square underlay.
+[ ] Google verification guidance expands only when needed; official-client launch/download works.

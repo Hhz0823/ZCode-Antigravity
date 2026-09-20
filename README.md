@@ -9,14 +9,14 @@
 </p>
 
 <p align="center">
-  <img alt="Stable" src="https://img.shields.io/badge/stable-V1.0.3-2f6bff">
+  <img alt="Stable" src="https://img.shields.io/badge/stable-V1.1.0-2f6bff">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-12%2B-111111?logo=apple">
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?logo=windows11">
   <img alt="Local only" src="https://img.shields.io/badge/API-loopback%20only-20a464">
 </p>
 
 <p align="center">
-  <a href="https://github.com/Hhz0823/ZCode-Antigravity/releases/tag/v1.0.3"><strong>下载 V1.0.3 正式版</strong></a>
+  <a href="https://github.com/Hhz0823/ZCode-Antigravity/releases/tag/v1.1.0"><strong>下载 V1.1.0 正式版</strong></a>
   · <a href="#快速开始">快速开始</a>
   · <a href="#一键接入-agent--cli">Agent 接入</a>
   · <a href="#隐私与安全">安全边界</a>
@@ -26,33 +26,34 @@ ZCode Antigravity 是面向 Windows 与 macOS 的本地 AI 控制中心。它负
 ZCode / Agent 配置、额度监控与网络出口选择；默认只启用 Gemini，需要时可在设置中开启
 Google Antigravity 账号内的 Claude、Grok 和其他文本模型。
 
-> 当前源码与最新正式版均为 `1.0.3`，支持 Gemini 3.8、Google Claude 与经过 SHA-256 校验的双平台自动更新。
+> 当前源码与最新正式版均为 `1.1.0`，默认 Gemini 3.8 / 3.7、384K 上下文和 High 思考，支持经过 SHA-256 校验的双平台自动更新。
 
 ## 核心功能
 
 | 功能 | 能做什么 |
 | --- | --- |
 | **Gemini 默认，Claude / Grok 可选** | 默认只向客户端暴露 Gemini；Google Claude、Grok / xAI 与其他文本模型按需开启。 |
-| **原生 Google 联网搜索** | 独立的 `gemini-web-search` 模型调用 Antigravity 原生 Google Search，返回网页引用和可检查的搜索请求数据。 |
+| **384K + High 默认配置** | 同步新版与旧版 ZCode 配置；新版思考开关的“开启”明确映射为 High。 |
 | **多模态输入** | Gemini Flash 支持文本、图片、音频和视频；Google Claude 支持文本与图片输入，当前均为文本输出。 |
 | **一键接入更多 Agent** | 自动备份并合并 ZCode、DeepSeek Harness、Grok Build、Codex、Claude Code、Gemini CLI、Qwen Code、Kimi Code 与 OpenCode 配置。 |
 | **无需强制开启 TUN** | Windows 自动使用系统代理或运行中的 v2rayN mixed / HTTP 代理，均不可用时才直连；手动代理始终优先。 |
 | **额度与 Token 小组件** | macOS 菜单栏和 Windows 系统托盘直接查看 5 小时 / 本周额度、重置时间、最近输出 Token、推理 Token 与 Token/s。 |
 | **自动检测与安全更新** | 启动后及每 6 小时检查 GitHub 正式版；可手动更新或开启自动安装，下载后核对平台、大小与 GitHub SHA-256。 |
 | **本地安全边界** | API、OAuth 回调和管理接口只监听 `127.0.0.1`；配置写入前自动备份，凭据使用系统安全能力加密。 |
-| **双平台精美界面** | macOS 使用 SwiftUI + AppKit 原生界面，Windows 使用 Electron + React + Tailwind；背景玻璃化，内容层保持高对比度。 |
+| **双平台精美界面** | macOS 使用 SwiftUI + AppKit 原生界面，Windows 使用简洁浅色控制中心，支持一键打开 Antigravity 和账号验证指引。 |
 
 ## 模型与联网能力
 
 默认的 Antigravity 模型：
 
-- `gemini-3.8-flash`：最新 Flash 路由，支持 Low / Medium / High 思考等级与多模态输入。
+- `gemini-3.8-flash`：默认模型，支持多模态输入。
 - `gemini-3.7-flash`：通用对话、编程与多模态理解。
-- `gemini-3.6-flash`：兼容模型。
-- `gemini-web-search`：界面显示为 **Gemini Web Search (Google)**，固定走原生 Google Search 并返回来源引用。
 
-普通 Gemini 模型不会因为提示词中写了“搜索”就伪装成已联网。需要最新网页信息时，请明确选择
-`Gemini Web Search (Google)`。Google Claude、Grok 和其他 AI 文本模型默认关闭，可在“设置 → 模型”中开启并重新同步；
+两者默认上下文为 **384K（393,216 tokens）**，并开启 **High** 思考。新版 ZCode 中“开启思考”
+明确发送 High，“关闭”发送禁用思考请求；旧版保留 Low / Medium / High，默认 High。
+同步会移除本程序管理的 Gemini 3.6 及更早模型，包括基于 3.1 的旧 `gemini-web-search` 别名。
+普通模型不会因为提示词写了“搜索”就自动联网；需要网页信息时请使用客户端的搜索工具。
+Google Claude、Grok 和其他 AI 文本模型默认关闭，可在“设置 → 模型”中开启并重新同步。
 图片 / 视频生成模型不会混入文本模型列表。
 
 开启“Google Claude / 其他模型”后，当前已验证的 Google Antigravity 模型为
@@ -77,16 +78,16 @@ Google Antigravity 账号内的 Claude、Grok 和其他文本模型。
 
 ## 下载
 
-前往 [V1.0.3 正式版 Release](https://github.com/Hhz0823/ZCode-Antigravity/releases/tag/v1.0.3) 下载：
+前往 [V1.1.0 正式版 Release](https://github.com/Hhz0823/ZCode-Antigravity/releases/tag/v1.1.0) 下载：
 
 | 文件 | 用途 | 推荐场景 |
 | --- | --- | --- |
-| `ZCode-Antigravity-macOS-Universal-v1.0.3.zip` | macOS Universal App 与校验 / 维护工具 | macOS 用户首选 |
-| `ZCode-Antigravity-Setup-v1.0.3.exe` | Windows 图形化安装器 | Windows 用户首选 |
-| `ZCode-Antigravity-OneClick-v1.0.3.bat` | 内嵌完整载荷的单文件安装器 | 备用安装方案 |
-| `ZCode-Antigravity-Windows-x64-1.0.3.zip` | 可逐文件校验的 Windows 便携包 | 手动部署与排错 |
-| `ZCode-Antigravity-Source-v1.0.3.zip` | 与发布标签对应的源码快照 | 审计与二次开发 |
-| `SHA256SUMS-v1.0.3.txt` | 全部正式版资产的 SHA-256 | 下载后完整性校验 |
+| `ZCode-Antigravity-macOS-Universal-v1.1.0.zip` | macOS Universal App 与校验 / 维护工具 | macOS 用户首选 |
+| `ZCode-Antigravity-Setup-v1.1.0.exe` | Windows 图形化安装器 | Windows 用户首选 |
+| `ZCode-Antigravity-OneClick-v1.1.0.bat` | 内嵌完整载荷的单文件安装器 | 备用安装方案 |
+| `ZCode-Antigravity-Windows-x64-1.1.0.zip` | 可逐文件校验的 Windows 便携包 | 手动部署与排错 |
+| `ZCode-Antigravity-Source-v1.1.0.zip` | 与发布标签对应的源码快照 | 审计与二次开发 |
+| `SHA256SUMS-v1.1.0.txt` | 全部正式版资产的 SHA-256 | 下载后完整性校验 |
 
 ## 快速开始
 
@@ -102,7 +103,7 @@ Google Antigravity 账号内的 Claude、Grok 和其他文本模型。
 ### Windows
 
 1. 从系统托盘完全退出 ZCode；仅关闭主窗口可能仍会留下 `ZCode.exe`。
-2. 校验 SHA-256 后运行 `ZCode-Antigravity-Setup-v1.0.3.exe`。当前安装器未使用商业代码签名证书。
+2. 校验 SHA-256 后运行 `ZCode-Antigravity-Setup-v1.1.0.exe`。当前安装器未使用商业代码签名证书。
 3. 登录 Antigravity 并点击“一键接入 ZCode”。程序会自动探测 Windows 系统代理与 v2rayN，无需强制开启 TUN。
 4. 重新打开 ZCode，选择 Provider `Google` 和目标模型；系统托盘图标可随时打开额度小组件。
 
@@ -143,7 +144,7 @@ Windows 自动网络顺序为：手动 `proxyURL` → 当前用户系统代理 �
 
 ## 已验证范围
 
-V1.0.3 正式版发布流程包括：
+V1.1.0 正式版发布流程包括：
 
 - 管理器与固定 CLIProxyAPI 源码的 Go 测试、`go vet` 与依赖校验。
 - macOS arm64 / x86_64 类型检查、Universal 构建、签名结构、包内哈希和本机启动 / 网关健康检查。
@@ -189,8 +190,13 @@ npm run package:windows
 
 ### 为什么 Gemini 没有联网搜索？
 
-普通 Gemini 3.8 / 3.7 / 3.6 是对话模型。请在客户端明确选择 `Gemini Web Search (Google)`；若升级后看不到，
-完全退出 ZCode，回到控制中心点击“修复并重新同步”。
+新版仅保留 Gemini 3.7 / 3.8，旧的 Google Search 别名使用 Gemini 3.1，已一并移除。
+需要最新网页信息时使用客户端提供的搜索工具。
+
+### 新添加的 Google 账号无法使用模型？
+
+打开 Antigravity 并登录同一账号，尝试发送一条消息。若 Google 要求身份或年龄验证，
+在官方页面由本人完成，再返回控制中心刷新额度。普通网络、资格或额度错误不会一律判定为验证要求。
 
 ### 为什么显示 401、403、429 或模型不可用？
 
@@ -199,7 +205,7 @@ npm run package:windows
 ### 为什么系统提示未知发布者？
 
 当前 Windows 安装器未使用商业代码签名，macOS App 使用临时签名且未公证。请先核对 Release 中的
-`SHA256SUMS-v1.0.3.txt`，哈希完全一致后再运行；不要全局关闭系统安全机制。
+`SHA256SUMS-v1.1.0.txt`，哈希完全一致后再运行；不要全局关闭系统安全机制。
 
 ## 商标与免责声明
 

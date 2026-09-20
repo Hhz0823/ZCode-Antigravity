@@ -286,7 +286,7 @@ button { font: inherit; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }
 
-/* Windows light liquid-glass theme mirrors the native macOS control center. */
+/* Compact light control center. Widget styling stays independent below. */
 :root {
   color: #20232b;
   --glass-stroke: rgba(255, 255, 255, .86);
@@ -295,24 +295,9 @@ button { font: inherit; }
   --glass-surface-strong: rgba(247, 249, 255, .97);
 }
 
-.app-shell {
-  border-color: rgba(255, 255, 255, .62);
-  background:
-    linear-gradient(132deg, rgba(255,255,255,.18), rgba(239,243,253,.05) 43%, rgba(239,237,255,.1)),
-    radial-gradient(circle at 72% -8%, rgba(123,178,255,.1), transparent 42%),
-    radial-gradient(circle at 26% 96%, rgba(77,202,238,.08), transparent 40%),
-    rgba(224,230,242,.1);
-  box-shadow: inset 0 1px rgba(255,255,255,.78), inset 1px 0 rgba(255,255,255,.34), 0 28px 90px rgba(54,65,92,.2);
-  backdrop-filter: blur(30px) saturate(145%) contrast(102%);
-  -webkit-backdrop-filter: blur(30px) saturate(145%) contrast(102%);
-}
-.app-shell.solid-mode { background: linear-gradient(135deg, #edf2fa, #e3eaf5 55%, #eef1fa); }
-.app-shell::before { background: linear-gradient(118deg, rgba(255,255,255,.24), transparent 22%, transparent 72%, rgba(124,133,255,.05)); }
-.app-shell::after { box-shadow: inset 0 0 0 1px rgba(255,255,255,.28), inset 0 1px rgba(255,255,255,.72); }
-.noise-layer { opacity: .016; mix-blend-mode: multiply; }
-.liquid-orb { opacity: .17; filter: blur(76px); }
-.orb-one { background: linear-gradient(130deg, #62c8ff, #7895ff 65%, #cba9ff); }
-.orb-two { background: linear-gradient(130deg, #5caeff, #78dfd5 70%); }
+.app-shell { border-color: #dce2ec; background: #f5f7fb; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.app-shell.solid-mode { background: #f5f7fb; }
+.app-shell::before, .app-shell::after, .app-shell .noise-layer, .app-shell .liquid-orb { display: none; }
 
 .window-chrome {
   height: 44px;
@@ -335,67 +320,23 @@ button { font: inherit; }
 .app-body { display: block; height: calc(100% - 44px); }
 .main-panel {
   height: 100%;
-  padding: 25px 32px 28px;
+  padding: 18px 24px 20px;
   scrollbar-color: rgba(65,103,171,.24) transparent;
 }
-.mac-brand-bar, .horizontal-nav, .provider-tabs, .status-strip, .glass-card, .mac-meta-row {
-  border: 1px solid rgba(255,255,255,.96);
-  background: rgba(250,251,255,.94);
-  box-shadow: inset 0 1px rgba(255,255,255,.92), 0 14px 38px -28px rgba(57,69,105,.32);
-}
-.mac-brand-bar {
-  display: flex;
-  min-height: 78px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  border-radius: 23px;
-  padding: 12px 17px;
-}
-.mac-brand-identity { display: flex; min-width: 0; align-items: center; gap: 14px; }
-.mac-brand-logo {
-  width: 54px;
-  height: 54px;
-  flex: none;
-  border: 1px solid rgba(255,255,255,.84);
-  border-radius: 17px;
-  object-fit: cover;
-  box-shadow: inset 0 1px rgba(255,255,255,.45), 0 12px 26px -15px rgba(114,83,8,.52);
-}
-.mac-brand-identity h1 { color: #212329; font-size: 24px; font-weight: 720; letter-spacing: -.035em; }
-.mac-brand-identity p { margin-top: 2px; color: #707580; font-size: 11px; }
-.mac-brand-actions { display: flex; align-items: center; gap: 9px; }
-.mac-brand-actions > button {
-  border-color: rgba(114,126,153,.2) !important;
-  color: #424852 !important;
-  background: rgba(255,255,255,.9) !important;
-  box-shadow: inset 0 1px rgba(255,255,255,.7);
-}
-.mac-brand-actions > button:hover { background: rgba(255,255,255,.98) !important; }
-.mac-meta-row { display: flex; min-height: 36px; align-items: center; justify-content: space-between; gap: 16px; margin-top: 11px; border-radius: 17px; padding: 7px 12px; }
-.mac-meta-row > div { display: flex; align-items: center; gap: 7px; color: #707681; font-size: 11px; }
-.mac-meta-row strong { color: #4d535e; font-weight: 600; }
-.mac-meta-row svg { width: 13px; height: 13px; }
-
-.horizontal-nav {
-  display: flex;
-  min-height: 49px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 11px;
-  overflow-x: auto;
-  border-radius: 19px;
-  padding: 5px 8px;
-  scrollbar-width: none;
-}
+.mac-brand-bar { display: flex; min-height: 58px; align-items: center; justify-content: space-between; gap: 16px; padding: 0 2px 14px; }
+.mac-brand-identity { display: flex; min-width: 0; align-items: center; gap: 12px; }
+.mac-brand-logo { width: 42px; height: 42px; border-radius: 12px; }
+.mac-brand-identity h1 { color: #202a3d; font-size: 22px; font-weight: 700; letter-spacing: -.03em; }
+.mac-brand-identity p { margin-top: 4px; color: #64748b; font-size: 12px; }
+.mac-brand-actions { display: flex; align-items: center; gap: 14px; }
+.header-account-count { color: #64748b; font-size: 12px; white-space: nowrap; }
+.horizontal-nav { display: flex; min-height: 46px; align-items: center; margin-top: 0; overflow-x: auto; border-bottom: 1px solid #e1e7f0; padding: 0 0 10px; scrollbar-width: none; }
 .horizontal-nav::-webkit-scrollbar { display: none; }
-.horizontal-nav-items { display: flex; align-items: center; gap: 3px; }
-.nav-item { width: auto; flex: none; gap: 8px; border-radius: 13px; padding: 9px 13px; color: #737983; font-size: 12px; font-weight: 600; }
-.nav-item:hover { color: #2f3540; background: rgba(255,255,255,.94); }
-.nav-item.active { color: white; border-color: rgba(255,255,255,.55); background: linear-gradient(120deg, #2a72f5, #7c5df8); box-shadow: inset 0 1px rgba(255,255,255,.34), 0 10px 24px -16px rgba(65,87,246,.8); }
-.nav-signature { display: flex; flex: none; align-items: center; gap: 7px; padding-right: 8px; color: #747a84; font-size: 10px; font-weight: 600; }
-.nav-signature svg { width: 14px; height: 14px; }
+.horizontal-nav-items { display: flex; align-items: center; gap: 4px; }
+.nav-item { width: auto; flex: none; gap: 7px; border-radius: 9px; padding: 9px 12px; color: #64748b; font-size: 12px; font-weight: 550; }
+.nav-item:hover { color: #263a5a; background: #eaf0f9; }
+.nav-item.active { color: #1d5dc4; border-color: transparent; background: #e5edfc; box-shadow: none; }
+.nav-item.active svg { color: #2563eb; }
 
 .provider-tabs {
   display: grid;
@@ -414,26 +355,29 @@ button { font: inherit; }
 .provider-tab .count { color: #27303f; background: rgba(61,108,220,.1); }
 .provider-tab.active .count { color: white; background: rgba(255,255,255,.17); }
 
-.status-strip { margin-top: 11px; border-radius: 19px; background: rgba(250,251,255,.94); }
-.status-cell { padding: 12px 14px; border-right-color: rgba(93,107,137,.11); }
-.status-name { color: #707681; }
+.status-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 12px 0; border: 1px solid #e0e7f0; border-radius: 12px; background: #fff; box-shadow: none; }
+.status-cell { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-right-color: #e8ecf3; }
+.status-cell > div { flex: none; }
+.status-cell > div > svg, .status-cell > span { display: none; }
+.status-cell p { margin-top: 0; margin-left: auto; }
+.status-name { color: #64748b; font-size: 11px; font-weight: 500; letter-spacing: 0; }
 .status-cell p { color: #252a32; }
 .status-cell > span { color: #777d88; }
 .status-cell svg { color: #858c98 !important; }
 .status-dot { background: #b9bec7; box-shadow: 0 0 0 3px rgba(128,136,150,.08); }
 .status-dot.online { background: #2fc36b; box-shadow: 0 0 9px rgba(47,195,107,.3), 0 0 0 3px rgba(47,195,107,.08); }
 
-.page-content { margin-top: 11px; }
+.page-content { margin-top: 12px; }
 .content-grid { grid-template-columns: minmax(0, 1.7fr) minmax(285px, .66fr); gap: 12px; }
-.glass-card { border-color: rgba(255,255,255,.98) !important; background: rgba(250,251,255,.96); box-shadow: inset 0 1px rgba(255,255,255,.98), 0 18px 42px -33px rgba(55,67,104,.42); }
+.glass-card { border-color: #e0e7f0 !important; background: #fff; box-shadow: 0 2px 8px rgba(30,50,80,.025); }
 .glass-card::before { display: none; }
-.app-shell .glass-card h2, .app-shell .glass-card h3, .app-shell .glass-card .text-white { color: #23272f !important; }
+.app-shell .glass-card h2, .app-shell .glass-card h3, .app-shell .glass-card .text-white:not(button) { color: #23272f !important; }
 .app-shell .glass-card .text-slate-100, .app-shell .glass-card .text-slate-200, .app-shell .glass-card .text-slate-300 { color: #4f5662 !important; }
 .app-shell .glass-card .text-slate-400, .app-shell .glass-card .text-slate-500, .app-shell .glass-card .text-slate-600 { color: #777e89 !important; }
 .app-shell .glass-card .text-sky-300\/80, .app-shell .glass-card .text-sky-300 { color: #276df2 !important; }
 
 .overview-metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; margin-bottom: 14px; }
-.overview-metrics > div { min-width: 0; border: 1px solid rgba(102,117,150,.15); border-radius: 15px; padding: 11px 12px; background: rgba(255,255,255,.96); box-shadow: inset 0 1px rgba(255,255,255,.98); }
+.overview-metrics > div { min-width: 0; border: 1px solid rgba(102,117,150,.15); border-radius: 10px; padding: 10px 11px; background: #f8fafc; box-shadow: none; }
 .overview-metrics > div p:first-child { color: #767c87; }
 .overview-metrics > div p:last-child { overflow: hidden; color: #272c34; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
 .quota-tile, .account-card, .connector-card, .protocol-row, .route-card, .setting-row, .auth-waiting {
@@ -447,7 +391,7 @@ button { font: inherit; }
 .quota-icon, .action-icon, .protocol-icon, .connector-icon { border-color: rgba(61,113,234,.17); color: #2770ef; background: linear-gradient(145deg, rgba(76,143,255,.14), rgba(100,93,244,.07)); }
 .action-row { border-color: rgba(105,119,151,.17); color: #252a32; background: rgba(255,255,255,.96); }
 .action-row:hover { border-color: rgba(62,104,223,.25); background: rgba(255,255,255,.99); }
-.action-row.primary { color: white; border-color: rgba(255,255,255,.48); background: linear-gradient(115deg, #2977f5, #2e65e8 64%, #6554ed); box-shadow: 0 13px 30px -20px rgba(43,96,237,.8); }
+.action-row.primary { color: white; border-color: rgba(255,255,255,.48); background: #2563eb; box-shadow: none; }
 .action-row small { color: #747b86; }
 .action-row.primary small { color: rgba(255,255,255,.76); }
 .action-row > svg { color: #606976; }
@@ -514,12 +458,15 @@ button { font: inherit; }
 .widget-provider-tabs button.active em { color: white; background: rgba(255,255,255,.17); }
 .widget-account strong, .widget-gauge-header strong, .widget-credit > strong, .widget-stats strong { color: #292e37; }
 
-/* Electron delegates the expensive desktop blur to Windows DWM. Keeping the
-   renderer translucent but filter-free prevents repaints while moving/scrolling. */
+/* Native windows keep transparent edges without expensive renderer blur. */
 .electron-shell .app-shell,
 .electron-shell .widget-shell {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+.electron-shell .widget-shell {
+  background: linear-gradient(145deg, #f3f6fc, #e5ecf9);
+  box-shadow: inset 0 1px rgba(255,255,255,.96);
 }
 .electron-shell .window-chrome,
 .electron-shell .widget-header {
@@ -536,14 +483,6 @@ button { font: inherit; }
   contain: layout paint style;
   transform: translateZ(0);
   will-change: scroll-position;
-}
-.electron-shell .mac-brand-bar,
-.electron-shell .horizontal-nav,
-.electron-shell .provider-tabs,
-.electron-shell .status-strip,
-.electron-shell .glass-card,
-.electron-shell .mac-meta-row {
-  box-shadow: inset 0 1px rgba(255,255,255,.96);
 }
 .electron-shell .liquid-orb,
 .electron-shell .widget-orb,
@@ -563,10 +502,41 @@ button { font: inherit; }
 .widget-gauge-header > span, .widget-credit > span, .widget-stats span { color: #707885; }
 .widget-footer button { color: white; border-color: rgba(255,255,255,.52); background: linear-gradient(120deg, #367cf0, #5964e7); }
 
+.account-workspace { display: grid; gap: 16px; }
+.google-account-guide { grid-column: 1 / -1; padding: 16px 18px; border: 1px solid #d7e3f7; border-radius: 14px; background: #f2f6ff; color: #25364f; }
+.google-account-guide.needs-verification { border-color: #ead3a1; background: linear-gradient(125deg, #fffdf5, #fff5df); }
+.guide-heading { display: flex; align-items: center; gap: 12px; cursor: pointer; list-style: none; }
+.guide-heading::-webkit-details-marker { display: none; }
+.guide-heading:focus-visible { outline: 2px solid #2563eb; outline-offset: 5px; border-radius: 8px; }
+.guide-heading > div { flex: 1; min-width: 0; }
+.guide-heading h2 { margin: 0; font-size: 14px; font-weight: 650; }
+.guide-heading p, .guide-steps p { margin: 5px 0 0; color: #596b83; font-size: 12px; line-height: 1.7; }
+.guide-icon { display: grid; width: 40px; height: 40px; flex: none; place-items: center; border-radius: 13px; color: #2868d3; background: #e1ecff; }
+.guide-icon svg { width: 21px; height: 21px; }
+.guide-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin: 18px 0; padding: 0; list-style: none; }
+.guide-steps li { display: flex; align-items: flex-start; gap: 10px; }
+.guide-steps li > span { display: grid; width: 25px; height: 25px; flex: none; place-items: center; border: 1px solid #cddaf0; border-radius: 50%; font-size: 12px; color: #3568b6; background: white; }
+.guide-steps strong { font-size: 13px; }
+.guide-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.guide-note { margin: 12px 0 0; font-size: 11px; line-height: 1.75; color: #65758a; }
+.account-card.verification-card { border-color: #e8c78b; background: #fffcf4; }
+.account-card .account-status-message { margin-top: 12px; color: #875b23; font-size: 12px; line-height: 1.75; overflow-wrap: anywhere; }
+@media (max-width: 800px) {
+  .guide-steps { grid-template-columns: 1fr; gap: 13px; }
+  .guide-heading { align-items: flex-start; flex-wrap: wrap; }
+}
+
 @media (max-width: 1050px) {
   .main-panel { padding-inline: 20px; }
   .nav-item { padding-inline: 10px; }
-  .nav-signature { display: none; }
   .content-grid { grid-template-columns: minmax(0,1.35fr) minmax(260px,.72fr); }
+  .overview-metrics { gap: 6px; }
+  .overview-metrics > div { padding-inline: 9px; }
+}
+
+@media (max-width: 740px) {
+  .header-account-count { display: none; }
+  .content-grid { grid-template-columns: 1fr; }
   .overview-metrics { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .status-cell { padding-inline: 10px; gap: 8px; }
 }

@@ -15,6 +15,7 @@ interface ZCodeNativeBridge {
   }): Promise<void>;
   showMainWindow(): Promise<void>;
   openXaiVerificationURL(url: string): Promise<void>;
+  openGoogleHelp(page: "download" | "verification"): Promise<void>;
   windowAction(action: DesktopWindowAction): Promise<void>;
   writeClipboard(value: string): Promise<void>;
   onRefresh(callback: () => void): void;

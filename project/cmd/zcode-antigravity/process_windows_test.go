@@ -3,9 +3,26 @@
 package main
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 )
+
+func TestAntigravityApplicationPathFindsUserInstallation(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("LOCALAPPDATA", root)
+	executable := filepath.Join(root, "Programs", "Antigravity", "Antigravity.exe")
+	if err := os.MkdirAll(filepath.Dir(executable), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(executable, []byte("test fixture"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if got := antigravityApplicationPath(); got != executable {
+		t.Fatalf("application path = %q, want %q", got, executable)
+	}
+}
 
 func TestPrepareChildProcessPreventsConsoleWindows(t *testing.T) {
 	cmd := exec.Command("cmd.exe", "/c", "exit", "0")

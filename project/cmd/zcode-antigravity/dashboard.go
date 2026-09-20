@@ -452,8 +452,12 @@ func (g *guiRuntime) serveAction(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "Grok 模型默认关闭；请先在设置中开启 Grok 模型"})
 		return
 	}
-	if action == "open-zcode" {
-		if errOpen := openZCodeApplication(); errOpen != nil {
+	if action == "open-zcode" || action == "open-antigravity" {
+		openApplication := openZCodeApplication
+		if action == "open-antigravity" {
+			openApplication = openAntigravityApplication
+		}
+		if errOpen := openApplication(); errOpen != nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": errOpen.Error()})
 			return
 		}

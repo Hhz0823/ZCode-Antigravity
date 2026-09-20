@@ -18,13 +18,14 @@ import (
 // managerReport is the native UI's privacy-safe management model. Credentials,
 // raw prompts and response bodies are deliberately never included.
 type managerReport struct {
-	Version   string                `json:"version"`
-	Accounts  []managerAccount      `json:"accounts"`
-	Proxy     managerProxy          `json:"proxy"`
-	Routing   managerRouting        `json:"routing"`
-	Settings  managerPublicSettings `json:"settings"`
-	Features  []managerFeature      `json:"features"`
-	UpdatedAt time.Time             `json:"updatedAt"`
+	Version              string                `json:"version"`
+	AntigravityInstalled bool                  `json:"antigravityInstalled"`
+	Accounts             []managerAccount      `json:"accounts"`
+	Proxy                managerProxy          `json:"proxy"`
+	Routing              managerRouting        `json:"routing"`
+	Settings             managerPublicSettings `json:"settings"`
+	Features             []managerFeature      `json:"features"`
+	UpdatedAt            time.Time             `json:"updatedAt"`
 }
 
 type managerAccount struct {
@@ -109,9 +110,10 @@ func (g *guiRuntime) managerReport() managerReport {
 	cfg := g.app.currentSettings()
 	accounts, _ := readManagerAccounts(g.app.paths.AuthDir)
 	report := managerReport{
-		Version:   version,
-		Accounts:  accounts,
-		UpdatedAt: time.Now().UTC(),
+		Version:              version,
+		AntigravityInstalled: antigravityApplicationPath() != "",
+		Accounts:             accounts,
+		UpdatedAt:            time.Now().UTC(),
 		Proxy: managerProxy{Protocols: []managerProtocol{
 			{Name: "OpenAI", Path: "/v1/chat/completions", Description: "Chat Completions / Responses 兼容"},
 			{Name: "Anthropic", Path: "/v1/messages", Description: "Claude Code 原生消息协议"},
@@ -263,9 +265,8 @@ func readManagerAccounts(dir string) ([]managerAccount, error) {
 		if disabled, _ := metadata["disabled"].(bool); disabled {
 			status = "disabled"
 		}
-		stableID := sha256.Sum256([]byte(entry.Name()))
 		accounts = append(accounts, managerAccount{
-			ID: provider + "-" + fmt.Sprintf("%x", stableID[:6]), Provider: provider, Label: redactAccountLabel(label), Plan: plan,
+			ID: managerAccountID(provider, entry.Name()), Provider: provider, Label: redactAccountLabel(label), Plan: plan,
 			Status: status, Updated: info.ModTime().UTC(),
 		})
 	}
@@ -276,6 +277,14 @@ func readManagerAccounts(dir string) ([]managerAccount, error) {
 		return accounts[i].Updated.After(accounts[j].Updated)
 	})
 	return accounts, nil
+}
+
+func managerAccountID(provider, name string) string {
+	if name == "" {
+		return ""
+	}
+	digest := sha256.Sum256([]byte(filepath.Base(name)))
+	return provider + "-" + fmt.Sprintf("%x", digest[:6])
 }
 
 func firstMetadataString(metadata map[string]any, keys ...string) string {
